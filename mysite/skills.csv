@@ -1,0 +1,326 @@
+﻿Name,Type,Rating,Checked
+.Net,Language,0,TRUE
+Actuarial Science,Domain,0,TRUE
+Adobe Acrobat,Technology,2,TRUE
+Agda,Language,0,TRUE
+Agile Methdology,Domain,0,TRUE
+Akka,Technology,0,TRUE
+Algorithms,Domain,5,TRUE
+Amazon RDS,Technology,4,TRUE
+Amazon Redshift,Technology,0,TRUE
+Amazon Web Services (AWS),Technology,3,TRUE
+Analysis of Variance (ANOVA),Domain,0,TRUE
+Apache Airflow,Technology,0,TRUE
+Apache Hadoop,Technology,0,TRUE
+Apache Hive,Technology,0,TRUE
+Apache Spark,Technology,0,TRUE
+Applied Mathematics,Domain,3,TRUE
+Artificial Intelligence (AI),Domain,3,TRUE
+AWS Glue,Technology,0,TRUE
+AWS Lambda,Technology,0,TRUE
+Azure Data Factory (ADF),Technology,0,TRUE
+Azure Machine Learning,Technology,0,TRUE
+B-Trees,Domain,0,TRUE
+Bash,Language,1,TRUE
+BigQuery,Technology,0,TRUE
+BigTable,Technology,0,TRUE
+Bitbucket,Technology,0,TRUE
+Bitcoin,Technology,0,TRUE
+Blockchains,Technology,0,TRUE
+Bootstrap,Technology,2,TRUE
+Business Intelligence (BI),Technology,0,TRUE
+C,Language,0,TRUE
+C#,Language,0,TRUE
+C++,Language,0,TRUE
+Cassandra,Technology,0,TRUE
+Category Theory,Domain,1,TRUE
+CI/CD Pipelines,Domain,0,TRUE
+Cirq,Technology,0,TRUE
+Classification,Domain,4,TRUE
+Clojure,Language,0,TRUE
+Cloud Computing,Domain,1,TRUE
+Cloudera,Technology,0,TRUE
+Clustering,Domain,2,TRUE
+Combinatorial Optimization,Domain,3,TRUE
+Command-Line Interface,Domain,3,TRUE
+Computer Science,Domain,4,TRUE
+Constraint Programming,Domain,2,TRUE
+Containerization,Domain,0,TRUE
+Convex Optimization,Domain,3,TRUE
+Cryptocurrency,Domain,0,TRUE
+Cryptography,Domain,0,TRUE
+CSS,Language,3,TRUE
+Dagster,Technology,0,TRUE
+Dart,Technology,0,TRUE
+Data Analysis,Domain,1,TRUE
+Data Architecture,Domain,1,TRUE
+Data Cleaning,Domain,2,TRUE
+Data Engineering,Domain,3,TRUE
+Data Governance,Domain,0,TRUE
+Data Lakes,Domain,1,TRUE
+Data Marts,Domain,0,TRUE
+Data Mining,Domain,2,TRUE
+Data Modeling,Domain,3,TRUE
+Data Pipelines,Domain,2,TRUE
+Data Reporting,Domain,3,TRUE
+Data Science,Domain,3,TRUE
+Data Structures,Domain,4,TRUE
+Data Visualization,Domain,3,TRUE
+Data Warehouse,Domain,1,TRUE
+Database Design,Domain,3,TRUE
+Database Systems,Domain,4,TRUE
+Databricks,Technology,0,TRUE
+Datadog,Technology,0,TRUE
+DBT,Technology,0,TRUE
+Decision Trees,Domain,2,TRUE
+Deep Learning,Domain,4,TRUE
+DevOps,Domain,1,TRUE
+Directed Acyclic Graphs (DAGs),Domain,1,TRUE
+Discord,Technology,2,TRUE
+Distributed Systems,Domain,0,TRUE
+Divide-and-Conquer,Domain,3,TRUE
+Django,Technology,4,TRUE
+Docker,Technology,0,TRUE
+Druid,Technology,0,TRUE
+Dynamic Programming,Domain,4,TRUE
+DynamoDB,Technology,0,TRUE
+E/R Model,Domain,4,TRUE
+EC2,Technology,1,TRUE
+Erlang,Language,0,TRUE
+ETL/ELT Pipelines,Domain,2,TRUE
+Exploratory Data Analysis,Domain,1,TRUE
+FastAPI,Technology,0,TRUE
+Feature Engineering,Domain,1,TRUE
+FinTech,Domain,0,TRUE
+Flask,Technology,0,TRUE
+Flink,Technology,0,TRUE
+Flume,Technology,0,TRUE
+Formal Verification,Domain,0,TRUE
+Fraud,Domain,0,TRUE
+Functional Programming,Domain,4,TRUE
+Game Theory,Domain,3,TRUE
+Generalized Linear Models,Domain,2,TRUE
+Generative AI,Domain,2,TRUE
+Git,Technology,3,TRUE
+GitHub,Technology,4,TRUE
+GitHub Pages,Technology,1,TRUE
+GitLab,Technology,0,TRUE
+Go/Golang,Language,0,TRUE
+Google Cloud (GCP),Technology,0,TRUE
+Gradient Boosting,Domain,1,TRUE
+Gradient Descent,Domain,3,TRUE
+Gradle,Technology,0,TRUE
+Graph Databases,Domain,0,TRUE
+Graph Neural Networks,Domain,3,TRUE
+Graph Theory,Domain,3,TRUE
+GraphQL,Technology,0,TRUE
+Haskell,Language,1,TRUE
+HBASE,Technology,0,TRUE
+Hibernate,Technology,0,TRUE
+HTML,Language,3,TRUE
+HTML5,Language,0,TRUE
+IBM DB2,Technology,1,TRUE
+IBM Watson,Technology,1,TRUE
+Idris,Language,0,TRUE
+Informatica,Technology,0,TRUE
+Integer Programming,Domain,2,TRUE
+Inventory Control,Domain,1,TRUE
+Java,Language,2,TRUE
+JavaScript,Language,2,TRUE
+Jenkins,Technology,0,TRUE
+JIRA,Technology,0,TRUE
+JSON,Technology,2,TRUE
+Julia,Language,2,TRUE
+Jupyter Notebooks,Technology,2,TRUE
+K-Means Clustering,Domain,3,TRUE
+K-Nearest Neighbors (kNN),Domain,3,TRUE
+Kafka,Technology,0,TRUE
+Kanban,Technology,2,TRUE
+Keras,Technology,0,TRUE
+Kinesis,Technology,0,TRUE
+Kotlin,Language,0,TRUE
+KQL,Technology,0,TRUE
+Kubernetes,Technology,0,TRUE
+Lambda Calculus,Domain,0,TRUE
+Large Language Models (LLMs),Domain,3,TRUE
+LaTeX,Language,4,TRUE
+ldap3,Technology,2,TRUE
+Linear Algebra,Domain,4,TRUE
+Linear Programming/Optimization,Domain,3,TRUE
+Linear Regression,Domain,3,TRUE
+Linux,Technology,1,TRUE
+Lisp,Language,0,TRUE
+Logic,Domain,3,TRUE
+Logistic Regression,Domain,3,TRUE
+Logistics,Domain,2,TRUE
+Long Short Term Memory (LSTM) Networks,Domain,2,TRUE
+Looker,Technology,0,TRUE
+Lucid,Technology,3,TRUE
+Machine Learning,Domain,4,TRUE
+MapReduce,Technology,0,TRUE
+Markdown,Language,3,TRUE
+Market Basket Analysis,Domain,1,TRUE
+Markov Models,Domain,1,TRUE
+Mathematica,Language,0,TRUE
+Mathematical Modeling,Domain,2,TRUE
+Mathematical Optimization,Domain,4,TRUE
+Mathematics,Domain,5,TRUE
+MATLAB,Language,2,TRUE
+Matplotlib,Technology,3,TRUE
+Maven,Technology,0,TRUE
+Microsoft Azure,Technology,0,TRUE
+Microsoft Office Suite,Technology,2,TRUE
+Microsoft SQL Server,Technology,3,TRUE
+Mixed Integer Programming,Domain,0,TRUE
+ML Pipelines,Domain,0,TRUE
+MLflow,Technology,0,TRUE
+MLib,Technology,0,TRUE
+MLOPS,Domain,0,TRUE
+Mojo,Technology,0,TRUE
+MongoDB,Technology,1,TRUE
+Monte-Carlo Simulation,Domain,1,TRUE
+MuleSoft,Technology,0,TRUE
+Multiple Linear Regression,Domain,1,TRUE
+MySQL,Technology,0,TRUE
+Naive Bayes,Domain,4,TRUE
+Natural Language Processing (NLP),Domain,0,TRUE
+Network Flows,Domain,3,TRUE
+Neural Networks,Domain,4,TRUE
+Nifi,Technology,0,TRUE
+Nonlinear Programming/Optimization,Domain,1,TRUE
+NoSQL,Domain,1,TRUE
+Notion Productivity Software,Technology,4,TRUE
+Numpy,Technology,4,TRUE
+Object-Oriented Programming (OOP),Domain,5,TRUE
+Object-Relational Mapping,Domain,2,TRUE
+Objective C,Language,0,TRUE
+OCaml,Language,0,TRUE
+Oozie,Technology,0,TRUE
+OpenVINO,Technology,0,TRUE
+Operations Research,Domain,1,TRUE
+Oracle,Technology,1,TRUE
+Orchestration Tools,Domain,0,TRUE
+Pandas,Technology,5,TRUE
+Parallel/Distributed Computing,Domain,0,TRUE
+Parquet,Technology,1,TRUE
+Perl,Language,0,TRUE
+PHP,Language,0,TRUE
+Pig,Technology,0,TRUE
+Play,Technology,0,TRUE
+PostgreSQL,Technology,4,TRUE
+Power BI,Technology,0,TRUE
+PowerShell,Language,3,TRUE
+Predictive Modeling,Domain,2,TRUE
+Principal Component Analysis,Domain,2,TRUE
+Probability Theory,Domain,3,TRUE
+Prophet,Technology,0,TRUE
+PyCharm,Technology,4,TRUE
+pyodbc,Technology,0,TRUE
+PyQuil,Technology,0,TRUE
+PySpark,Technology,0,TRUE
+Python,Language,5,TRUE
+Pytorch,Technology,0,TRUE
+Q-Learning,Domain,3,TRUE
+Queing Theory,Domain,1,TRUE
+Query Optimization,Domain,0,TRUE
+QuickBooks Online,Technology,1,TRUE
+Quiskit,Technology,0,TRUE
+R,Language,1,TRUE
+Random Forest,Domain,0,TRUE
+Ray,Technology,0,TRUE
+React,Technology,0,TRUE
+Reactive Programming,Domain,0,TRUE
+Recommender Systems,Domain,1,TRUE
+Recurrent Neural Networks (RNNs),Domain,1,TRUE
+Redis,Technology,1,TRUE
+Regression,Domain,3,TRUE
+Reinforcement Learning,Domain,3,TRUE
+Relational Algebra,Domain,4,TRUE
+Relational Calculus,Domain,2,TRUE
+Relational Databases,Domain,5,TRUE
+REST APIs,Domain,2,TRUE
+Retrieval Augmented Generation (RAG),Domain,1,TRUE
+Ruby,Language,0,TRUE
+Rust,Language,0,TRUE
+Sagemaker,Technology,0,TRUE
+Salesforce,Technology,2,TRUE
+SAS,Language,0,TRUE
+SBT,Technology,0,TRUE
+Scala,Language,3,TRUE
+Scala with Cats,Technology,0,TRUE
+Scalaz,Technology,0,TRUE
+Scheduling Algorithms,Domain,1,TRUE
+Scikit-Learn,Technology,2,TRUE
+SCIPy,Technology,1,TRUE
+Scrum Methodology,Domain,0,TRUE
+Seaborn,Technology,1,TRUE
+Service-Oriented Architecture (SOA),Domain,0,TRUE
+Set Theory,Domain,4,TRUE
+Shiny,Technology,0,TRUE
+Simulation Modeling,Domain,1,TRUE
+Singular Value Decomposition,Domain,3,TRUE
+Slack,Technology,2,TRUE
+Smart Contracts,Domain,0,TRUE
+Snowflake,Technology,0,TRUE
+Snowflake Schema,Domain,0,TRUE
+Social Networks,Domain,0,TRUE
+Software as a Service (SaaS),Domain,1,TRUE
+Software Design/Development,Domain,3,TRUE
+Software Engineering,Domain,3,TRUE
+Solidity,Technology,0,TRUE
+Spark SQL,Technology,0,TRUE
+Spark-Streaming,Technology,0,TRUE
+Spring,Technology,0,TRUE
+Spring Boot,Technology,0,TRUE
+SQL,Language,5,TRUE
+SQLite,Technology,4,TRUE
+Sqoop,Technology,0,TRUE
+Standard ML,Technology,0,TRUE
+Star Schema,Domain,0,TRUE
+Stata,Language,0,TRUE
+Statistics,Domain,2,TRUE
+Stochastic Programming,Domain,0,TRUE
+Streaming,Domain,0,TRUE
+Supervised Learning,Domain,4,TRUE
+Supply Chain,Domain,0,TRUE
+Support Vector Machines,Domain,2,TRUE
+Swift,Technology,0,TRUE
+Synapse,Technology,0,TRUE
+System Design,Domain,1,TRUE
+T-SQL,Technology,0,TRUE
+Tableau,Technology,0,TRUE
+Teaching,Domain,1,TRUE
+Technical Debt,Domain,0,TRUE
+Technical Writing,Domain,1,TRUE
+Tensor Algebra,Domain,1,TRUE
+TensorFlow,Technology,0,TRUE
+Teradata,Technology,0,TRUE
+Terraform,Technology,0,TRUE
+Text Mining,Domain,0,TRUE
+Trello,Technology,1,TRUE
+Tutorial D,Language,0,TRUE
+Tutoring,Domain,2,TRUE
+Type Classes,Domain,3,TRUE
+Type Theory,Domain,0,TRUE
+Typelevel.Scala,Technology,0,TRUE
+TypeScript,Language,0,TRUE
+Ubuntu,Technology,2,TRUE
+Unit Testing,Domain,0,TRUE
+Unix,Technology,0,TRUE
+Unsupervised Learning,Domain,3,TRUE
+VBA,Language,0,TRUE
+Vector Databases,Domain,0,TRUE
+Version Control,Domain,3,TRUE
+Vertex.AI,Technology,0,TRUE
+Virtualization,Technology,0,TRUE
+Visual Studio Code,Technology,1,TRUE
+VisualBasic,Technology,0,TRUE
+Voting Systems,Domain,2,TRUE
+Vue,Technology,0,TRUE
+Web Design/Development,Domain,3,TRUE
+Web Scraping,Domain,1,TRUE
+Written Communication,Domain,3,TRUE
+XGBoost,Technology,0,TRUE
+XML,Technology,0,TRUE
+ZIO,Technology,0,TRUE
+Zoom,Technology,2,TRUE
