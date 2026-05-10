@@ -7,7 +7,10 @@ from .models import Skill
 class SkillForm(forms.ModelForm):
     class Meta:
         model = Skill
-        fields = ["name", "type", "rating"]
+        fields = ["name", "type", "rating", "updated"]
+        widgets = {
+            "updated": forms.DateInput(attrs={"type": "date"}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

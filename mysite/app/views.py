@@ -1,5 +1,6 @@
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
+from django.db.models import F
 
 from .forms import SkillForm, SkillFormSet
 from .models import Skill
@@ -7,7 +8,11 @@ from .models import Skill
 
 def skill_formset_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    paginator = Paginator(Skill.objects.all().order_by("id"), 9)
+    queryset = Skill.objects.all().order_by(
+        F("updated").asc(nulls_first=True),
+        "name",
+    )
+    paginator = Paginator(queryset, 9)
     page_obj = paginator.get_page(page_number)
     page_queryset = page_obj.object_list
 

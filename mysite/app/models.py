@@ -22,7 +22,7 @@ class Skill(models.Model):
         ],
     )
 
+    updated = models.DateField(blank=True, null=True)
+
     def __str__(self):
         return f"{self.name} ({self.rating}/5)"
-
-
