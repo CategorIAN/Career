@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Skill Formset</title>
+</head>
+<body>
+    <h1>Skill Formset</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ formset.management_form }}
+        <table border="1" cellpadding="8" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Rating</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in formset %}
+                    <tr>
+                        {% for hidden in form.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+                        <td>
+                            {{ form.name.errors }}
+                            {{ form.name }}
+                        </td>
+                        <td>
+                            {{ form.type.errors }}
+                            {{ form.type }}
+                        </td>
+                        <td>
+                            {{ form.rating.errors }}
+                            {{ form.rating }}
+                        </td>
+                        <td>{{ form.DELETE }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>
