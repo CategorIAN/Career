@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Career{% endblock %}</title>
+</head>
+<body>
+    <nav style="display: flex; gap: 0.5rem; width: 100%; padding: 0.2rem 0.5rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem; box-sizing: border-box;">
+        <a href="{% url 'skill-formset' %}" style="padding: 0.2rem 0.5rem; border: 1px solid #888; text-decoration: none;">Skill Table</a>
+        <a href="{% url 'blank-page' %}" style="padding: 0.2rem 0.5rem; border: 1px solid #888; text-decoration: none;">Blank Page</a>
+    </nav>
+
+    {% block content %}{% endblock %}
+</body>
+</html>

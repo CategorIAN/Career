@@ -1,82 +1,77 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Skill Formset</title>
-</head>
-<body>
-    <h1>Skill Formset</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{ formset.management_form }}
-        <input type="hidden" name="page" value="{{ page_obj.number }}">
-        <table border="1" cellpadding="8" cellspacing="0">
-            <thead>
+{% extends "app/base.html" %}
+
+{% block title %}Skill Formset{% endblock %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <input type="hidden" name="page" value="{{ page_obj.number }}">
+    <table border="1" cellpadding="8" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Rating</th>
+                <th>Updated</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    {{ new_form.name.errors }}
+                    {{ new_form.name }}
+                </td>
+                <td>
+                    {{ new_form.type.errors }}
+                    {{ new_form.type }}
+                </td>
+                <td>
+                    {{ new_form.rating.errors }}
+                    {{ new_form.rating }}
+                </td>
+                <td>
+                    {{ new_form.updated.errors }}
+                    {{ new_form.updated }}
+                </td>
+                <td>New</td>
+            </tr>
+            {% for form in formset %}
                 <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Rating</th>
-                    <th>Updated</th>
-                    <th>Delete</th>
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+                    <td>
+                        {{ form.name.errors }}
+                        {{ form.name }}
+                    </td>
+                    <td>
+                        {{ form.type.errors }}
+                        {{ form.type }}
+                    </td>
+                    <td>
+                        {{ form.rating.errors }}
+                        {{ form.rating }}
+                    </td>
+                    <td>
+                        {{ form.updated.errors }}
+                        {{ form.updated }}
+                    </td>
+                    <td>{{ form.DELETE }}</td>
                 </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>
-                        {{ new_form.name.errors }}
-                        {{ new_form.name }}
-                    </td>
-                    <td>
-                        {{ new_form.type.errors }}
-                        {{ new_form.type }}
-                    </td>
-                    <td>
-                        {{ new_form.rating.errors }}
-                        {{ new_form.rating }}
-                    </td>
-                    <td>
-                        {{ new_form.updated.errors }}
-                        {{ new_form.updated }}
-                    </td>
-                    <td>New</td>
-                </tr>
-                {% for form in formset %}
-                    <tr>
-                        {% for hidden in form.hidden_fields %}
-                            {{ hidden }}
-                        {% endfor %}
-                        <td>
-                            {{ form.name.errors }}
-                            {{ form.name }}
-                        </td>
-                        <td>
-                            {{ form.type.errors }}
-                            {{ form.type }}
-                        </td>
-                        <td>
-                            {{ form.rating.errors }}
-                            {{ form.rating }}
-                        </td>
-                        <td>
-                            {{ form.updated.errors }}
-                            {{ form.updated }}
-                        </td>
-                        <td>{{ form.DELETE }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <button type="submit">Save</button>
-    </form>
-    <div style="margin-top: 1rem;">
-        {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
-        {% endif %}
-        <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}">Next</a>
-        {% endif %}
-    </div>
-</body>
-</html>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Save</button>
+</form>
+<div style="margin-top: 1rem;">
+    {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+</div>
+{% endblock %}

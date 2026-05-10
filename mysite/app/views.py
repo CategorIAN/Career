@@ -12,7 +12,7 @@ def skill_formset_view(request):
         F("updated").asc(nulls_first=True),
         "name",
     )
-    paginator = Paginator(queryset, 9)
+    paginator = Paginator(queryset, 8)
     page_obj = paginator.get_page(page_number)
     page_queryset = page_obj.object_list
 
@@ -42,3 +42,7 @@ def skill_formset_view(request):
             "page_obj": page_obj,
         },
     )
+
+
+def blank_page_view(request):
+    return render(request, "app/blank_page.html")
