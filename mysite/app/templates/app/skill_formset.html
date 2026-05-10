@@ -10,6 +10,7 @@
     <form method="post">
         {% csrf_token %}
         {{ formset.management_form }}
+        <input type="hidden" name="page" value="{{ page_obj.number }}">
         <table border="1" cellpadding="8" cellspacing="0">
             <thead>
                 <tr>
@@ -20,6 +21,21 @@
                 </tr>
             </thead>
             <tbody>
+                <tr>
+                    <td>
+                        {{ new_form.name.errors }}
+                        {{ new_form.name }}
+                    </td>
+                    <td>
+                        {{ new_form.type.errors }}
+                        {{ new_form.type }}
+                    </td>
+                    <td>
+                        {{ new_form.rating.errors }}
+                        {{ new_form.rating }}
+                    </td>
+                    <td>New</td>
+                </tr>
                 {% for form in formset %}
                     <tr>
                         {% for hidden in form.hidden_fields %}
@@ -44,5 +60,14 @@
         </table>
         <button type="submit">Save</button>
     </form>
+    <div style="margin-top: 1rem;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+    </div>
 </body>
 </html>

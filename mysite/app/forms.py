@@ -9,10 +9,22 @@ class SkillForm(forms.ModelForm):
         model = Skill
         fields = ["name", "type", "rating"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+    def clean_name(self):
+        return self.cleaned_data.get("name") or ""
+
+    def clean_rating(self):
+        rating = self.cleaned_data.get("rating")
+        return 0 if rating in (None, "") else rating
+
 
 SkillFormSet = modelformset_factory(
     Skill,
     form=SkillForm,
-    extra=1,
+    extra=0,
     can_delete=True,
 )

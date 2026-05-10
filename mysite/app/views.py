@@ -1,16 +1,39 @@
 from django.shortcuts import redirect, render
+from django.core.paginator import Paginator
 
-from .forms import SkillFormSet
+from .forms import SkillForm, SkillFormSet
 from .models import Skill
 
 
 def skill_formset_view(request):
-    if request.method == "POST":
-        formset = SkillFormSet(request.POST, queryset=Skill.objects.all())
-        if formset.is_valid():
-            formset.save()
-            return redirect("skill-formset")
-    else:
-        formset = SkillFormSet(queryset=Skill.objects.all())
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    paginator = Paginator(Skill.objects.all().order_by("id"), 9)
+    page_obj = paginator.get_page(page_number)
+    page_queryset = page_obj.object_list
 
-    return render(request, "app/skill_formset.html", {"formset": formset})
+    if request.method == "POST":
+        new_form = SkillForm(request.POST, prefix="new")
+        formset = SkillFormSet(request.POST, queryset=page_queryset)
+        new_form_has_data = new_form.has_changed()
+        is_new_form_valid = new_form.is_valid() if new_form_has_data else True
+        is_formset_valid = formset.is_valid()
+
+        if is_new_form_valid and new_form_has_data:
+            new_form.save()
+
+        if is_formset_valid and is_new_form_valid:
+            formset.save()
+            return redirect(f"{request.path}?page={page_obj.number}")
+    else:
+        new_form = SkillForm(prefix="new")
+        formset = SkillFormSet(queryset=page_queryset)
+
+    return render(
+        request,
+        "app/skill_formset.html",
+        {
+            "new_form": new_form,
+            "formset": formset,
+            "page_obj": page_obj,
+        },
+    )
