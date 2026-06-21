@@ -28,6 +28,16 @@ class Skill(models.Model):
         return f"{self.name} ({self.rating}/5)"
 
 
+class FreelancerSkill(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100)
+    category_id = models.IntegerField(null=True, blank=True)
+    category_name = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Project(models.Model):
     freelancer_id = models.BigIntegerField(unique=True)
 
@@ -59,6 +69,12 @@ class Project(models.Model):
 
     imported_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    freelancer_skills = models.ManyToManyField(
+        FreelancerSkill,
+        related_name="projects",
+        blank=True,
+    )
 
     def __str__(self):
         return self.title

@@ -11,19 +11,42 @@
     <button type="submit">Search</button>
 </form>
 
-{% for project in projects %}
-    <h3>{{ project.title }}</h3>
+<table>
+    <tr>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Type</th>
+        <th>Budget</th>
+        <th>Bids</th>
+        <th>Skills</th>
+    </tr>
 
-    <p>
-        {{ project.budget.minimum }}
-        -
-        {{ project.budget.maximum }}
-    </p>
+    {% for project in projects %}
+    <tr>
+        <td>
+            <details>
+                <summary>{{ project.title }}</summary>
+                <p>{{ project.description|default:"No description returned." }}</p>
+            </details>
+        </td>
 
-    <p>
-        {{ project.bid_stats.bid_count }} bids
-    </p>
+        <td>{{ project.status }}</td>
+        <td>{{ project.type }}</td>
 
-    <hr>
-{% endfor %}
+        <td>
+            {{ project.budget.minimum }} - {{ project.budget.maximum }}
+        </td>
+
+        <td>
+            {{ project.bid_stats.bid_count }}
+        </td>
+
+        <td>
+            {% for job in project.jobs %}
+                {{ job.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
 {% endblock %}
