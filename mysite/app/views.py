@@ -1,9 +1,16 @@
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from django.db.models import F
+from django.conf import settings
+import json
 
 from .forms import SkillForm, SkillFormSet
 from .models import Skill
+
+from freelancersdk.session import Session
+from freelancersdk.resources.projects import search_projects
+import json
+from freelancersdk.resources.projects.helpers import create_get_projects_project_details_object
 
 
 def skill_formset_view(request):
@@ -44,5 +51,32 @@ def skill_formset_view(request):
     )
 
 
-def blank_page_view(request):
-    return render(request, "app/blank_page.html")
+def search_view(request, limit=10):
+    projects = []
+    query = ""
+
+    if request.method == "POST":
+        query = request.POST.get("query", "")
+
+        session = Session(oauth_token=settings.FREELANCER_TOKEN)
+        project_details = create_get_projects_project_details_object(
+            full_description=True,
+            jobs=True,
+        )
+        response = search_projects(
+            session,
+            query=query,
+            project_details=project_details,
+            limit=limit,
+        )
+        projects = response["projects"]
+        print(json.dumps(projects, indent=4))
+
+    return render(
+        request,
+        "app/search.html",
+        {
+            "query": query,
+            "projects": projects,
+        }
+    )

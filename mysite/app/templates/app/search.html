@@ -1,0 +1,29 @@
+{% extends "app/base.html" %}
+
+{% block title %}Search Freelancer{% endblock %}
+
+{% block content %}
+<h1>Search Freelancer</h1>
+
+<form method="post">
+    {% csrf_token %}
+    <input name="query" value="{{ query }}">
+    <button type="submit">Search</button>
+</form>
+
+{% for project in projects %}
+    <h3>{{ project.title }}</h3>
+
+    <p>
+        {{ project.budget.minimum }}
+        -
+        {{ project.budget.maximum }}
+    </p>
+
+    <p>
+        {{ project.bid_stats.bid_count }} bids
+    </p>
+
+    <hr>
+{% endfor %}
+{% endblock %}

@@ -26,6 +26,8 @@ load_dotenv(BASE_DIR / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-)byphiz0s2oa@44x#)=r#cq*7584nqvlpx5@(_l04ctmvs342%'
 
+FREELANCER_TOKEN = os.environ.get('FREELANCER_TOKEN')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -35,13 +37,13 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'app.apps.AppConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'app'
 ]
 
 MIDDLEWARE = [
