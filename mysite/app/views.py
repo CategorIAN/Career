@@ -2,15 +2,23 @@ from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from django.db.models import F
 from django.conf import settings
-import json
+from datetime import datetime, UTC
+from urllib.parse import urlencode
 
 from .forms import SkillForm, SkillFormSet
 from .models import Skill
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
-import json
 from freelancersdk.resources.projects.helpers import create_get_projects_project_details_object
+
+
+SEARCH_PAGE_SIZE = 10
+SEARCH_API_BATCH_SIZE = 100
+
+
+def home_view(request):
+    return render(request, "app/home.html")
 
 
 def skill_formset_view(request):
@@ -51,32 +59,69 @@ def skill_formset_view(request):
     )
 
 
-def search_view(request, limit=10):
+def _fetch_all_projects(query):
+    session = Session(oauth_token=settings.FREELANCER_TOKEN)
+    project_details = create_get_projects_project_details_object(
+        full_description=True,
+        jobs=True,
+    )
     projects = []
-    query = ""
+    offset = 0
 
-    if request.method == "POST":
-        query = request.POST.get("query", "")
-
-        session = Session(oauth_token=settings.FREELANCER_TOKEN)
-        project_details = create_get_projects_project_details_object(
-            full_description=True,
-            jobs=True,
-        )
+    while True:
         response = search_projects(
             session,
             query=query,
             project_details=project_details,
-            limit=limit,
+            limit=SEARCH_API_BATCH_SIZE,
+            offset=offset,
         )
-        projects = response["projects"]
-        print(json.dumps(projects, indent=4))
+        batch = response.get("projects", [])
+
+        if not batch:
+            break
+
+        projects.extend(batch)
+
+        if len(batch) < SEARCH_API_BATCH_SIZE:
+            break
+
+        offset += SEARCH_API_BATCH_SIZE
+
+    for project in projects:
+        project["submitdate_datetime"] = str(datetime.fromtimestamp(
+            project["submitdate"],
+            UTC,
+        ).date())
+
+    return projects
+
+
+def search_view(request):
+    if request.method == "POST":
+        query = request.POST.get("query", "").strip()
+        if not query:
+            return redirect(request.path)
+
+        return redirect(f"{request.path}?{urlencode({'query': query})}")
+
+    query = request.GET.get("query", "").strip()
+    page_number = request.GET.get("page") or 1
+    all_projects = []
+    page_obj = None
+
+    if query:
+        all_projects = _fetch_all_projects(query)
+        paginator = Paginator(all_projects, SEARCH_PAGE_SIZE)
+        page_obj = paginator.get_page(page_number)
 
     return render(
         request,
         "app/search.html",
         {
             "query": query,
-            "projects": projects,
+            "projects": page_obj.object_list if page_obj else [],
+            "page_obj": page_obj,
+            "total_projects": len(all_projects),
         }
     )

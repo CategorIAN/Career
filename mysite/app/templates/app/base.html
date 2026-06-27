@@ -4,13 +4,242 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Career{% endblock %}</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 16px;
+            padding: 24px 16px;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: width 0.2s ease;
+            background: #000000;
+        }
+
+        .sidebar:hover {
+            width: 220px;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 10px 12px;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.1s ease;
+            pointer-events: none;
+        }
+
+        .sidebar:hover .nav-link {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .nav-link:hover {
+            background: #374151;
+        }
+
+        .page-content {
+            flex: 1;
+            padding: 1rem;
+            min-width: 0;
+        }
+
+        .project-results {
+            width: 100%;
+            margin-top: 1rem;
+            border-collapse: collapse;
+            background: #d8d8d8;
+            border: 1px solid #8c8c8c;
+        }
+
+        .project-results th,
+        .project-results td {
+            padding: 0.75rem;
+            border: 1px solid #8c8c8c;
+            vertical-align: top;
+            text-align: left;
+        }
+
+        .project-results th {
+            background: #bcbcbc;
+            font-weight: 700;
+        }
+
+        .project-results tr:nth-child(even) td {
+            background: #e4e4e4;
+        }
+
+        .skills-row td {
+            background: #efefef;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .skills-toggle {
+            padding: 0.35rem 0.8rem;
+            border: 1px solid #7d7d7d;
+            background: #f2f2f2;
+            color: #222;
+            cursor: pointer;
+        }
+
+        .skills-toggle:hover {
+            background: #e7e7e7;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.72);
+        }
+
+        .modal-content {
+            position: relative;
+            width: min(700px, 100%);
+            max-height: min(70vh, 640px);
+            overflow-y: auto;
+            background: #fff;
+            color: #111;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        #modal-title {
+            margin: 0 2.5rem 1rem 0;
+        }
+
+        #modal-description {
+            margin: 0;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        #close-modal {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            border: none;
+            background: none;
+            font-size: 1.75rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .description-button {
+            background: none;
+            border: none;
+            padding: 0;
+            color: #1d3f75;
+            text-align: left;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .pagination a {
+            padding: 0.35rem 0.8rem;
+            border: 1px solid #7d7d7d;
+            background: #f2f2f2;
+            color: #222;
+            text-decoration: none;
+        }
+
+        .pagination a:hover {
+            background: #e7e7e7;
+        }
+    </style>
 </head>
 <body>
-    <nav style="display: flex; gap: 0.5rem; width: 100%; padding: 0.2rem 0.5rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem; box-sizing: border-box;">
-        <a href="{% url 'skills' %}" style="padding: 0.2rem 0.5rem; border: 1px solid #888; text-decoration: none;">Skill Table</a>
-        <a href="{% url 'search' %}" style="padding: 0.2rem 0.5rem; border: 1px solid #888; text-decoration: none;">Search</a>
-    </nav>
+    <div class="app-layout">
+        <nav class="sidebar">
+            <a class="nav-link" href="{% url 'skills' %}">Skill Table</a>
+            <a class="nav-link" href="{% url 'search' %}">Search</a>
+        </nav>
 
-    {% block content %}{% endblock %}
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
 </body>
+<script>
+    const modal = document.getElementById("description-modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalDescription = document.getElementById("modal-description");
+    const closeModalButton = document.getElementById("close-modal");
+
+    if (modal && modalTitle && modalDescription && closeModalButton) {
+        const hideModal = () => {
+            modal.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+
+        document.querySelectorAll(".description-button").forEach(button => {
+            button.addEventListener("click", () => {
+                modalTitle.textContent = button.dataset.title;
+                modalDescription.textContent = button.dataset.description;
+                modal.classList.remove("hidden");
+                document.body.classList.add("modal-open");
+            });
+        });
+
+        closeModalButton.addEventListener("click", hideModal);
+
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                hideModal();
+            }
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !modal.classList.contains("hidden")) {
+                hideModal();
+            }
+        });
+    }
+
+    document.querySelectorAll(".skills-toggle").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const skillsRow = document.getElementById(targetId);
+
+            if (!skillsRow) {
+                return;
+            }
+
+            const isHidden = skillsRow.classList.contains("hidden");
+            skillsRow.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+</script>
 </html>

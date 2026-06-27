@@ -5,13 +5,16 @@
 {% block content %}
 <h1>Search Freelancer</h1>
 
-<form method="post">
-    {% csrf_token %}
+<form method="get">
     <input name="query" value="{{ query }}">
     <button type="submit">Search</button>
 </form>
 
-<table>
+{% if query %}
+<p>{{ total_projects }} project{{ total_projects|pluralize }} found.</p>
+{% endif %}
+
+<table class="project-results">
     <tr>
         <th>Title</th>
         <th>Status</th>
@@ -19,34 +22,108 @@
         <th>Budget</th>
         <th>Bids</th>
         <th>Skills</th>
+        <th>Avg Bid</th>
+        <th>Posted</th>
+        <th>Bid Period</th>
+        <th>Urgent</th>
+        <th>Featured</th>
     </tr>
 
     {% for project in projects %}
     <tr>
         <td>
-            <details>
-                <summary>{{ project.title }}</summary>
-                <p>{{ project.description|default:"No description returned." }}</p>
-            </details>
+            <button
+                type="button"
+                class="description-button"
+                data-title="{{ project.title|escape }}"
+                data-description="{{ project.description|default:'No description returned.'|escape }}"
+            >
+                {{ project.title }}
+            </button>
         </td>
 
         <td>{{ project.status }}</td>
         <td>{{ project.type }}</td>
+        <td>
+            {% with currency_symbol=project.currency.sign|default:project.currency.code|default:"" %}
+                {{ currency_symbol }}{{ project.budget.minimum|floatformat:2 }} - {{ currency_symbol }}{{ project.budget.maximum|floatformat:2 }}
+            {% endwith %}
+        </td>
+        <td>{{ project.bid_stats.bid_count }}</td>
 
         <td>
-            {{ project.budget.minimum }} - {{ project.budget.maximum }}
+            <button type="button" class="skills-toggle" data-target="skills-{{ forloop.counter0 }}">
+                Show
+            </button>
+        </td>
+        <td>
+            {% with currency_symbol=project.currency.sign|default:project.currency.code|default:"" %}
+                {% if project.bid_stats.bid_avg %}
+                    {{ currency_symbol }}{{ project.bid_stats.bid_avg|floatformat:2 }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            {% endwith %}
         </td>
 
         <td>
-            {{ project.bid_stats.bid_count }}
+            {{ project.submitdate_datetime }}
         </td>
 
         <td>
+            {{ project.bidperiod }} days
+        </td>
+
+        <td>
+            {% if project.upgrades.urgent %}
+                Yes
+            {% else %}
+                No
+            {% endif %}
+        </td>
+
+        <td>
+            {% if project.upgrades.featured %}
+                Yes
+            {% else %}
+                No
+            {% endif %}
+        </td>
+    </tr>
+    <tr id="skills-{{ forloop.counter0 }}" class="skills-row hidden">
+        <td colspan="11">
+            <strong>Skills:</strong>
             {% for job in project.jobs %}
                 {{ job.name }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                No skills listed.
             {% endfor %}
         </td>
     </tr>
     {% endfor %}
 </table>
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+        <a href="?query={{ query|urlencode }}&page=1">First</a>
+        <a href="?query={{ query|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+        <a href="?query={{ query|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+        <a href="?query={{ query|urlencode }}&page={{ page_obj.paginator.num_pages }}">Last</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<div id="description-modal" class="modal hidden">
+    <div class="modal-content">
+        <button type="button" id="close-modal" aria-label="Close description modal">&times;</button>
+        <h2 id="modal-title"></h2>
+        <p id="modal-description"></p>
+    </div>
+</div>
 {% endblock %}
