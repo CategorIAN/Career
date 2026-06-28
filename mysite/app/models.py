@@ -155,6 +155,9 @@ class Education(models.Model):
 
     description = models.TextField(blank=True)
 
+    def __str__(self):
+        return f"{self.degree} in {self.field_of_study} @ {self.school}"
+
 
 class Address(models.Model):
     street_1 = models.CharField(max_length=200)
@@ -251,6 +254,9 @@ class Role(models.Model):
     is_public = models.BooleanField(default=True)
 
     skills = models.ManyToManyField("Skill", blank=True)
+
+    def __str__(self):
+        return self.title
 
 
 class RoleTask(models.Model):
@@ -435,6 +441,67 @@ class Supervisor(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Reference(models.Model):
+    name = models.CharField(max_length=200)
+
+    role = models.ForeignKey(
+        "Role",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    education = models.ForeignKey(
+        "Education",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    title = models.CharField(max_length=200, blank=True)
+
+    email = models.EmailField(blank=True)
+
+    phone = models.CharField(max_length=30, blank=True)
+
+    relationship = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+
+    preferred = models.BooleanField(default=False)
+
+    may_contact = models.BooleanField(default=False)
+
+    notes = models.TextField(blank=True)
+
+
+class Residency(models.Model):
+    address = models.ForeignKey(
+        "Address",
+        on_delete=models.PROTECT,
+    )
+
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+
+    current = models.BooleanField(default=False)
+
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.address} ({self.start_date} - {self.end_date or 'Present'})"
+
+
+class ProfileSetting(models.Model):
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.key
 
 
 

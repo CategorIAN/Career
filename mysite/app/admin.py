@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
-                     Project, ProjectTask, Skill, Course, Supervisor)
+                     Project, ProjectTask, Skill, Course, Supervisor, Reference,
+                     Residency, ProfileSetting)
 
 
 class RoleTaskInline(admin.TabularInline):
@@ -122,6 +123,86 @@ class ProjectTaskAdmin(admin.ModelAdmin):
     @staticmethod
     def short_description(obj):
         return obj.description[:80]
+
+
+@admin.register(Reference)
+class ReferenceAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "role__title",
+        "education",
+        "relationship",
+        "preferred",
+        "may_contact",
+    )
+
+    list_filter = (
+        "preferred",
+        "may_contact",
+        "role__company",
+        "education__school",
+    )
+
+    search_fields = (
+        "name",
+        "title",
+        "relationship",
+        "email",
+        "notes",
+        "role__title",
+        "role__company__name",
+        "education__school__name",
+    )
+
+    ordering = (
+        "name",
+    )
+
+    autocomplete_fields = (
+        "role",
+        "education",
+    )
+
+
+@admin.register(Residency)
+class ResidencyAdmin(admin.ModelAdmin):
+    list_display = (
+        "address",
+        "start_date",
+        "end_date",
+        "current",
+    )
+
+    list_filter = (
+        "current",
+        "address__city",
+    )
+
+    search_fields = (
+        "address__street_1",
+        "address__street_2",
+        "address__city__name",
+        "address__postal_code",
+        "notes",
+    )
+
+    ordering = (
+        "-start_date",
+    )
+
+    autocomplete_fields = (
+        "address",
+    )
+
+
+@admin.register(ProfileSetting)
+class ProfileSettingAdmin(admin.ModelAdmin):
+    list_display = ("key", "short_value")
+    search_fields = ("key", "value", "notes")
+
+    @admin.display(description="Value")
+    def short_value(self, obj):
+        return obj.value[:80] + "..." if len(obj.value) > 80 else obj.value
 
 
 
