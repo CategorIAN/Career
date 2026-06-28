@@ -208,11 +208,6 @@ class Role(models.Model):
 
     title = models.CharField(max_length=200)
 
-    employment_type = models.CharField(
-        max_length=50,
-        blank=True,
-    )
-
     start_date = models.DateField()
 
     end_date = models.DateField(
@@ -222,22 +217,27 @@ class Role(models.Model):
 
     current = models.BooleanField(default=False)
 
-    starting_salary = models.DecimalField(
+    starting_pay = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
     )
 
-    ending_salary = models.DecimalField(
+    ending_pay = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
     )
+
+    class PayFrequency(models.TextChoices):
+        HOURLY = "hourly", "Hourly"
+        MONTHLY = "monthly", "Monthly"
 
     pay_frequency = models.CharField(
         max_length=20,
+        choices=PayFrequency.choices,
         blank=True,
     )
 
@@ -249,6 +249,8 @@ class Role(models.Model):
     description = models.TextField(blank=True)
 
     is_public = models.BooleanField(default=True)
+
+    skills = models.ManyToManyField("Skill", blank=True)
 
 
 class RoleTask(models.Model):
@@ -269,7 +271,7 @@ class FreelancerSkill(models.Model):
         return self.name
 
 
-class Project(models.Model):
+class FreelancerProject(models.Model):
     freelancer_id = models.BigIntegerField(unique=True)
 
     title = models.CharField(max_length=255)
@@ -309,5 +311,133 @@ class Project(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Project(models.Model):
+    title = models.CharField(max_length=200)
+
+    short_description = models.CharField(
+        max_length=300,
+        blank=True,
+    )
+
+    description = models.TextField(blank=True)
+
+    start_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    resume_ready = models.BooleanField(default=False)
+
+    is_public = models.BooleanField(default=True)
+
+    github_url = models.URLField(blank=True)
+
+    live_url = models.URLField(blank=True)
+
+    sort_order = models.PositiveIntegerField(default=0)
+
+    skills = models.ManyToManyField(
+        "Skill",
+        blank=True,
+        related_name="projects",
+    )
+
+    def __str__(self):
+        return self.title
+
+
+class ProjectTask(models.Model):
+    project = models.ForeignKey(
+        "Project",
+        related_name="tasks",
+        on_delete=models.CASCADE,
+    )
+
+    description = models.TextField()
+
+    resume_ready = models.BooleanField(default=False)
+
+    sort_order = models.PositiveIntegerField(default=0)
+
+    skills = models.ManyToManyField(
+        "Skill",
+        blank=True,
+        related_name="project_tasks",
+    )
+
+
+class Course(models.Model):
+    education = models.ForeignKey(
+        "Education",
+        related_name="courses",
+        on_delete=models.CASCADE,
+    )
+
+    title = models.CharField(max_length=200)
+
+    code = models.CharField(
+        max_length=50,
+        blank=True,
+    )
+
+    description = models.TextField(blank=True)
+
+    skills = models.ManyToManyField(
+        "Skill",
+        blank=True,
+        related_name="courses",
+    )
+
+    grade = models.CharField(
+        max_length=10,
+        blank=True,
+    )
+
+    resume_ready = models.BooleanField(default=False)
+
+    sort_order = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return self.title
+
+
+class Supervisor(models.Model):
+    role = models.ForeignKey(
+        "Role",
+        related_name="supervisors",
+        on_delete=models.CASCADE,
+    )
+
+    name = models.CharField(max_length=200)
+
+    title = models.CharField(
+        max_length=200,
+        blank=True,
+    )
+
+    email = models.EmailField(blank=True)
+
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    may_contact = models.BooleanField(default=False)
+
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+
+
 
 
