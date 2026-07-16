@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 from urllib.parse import urlencode
 
 from .forms import SkillForm, SkillFormSet
-from .models import Skill
+from .models import Skill, Education, Role, ProfileSetting
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -124,4 +124,49 @@ def search_view(request):
             "page_obj": page_obj,
             "total_projects": len(all_projects),
         }
+    )
+
+
+def resume_view(request):
+    profile_settings = ProfileSetting.objects.filter(
+        key__in=[
+            "location",
+            "email",
+            "phone",
+            "linkedin_url",
+            "github_url",
+            "resume_summary",
+        ]
+    )
+    profile_by_key = {
+        setting.key: setting.value
+        for setting in profile_settings
+        if setting.value
+    }
+
+    roles = (
+        Role.objects
+        .filter(is_public=True)
+        .select_related("company", "company__address", "company__address__city")
+        .prefetch_related("tasks")
+        .order_by("-start_date")
+    )
+
+    education = Education.objects.all().order_by("-end_date")
+
+    skills = Skill.objects.all().order_by(
+        "type",
+        "-rating",
+        "name",
+    )
+
+    return render(
+        request,
+        "app/resume.html",
+        {
+            "profile": profile_by_key,
+            "roles": roles,
+            "education": education,
+            "skills": skills,
+        },
     )

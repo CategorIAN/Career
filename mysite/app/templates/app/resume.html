@@ -1,0 +1,118 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<main class="resume-page">
+
+    <header>
+        <h1>Ian Kessler</h1>
+        <p>
+            {% if profile.location %}
+                <span>{{ profile.location }}</span>
+            {% endif %}
+            {% if profile.email %}
+                {% if profile.location %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span>{{ profile.email }}</span>
+            {% endif %}
+            {% if profile.phone %}
+                {% if profile.location or profile.email %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span>{{ profile.phone }}</span>
+            {% endif %}
+            {% if profile.linkedin_url %}
+                {% if profile.location or profile.email or profile.phone %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span><a href="{{ profile.linkedin_url }}">{{ profile.linkedin_url }}</a></span>
+            {% endif %}
+            {% if profile.github_url %}
+                {% if profile.location or profile.email or profile.phone or profile.linkedin_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span><a href="{{ profile.github_url }}">{{ profile.github_url }}</a></span>
+            {% endif %}
+        </p>
+    </header>
+
+    <hr>
+
+    <section>
+        <h2>Summary</h2>
+        <p>{{ profile.resume_summary }}</p>
+    </section>
+
+    <hr>
+
+    <section>
+        <h2>Work Experience</h2>
+
+        {% for role in roles %}
+            <article>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+                    <h3 style="margin: 0;">{{ role.title }}</h3>
+                    <p style="margin: 0; text-align: right; white-space: nowrap;">
+                        {{ role.start_date|date:"M Y" }}
+                        &ndash;
+                        {% if role.current %}
+                            Present
+                        {% else %}
+                            {{ role.end_date|date:"M Y" }}
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+                    <p style="margin: 0;">
+                        {{ role.company.name }}
+                    </p>
+                    <p style="margin: 0; text-align: right; white-space: nowrap;">
+                        {% if role.company.address and role.company.address.city %}
+                            {{ role.company.address.city.name }}, {{ role.company.address.city.state.abbreviation }}
+                        {% endif %}
+                    </p>
+                </div>
+
+                {% if role.description %}
+                    <p>{{ role.description }}</p>
+                {% endif %}
+
+                <ul>
+                    {% for task in role.tasks.all %}
+                        <li>{{ task.description }}</li>
+                    {% endfor %}
+                </ul>
+            </article>
+        {% empty %}
+            <p>No public roles found.</p>
+        {% endfor %}
+    </section>
+
+    <hr>
+
+    <section>
+        <h2>Education</h2>
+
+        {% for item in education %}
+            <article>
+                <h3>{{ item.degree }}</h3>
+                <p>{{ item.school }}</p>
+
+                {% if item.description %}
+                    <p>{{ item.description }}</p>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </section>
+
+    <section>
+        <h2>Skills</h2>
+
+        {% regroup skills by type as skill_groups %}
+
+        {% for group in skill_groups %}
+            <h3>{{ group.grouper }}</h3>
+
+            <ul>
+                {% for skill in group.list %}
+                    <li>{{ skill.name }} &mdash; {{ skill.rating }}/5</li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    </section>
+
+</main>
+{% endblock %}
