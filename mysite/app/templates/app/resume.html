@@ -32,7 +32,7 @@
 
     <section>
         <h2>Summary</h2>
-        <p>{{ profile.resume_summary }}</p>
+        <p style="max-width: 80%;">{{ profile.resume_summary }}</p>
     </section>
 
     <hr>
@@ -126,17 +126,7 @@
 
         {% for group in skill_groups %}
             <p>
-                <strong>
-                {% if group.grouper == "Domain" %}
-                    Domains:
-                {% elif group.grouper == "Language" %}
-                    Languages:
-                {% elif group.grouper == "Technology" %}
-                    Technologies:
-                {% else %}
-                    {{ group.grouper }}
-                {% endif %}
-                </strong>
+                <u>{% if group.grouper == "Domain" %}Domains{% elif group.grouper == "Language" %}Languages{% elif group.grouper == "Technology" %}Technologies{% else %}{{ group.grouper }}{% endif %}</u>:
                 {% for skill in group.list %}
                     {% if not forloop.first %}, {% endif %}{{ skill.name }}
                 {% endfor %}
@@ -144,17 +134,34 @@
         {% endfor %}
     </section>
 
+    <hr>
+
     <section>
         <h2>Education</h2>
 
         {% for item in education %}
-            <article>
-                <h3>{{ item.degree }}</h3>
-                <p>{{ item.school }}</p>
+            <article style="margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+                    <p style="margin: 0;">
+                        <strong>{{ item.degree }}{% if item.field_of_study %}, {{ item.field_of_study }}{% endif %}{% if item.gpa %} (GPA {{ item.gpa }}){% endif %}</strong>
+                    </p>
+                    <p style="margin: 0; text-align: right; white-space: nowrap;">
+                        {% if item.end_date %}
+                            {{ item.end_date|date:"M Y" }}
+                        {% endif %}
+                    </p>
+                </div>
 
-                {% if item.description %}
-                    <p>{{ item.description }}</p>
-                {% endif %}
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+                    <p style="margin: 0;">
+                        {{ item.school }}
+                    </p>
+                    <p style="margin: 0; text-align: right; white-space: nowrap;">
+                        {% if item.school.city %}
+                            {{ item.school.city.name }}, {{ item.school.city.state.abbreviation }}
+                        {% endif %}
+                    </p>
+                </div>
             </article>
         {% endfor %}
     </section>
