@@ -22,10 +22,12 @@ class Skill(models.Model):
         ],
     )
 
+    resume_ready = models.BooleanField(default=False)
+
     updated = models.DateField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.name} ({self.rating}/5)"
+        return f"{self.name}"
 
 
 class Country(models.Model):

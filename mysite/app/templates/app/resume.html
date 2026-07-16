@@ -84,6 +84,67 @@
     <hr>
 
     <section>
+        <h2>Projects</h2>
+
+        {% for project in projects %}
+            <article>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+                    <h3 style="margin: 0;">{{ project.title }}</h3>
+                    <p style="margin: 0; text-align: right; white-space: nowrap;">
+                        {% if project.start_date %}
+                            {{ project.start_date|date:"M Y" }}
+                            {% if project.end_date %}
+                                &ndash; {{ project.end_date|date:"M Y" }}
+                            {% else %}
+                                &ndash; Present
+                            {% endif %}
+                        {% elif project.end_date %}
+                            Through {{ project.end_date|date:"M Y" }}
+                        {% endif %}
+                    </p>
+                </div>
+
+                {% if project.tasks.all %}
+                    <ul>
+                        {% for task in project.tasks.all %}
+                            <li>{{ task.description }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% empty %}
+            <p>No public projects found.</p>
+        {% endfor %}
+    </section>
+
+    <hr>
+
+    <section>
+        <h2>Skills</h2>
+
+        {% regroup skills by type as skill_groups %}
+
+        {% for group in skill_groups %}
+            <p>
+                <strong>
+                {% if group.grouper == "Domain" %}
+                    Domains:
+                {% elif group.grouper == "Language" %}
+                    Languages:
+                {% elif group.grouper == "Technology" %}
+                    Technologies:
+                {% else %}
+                    {{ group.grouper }}
+                {% endif %}
+                </strong>
+                {% for skill in group.list %}
+                    {% if not forloop.first %}, {% endif %}{{ skill.name }}
+                {% endfor %}
+            </p>
+        {% endfor %}
+    </section>
+
+    <section>
         <h2>Education</h2>
 
         {% for item in education %}
@@ -95,22 +156,6 @@
                     <p>{{ item.description }}</p>
                 {% endif %}
             </article>
-        {% endfor %}
-    </section>
-
-    <section>
-        <h2>Skills</h2>
-
-        {% regroup skills by type as skill_groups %}
-
-        {% for group in skill_groups %}
-            <h3>{{ group.grouper }}</h3>
-
-            <ul>
-                {% for skill in group.list %}
-                    <li>{{ skill.name }} &mdash; {{ skill.rating }}/5</li>
-                {% endfor %}
-            </ul>
         {% endfor %}
     </section>
 

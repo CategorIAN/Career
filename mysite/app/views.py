@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 from urllib.parse import urlencode
 
 from .forms import SkillForm, SkillFormSet
-from .models import Skill, Education, Role, ProfileSetting
+from .models import Skill, Education, Role, ProfileSetting, Project
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -152,9 +152,16 @@ def resume_view(request):
         .order_by("-start_date")
     )
 
+    projects = (
+        Project.objects
+        .filter(is_public=True)
+        .prefetch_related("tasks")
+        .order_by("sort_order", "-start_date", "title")
+    )
+
     education = Education.objects.all().order_by("-end_date")
 
-    skills = Skill.objects.all().order_by(
+    skills = Skill.objects.filter(resume_ready=True).order_by(
         "type",
         "-rating",
         "name",
@@ -166,6 +173,7 @@ def resume_view(request):
         {
             "profile": profile_by_key,
             "roles": roles,
+            "projects": projects,
             "education": education,
             "skills": skills,
         },
