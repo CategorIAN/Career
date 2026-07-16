@@ -1,6 +1,99 @@
 {% extends "app/base.html" %}
 
 {% block content %}
+<style>
+    .resume-page {
+        margin: 0 1rem;
+    }
+
+    .resume-page p,
+    .resume-page li {
+        font-size: 1.05rem;
+    }
+
+    .resume-download-button {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        border: 1px solid #7d7d7d;
+        border-radius: 999px;
+        background: #f2f2f2;
+        color: #222;
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .resume-download-button:hover {
+        background: #e7e7e7;
+    }
+
+    @media print {
+        @page {
+            size: letter;
+            margin: 0.35in;
+        }
+
+        .sidebar,
+        .resume-download-button {
+            display: none !important;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .page-content {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .resume-page {
+            margin: 0.35in;
+            box-sizing: border-box;
+            zoom: 0.79;
+            width: auto;
+            transform: none;
+            break-inside: avoid-page;
+        }
+
+        .resume-page,
+        .resume-page p,
+        .resume-page li {
+            line-height: 1.1;
+        }
+
+        .resume-page h1,
+        .resume-page h2,
+        .resume-page h3,
+        .resume-page p,
+        .resume-page ul {
+            margin-top: 0.2rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .resume-page hr {
+            margin: 0.35rem 0;
+        }
+
+        .resume-page article {
+            margin-bottom: 0.35rem;
+        }
+    }
+</style>
+
+<button
+    type="button"
+    class="resume-download-button"
+    aria-label="Download resume as PDF"
+    title="Download resume as PDF"
+    onclick="window.print()"
+>
+    &darr;
+</button>
+
 <main class="resume-page">
 
     <header>
@@ -32,7 +125,7 @@
 
     <section>
         <h2>Summary</h2>
-        <p style="max-width: 80%;">{{ profile.resume_summary }}</p>
+        <p style="max-width: 80%; text-align: justify;">{{ profile.resume_summary }}</p>
     </section>
 
     <hr>
