@@ -1,5 +1,7 @@
 {% extends "app/base.html" %}
 
+{% block title %}Ian Kessler Resume{% endblock %}
+
 {% block content %}
 <style>
     .resume-page {
@@ -30,6 +32,61 @@
         background: #e7e7e7;
     }
 
+    .contact-toggle {
+        position: fixed;
+        top: 1rem;
+        right: 4.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid #7d7d7d;
+        border-radius: 999px;
+        background: #f2f2f2;
+        color: #222;
+        font-size: 0.9rem;
+    }
+
+    .contact-toggle input {
+        display: none;
+    }
+
+    .contact-toggle-slider {
+        position: relative;
+        width: 2.4rem;
+        height: 1.35rem;
+        border-radius: 999px;
+        background: #c7c7c7;
+        transition: background 0.2s ease;
+        cursor: pointer;
+    }
+
+    .contact-toggle-slider::after {
+        content: "";
+        position: absolute;
+        top: 0.15rem;
+        left: 0.15rem;
+        width: 1.05rem;
+        height: 1.05rem;
+        border-radius: 50%;
+        background: #ffffff;
+        transition: transform 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .contact-toggle input:checked + .contact-toggle-slider {
+        background: #4b5563;
+    }
+
+    .contact-toggle input:checked + .contact-toggle-slider::after {
+        transform: translateX(1.05rem);
+    }
+
+    .contact-off .contact-item,
+    .contact-off .contact-separator {
+        display: none;
+    }
+
     @media print {
         @page {
             size: letter;
@@ -37,7 +94,8 @@
         }
 
         .sidebar,
-        .resume-download-button {
+        .resume-download-button,
+        .contact-toggle {
             display: none !important;
         }
 
@@ -89,29 +147,35 @@
     class="resume-download-button"
     aria-label="Download resume as PDF"
     title="Download resume as PDF"
-    onclick="window.print()"
+    id="resume-download-button"
 >
     &darr;
 </button>
 
-<main class="resume-page">
+<label class="contact-toggle" for="contact-mode-toggle">
+    <span>Contact</span>
+    <input type="checkbox" id="contact-mode-toggle" aria-label="Toggle contact mode">
+    <span class="contact-toggle-slider" aria-hidden="true"></span>
+</label>
+
+<main class="resume-page contact-off" id="resume-page">
 
     <header>
         <h1>Ian Kessler</h1>
         <p>
             {% if profile.location %}
-                <span>{{ profile.location }}</span>
+                <span class="contact-item">{{ profile.location }}</span>
             {% endif %}
             {% if profile.email %}
-                {% if profile.location %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span>{{ profile.email }}</span>
+                {% if profile.location %}<span class="contact-separator" style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span class="contact-item">{{ profile.email }}</span>
             {% endif %}
             {% if profile.phone %}
-                {% if profile.location or profile.email %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span>{{ profile.phone }}</span>
+                {% if profile.location or profile.email %}<span class="contact-separator" style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                <span class="contact-item">{{ profile.phone }}</span>
             {% endif %}
             {% if profile.linkedin_url %}
-                {% if profile.location or profile.email or profile.phone %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+                {% if profile.location or profile.email or profile.phone %}<span class="contact-separator" style="font-size: 1.2em;"> &middot; </span>{% endif %}
                 <span><a href="{{ profile.linkedin_url }}">{{ profile.linkedin_url }}</a></span>
             {% endif %}
             {% if profile.github_url %}
@@ -260,4 +324,35 @@
     </section>
 
 </main>
+<script>
+    const contactModeToggle = document.getElementById("contact-mode-toggle");
+    const resumePage = document.getElementById("resume-page");
+    const resumeDownloadButton = document.getElementById("resume-download-button");
+    const originalTitle = document.title;
+
+    if (contactModeToggle && resumePage) {
+        contactModeToggle.addEventListener("change", () => {
+            resumePage.classList.toggle("contact-off", !contactModeToggle.checked);
+        });
+    }
+
+    const getResumeTitle = () => (
+        contactModeToggle && contactModeToggle.checked
+            ? "Ian_Kessler_Resume"
+            : "Ian_Kessler_Resume_No_Contact_Info"
+    );
+
+    const restoreTitle = () => {
+        document.title = originalTitle;
+    };
+
+    if (resumeDownloadButton) {
+        resumeDownloadButton.addEventListener("click", () => {
+            document.title = getResumeTitle();
+            window.print();
+        });
+    }
+
+    window.addEventListener("afterprint", restoreTitle);
+</script>
 {% endblock %}
