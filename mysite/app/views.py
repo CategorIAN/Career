@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 from urllib.parse import urlencode
 
 from .forms import SkillForm, SkillFormSet
-from .models import Skill, Education, Role, ProfileSetting, Project
+from .models import Skill, Education, Role, ProfileSetting, Project, Reference
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -176,5 +176,26 @@ def resume_view(request):
             "projects": projects,
             "education": education,
             "skills": skills,
+        },
+    )
+
+
+def references_view(request):
+    references = (
+        Reference.objects
+        .select_related(
+            "role",
+            "role__company",
+            "education",
+            "education__school",
+        )
+        .order_by("-preferred", "name")
+    )
+
+    return render(
+        request,
+        "app/references.html",
+        {
+            "references": references,
         },
     )

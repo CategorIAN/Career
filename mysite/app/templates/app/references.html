@@ -1,0 +1,173 @@
+{% extends "app/base.html" %}
+
+{% block title %}References{% endblock %}
+
+{% block content %}
+<style>
+    .references-page {
+        margin: 1rem;
+    }
+
+    .references-page h1 {
+        margin-top: 0;
+    }
+
+    .references-download-button {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        border: 1px solid #7d7d7d;
+        border-radius: 999px;
+        background: #f2f2f2;
+        color: #222;
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .references-download-button:hover {
+        background: #e7e7e7;
+    }
+
+    .references-page p {
+        margin-bottom: 1rem;
+    }
+
+    .references-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #f3f3f3;
+        border: 1px solid #8c8c8c;
+    }
+
+    .references-table th,
+    .references-table td {
+        padding: 0.75rem;
+        border: 1px solid #8c8c8c;
+        vertical-align: top;
+        text-align: left;
+    }
+
+    .references-table th {
+        background: #bcbcbc;
+    }
+
+    .references-table td {
+        background: #fafafa;
+    }
+
+    .references-table tr:nth-child(even) td {
+        background: #f2f2f2;
+    }
+
+    @media print {
+        @page {
+            size: landscape;
+            margin: 0.5in;
+        }
+
+        .sidebar,
+        .references-download-button {
+            display: none !important;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .page-content {
+            padding: 0;
+        }
+
+        .references-page {
+            margin: 0.5in;
+            box-sizing: border-box;
+        }
+    }
+
+</style>
+
+<button
+    type="button"
+    class="references-download-button"
+    aria-label="Download references as PDF"
+    title="Download references as PDF"
+    id="references-download-button"
+>
+    &darr;
+</button>
+
+<section class="references-page">
+    <h1>References</h1>
+
+    {% if references %}
+        <table class="references-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Title</th>
+                    <th>Relationship</th>
+                    <th>Associated With</th>
+                    <th>Contact</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reference in references %}
+                    <tr>
+                        <td>{{ reference.name }}</td>
+                        <td>{{ reference.title|default:"-" }}</td>
+                        <td>{{ reference.relationship|default:"-" }}</td>
+                        <td>
+                            {% if reference.role %}
+                                {{ reference.role.title }}
+                                {% if reference.role.company %}
+                                    <br>{{ reference.role.company.name }}
+                                {% endif %}
+                            {% elif reference.education %}
+                                {{ reference.education.degree }}
+                                {% if reference.education.school %}
+                                    <br>{{ reference.education.school.name }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if reference.email %}
+                                <div>{{ reference.email }}</div>
+                            {% endif %}
+                            {% if reference.phone %}
+                                <div>{{ reference.phone }}</div>
+                            {% endif %}
+                            {% if not reference.email and not reference.phone %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No references found.</p>
+    {% endif %}
+</section>
+<script>
+    const referencesDownloadButton = document.getElementById("references-download-button");
+    const originalTitle = document.title;
+
+    const restoreTitle = () => {
+        document.title = originalTitle;
+    };
+
+    if (referencesDownloadButton) {
+        referencesDownloadButton.addEventListener("click", () => {
+            document.title = "Ian_Kessler_References";
+            window.print();
+        });
+    }
+
+    window.addEventListener("afterprint", restoreTitle);
+</script>
+{% endblock %}
