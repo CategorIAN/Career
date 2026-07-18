@@ -82,9 +82,41 @@
         transform: translateX(1.05rem);
     }
 
+    .summary-selector {
+        position: fixed;
+        top: 1rem;
+        right: 11.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid #7d7d7d;
+        border-radius: 999px;
+        background: #f2f2f2;
+        color: #222;
+        font-size: 0.9rem;
+    }
+
+    .summary-selector select {
+        border: 1px solid #7d7d7d;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #222;
+        padding: 0.2rem 0.7rem;
+        font-size: 0.9rem;
+    }
+
     .contact-off .contact-item,
     .contact-off .contact-separator {
         display: none;
+    }
+
+    .summary-copy {
+        display: none;
+    }
+
+    .summary-copy.is-visible {
+        display: block;
     }
 
     @media print {
@@ -95,7 +127,8 @@
 
         .sidebar,
         .resume-download-button,
-        .contact-toggle {
+        .contact-toggle,
+        .summary-selector {
             display: none !important;
         }
 
@@ -139,6 +172,14 @@
         .resume-page article {
             margin-bottom: 0.35rem;
         }
+
+        .resume-summary {
+            display: block !important;
+        }
+
+        .platform-summary {
+            display: none !important;
+        }
     }
 </style>
 
@@ -156,6 +197,16 @@
     <span>Contact</span>
     <input type="checkbox" id="contact-mode-toggle" aria-label="Toggle contact mode">
     <span class="contact-toggle-slider" aria-hidden="true"></span>
+</label>
+
+<label class="summary-selector" for="summary-view-select">
+    <span>View Summary</span>
+    <select id="summary-view-select" aria-label="View Summary">
+        <option value="resume">Resume Summary</option>
+        {% if profile.platform_summary %}
+            <option value="platform">Platform Summary</option>
+        {% endif %}
+    </select>
 </label>
 
 <main class="resume-page contact-off" id="resume-page">
@@ -189,7 +240,12 @@
 
     <section>
         <h2>Summary</h2>
-        <p style="max-width: 80%; text-align: justify;">{{ profile.resume_summary }}</p>
+        <p class="summary-copy resume-summary is-visible" id="resume-summary">
+            {{ profile.resume_summary }}
+        </p>
+        <p class="summary-copy platform-summary" id="platform-summary">
+            {{ profile.platform_summary|linebreaksbr }}
+        </p>
     </section>
 
     <hr>
@@ -300,7 +356,7 @@
             <article style="margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
                     <p style="margin: 0;">
-                        <strong>{{ item.degree }}{% if item.field_of_study %}, {{ item.field_of_study }}{% endif %}{% if item.gpa %} (GPA {{ item.gpa }}){% endif %}</strong>
+                        <strong>{{ item.degree }}{% if item.field_of_study %}, {{ item.field_of_study }}{% endif %}{% if item.gpa or item.honors %} ({% if item.gpa %}GPA {{ item.gpa }}{% endif %}{% if item.honors %}{% if item.gpa %}, {% endif %}{{ item.honors }}{% endif %}){% endif %}</strong>
                     </p>
                     <p style="margin: 0; text-align: right; white-space: nowrap;">
                         {% if item.end_date %}
@@ -328,6 +384,9 @@
     const contactModeToggle = document.getElementById("contact-mode-toggle");
     const resumePage = document.getElementById("resume-page");
     const resumeDownloadButton = document.getElementById("resume-download-button");
+    const summaryViewSelect = document.getElementById("summary-view-select");
+    const resumeSummary = document.getElementById("resume-summary");
+    const platformSummary = document.getElementById("platform-summary");
     const originalTitle = document.title;
 
     if (contactModeToggle && resumePage) {
@@ -336,10 +395,25 @@
         });
     }
 
+    const updateVisibleSummary = () => {
+        if (!summaryViewSelect || !resumeSummary || !platformSummary) {
+            return;
+        }
+
+        const showPlatform = summaryViewSelect.value === "platform";
+        resumeSummary.classList.toggle("is-visible", !showPlatform);
+        platformSummary.classList.toggle("is-visible", showPlatform);
+    };
+
+    if (summaryViewSelect) {
+        summaryViewSelect.addEventListener("change", updateVisibleSummary);
+        updateVisibleSummary();
+    }
+
     const getResumeTitle = () => (
         contactModeToggle && contactModeToggle.checked
             ? "Ian_Kessler_Resume"
-            : "Ian_Kessler_Resume_No_Contact_Info"
+            : "Ian_Kessler_Resume_Public"
     );
 
     const restoreTitle = () => {

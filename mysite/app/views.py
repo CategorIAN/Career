@@ -136,6 +136,7 @@ def resume_view(request):
             "linkedin_url",
             "github_url",
             "resume_summary",
+            "platform_summary",
         ]
     )
     profile_by_key = {
