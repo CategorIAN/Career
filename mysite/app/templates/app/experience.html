@@ -25,7 +25,7 @@
 
             <div id="role-details-{{ role.id }}" class="hidden">
             <div class="utility-meta">
-                <div class="utility-field">
+                <div class="utility-field utility-field-full">
                     <div class="utility-field-header">
                         <strong>Job title</strong>
                         <button type="button" class="copy-button" data-copy-source="role-title-{{ role.id }}">Copy</button>
@@ -41,22 +41,168 @@
                     <div class="utility-field-body">{{ role.company.name }}</div>
                 </div>
 
-                {% if role.copy_payload.location %}
+                {% if role.copy_payload.address %}
                     <div class="utility-field">
                         <div class="utility-field-header">
                             <strong>Location</strong>
-                            <button type="button" class="copy-button" data-copy-source="role-location-{{ role.id }}">Copy</button>
+                            <div class="utility-copy-actions">
+                                <button
+                                    type="button"
+                                    class="copy-button address-toggle-button"
+                                    data-target="role-address-components-{{ role.id }}"
+                                >
+                                    Show Address
+                                </button>
+                                {% if role.copy_payload.address %}
+                                    <button type="button" class="copy-button" data-copy-source="role-address-{{ role.id }}">Copy Address</button>
+                                {% endif %}
+                            </div>
                         </div>
-                        <div class="utility-field-body">{{ role.copy_payload.location }}</div>
+                        <div id="role-address-components-{{ role.id }}" class="utility-subfields hidden">
+                            {% if role.copy_payload.street_1 %}
+                                <div class="utility-subfield">
+                                    <div class="utility-subfield-header">
+                                        <strong>Street 1</strong>
+                                        <button type="button" class="copy-button" data-copy-source="role-street-1-{{ role.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ role.copy_payload.street_1 }}</div>
+                                </div>
+                            {% endif %}
+                            {% if role.copy_payload.street_2 %}
+                                <div class="utility-subfield">
+                                    <div class="utility-subfield-header">
+                                        <strong>Street 2</strong>
+                                        <button type="button" class="copy-button" data-copy-source="role-street-2-{{ role.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ role.copy_payload.street_2 }}</div>
+                                </div>
+                            {% endif %}
+                            {% if role.copy_payload.city %}
+                                <div class="utility-subfield">
+                                    <div class="utility-subfield-header">
+                                        <strong>City</strong>
+                                        <button type="button" class="copy-button" data-copy-source="role-city-{{ role.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ role.copy_payload.city }}</div>
+                                </div>
+                            {% endif %}
+                            {% if role.copy_payload.state_name %}
+                                <div class="utility-subfield">
+                                    <div class="utility-subfield-header">
+                                        <strong>State</strong>
+                                        <button type="button" class="copy-button" data-copy-source="role-state-name-{{ role.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ role.copy_payload.state_name }}</div>
+                                </div>
+                            {% endif %}
+                            {% if role.copy_payload.postal_code %}
+                                <div class="utility-subfield">
+                                    <div class="utility-subfield-header">
+                                        <strong>Postal code</strong>
+                                        <button type="button" class="copy-button" data-copy-source="role-postal-code-{{ role.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ role.copy_payload.postal_code }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
                 {% endif %}
 
                 <div class="utility-field">
                     <div class="utility-field-header">
                         <strong>Dates</strong>
-                        <button type="button" class="copy-button" data-copy-source="role-dates-{{ role.id }}">Copy</button>
+                        <div class="utility-copy-actions">
+                            <button
+                                type="button"
+                                class="copy-button date-toggle-button"
+                                data-target="role-date-components-{{ role.id }}"
+                            >
+                                Show Dates
+                            </button>
+                            <button type="button" class="copy-button" data-copy-source="role-dates-{{ role.id }}">Copy</button>
+                        </div>
                     </div>
                     <div class="utility-field-body">{{ role.copy_payload.date_range }}</div>
+                    <div id="role-date-components-{{ role.id }}" class="date-blocks hidden">
+                        {% if role.copy_payload.start_date %}
+                            <div class="utility-subfield date-block">
+                                <div class="utility-subfield-header">
+                                    <strong>Start date</strong>
+                                    <button type="button" class="copy-button" data-copy-source="role-start-date-{{ role.id }}">Copy</button>
+                                </div>
+                                <div class="utility-field-body">{{ role.copy_payload.start_date }}</div>
+                                <div class="date-part-grid">
+                                    {% if role.copy_payload.start_month %}
+                                        <div class="utility-subfield">
+                                            <div class="utility-subfield-header">
+                                                <strong>Month</strong>
+                                                <button type="button" class="copy-button" data-copy-source="role-start-month-{{ role.id }}">Copy</button>
+                                            </div>
+                                            <div class="utility-field-body">{{ role.copy_payload.start_month }}</div>
+                                        </div>
+                                    {% endif %}
+                                    {% if role.copy_payload.start_day %}
+                                        <div class="utility-subfield">
+                                            <div class="utility-subfield-header">
+                                                <strong>Day</strong>
+                                                <button type="button" class="copy-button" data-copy-source="role-start-day-{{ role.id }}">Copy</button>
+                                            </div>
+                                            <div class="utility-field-body">{{ role.copy_payload.start_day }}</div>
+                                        </div>
+                                    {% endif %}
+                                    {% if role.copy_payload.start_year %}
+                                        <div class="utility-subfield">
+                                            <div class="utility-subfield-header">
+                                                <strong>Year</strong>
+                                                <button type="button" class="copy-button" data-copy-source="role-start-year-{{ role.id }}">Copy</button>
+                                            </div>
+                                            <div class="utility-field-body">{{ role.copy_payload.start_year }}</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% if role.copy_payload.end_date %}
+                            <div class="utility-subfield date-block date-block-end">
+                                <div class="utility-subfield-header">
+                                    <strong>End date</strong>
+                                    <button type="button" class="copy-button" data-copy-source="role-end-date-{{ role.id }}">Copy</button>
+                                </div>
+                                <div class="utility-field-body">{{ role.copy_payload.end_date }}</div>
+                                {% if role.copy_payload.end_month or role.copy_payload.end_day or role.copy_payload.end_year %}
+                                    <div class="date-part-grid">
+                                        {% if role.copy_payload.end_month %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Month</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="role-end-month-{{ role.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ role.copy_payload.end_month }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if role.copy_payload.end_day %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Day</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="role-end-day-{{ role.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ role.copy_payload.end_day }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if role.copy_payload.end_year %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Year</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="role-end-year-{{ role.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ role.copy_payload.end_year }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -166,8 +312,21 @@
 
             <textarea id="role-title-{{ role.id }}" class="copy-source">{{ role.copy_payload.title }}</textarea>
             <textarea id="role-company-{{ role.id }}" class="copy-source">{{ role.copy_payload.company }}</textarea>
-            <textarea id="role-location-{{ role.id }}" class="copy-source">{{ role.copy_payload.location }}</textarea>
+            <textarea id="role-address-{{ role.id }}" class="copy-source">{{ role.copy_payload.address }}</textarea>
+            <textarea id="role-street-1-{{ role.id }}" class="copy-source">{{ role.copy_payload.street_1 }}</textarea>
+            <textarea id="role-street-2-{{ role.id }}" class="copy-source">{{ role.copy_payload.street_2 }}</textarea>
+            <textarea id="role-city-{{ role.id }}" class="copy-source">{{ role.copy_payload.city }}</textarea>
+            <textarea id="role-state-name-{{ role.id }}" class="copy-source">{{ role.copy_payload.state_name }}</textarea>
+            <textarea id="role-postal-code-{{ role.id }}" class="copy-source">{{ role.copy_payload.postal_code }}</textarea>
             <textarea id="role-dates-{{ role.id }}" class="copy-source">{{ role.copy_payload.date_range }}</textarea>
+            <textarea id="role-start-date-{{ role.id }}" class="copy-source">{{ role.copy_payload.start_date }}</textarea>
+            <textarea id="role-start-month-{{ role.id }}" class="copy-source">{{ role.copy_payload.start_month }}</textarea>
+            <textarea id="role-start-day-{{ role.id }}" class="copy-source">{{ role.copy_payload.start_day }}</textarea>
+            <textarea id="role-start-year-{{ role.id }}" class="copy-source">{{ role.copy_payload.start_year }}</textarea>
+            <textarea id="role-end-date-{{ role.id }}" class="copy-source">{{ role.copy_payload.end_date }}</textarea>
+            <textarea id="role-end-month-{{ role.id }}" class="copy-source">{{ role.copy_payload.end_month }}</textarea>
+            <textarea id="role-end-day-{{ role.id }}" class="copy-source">{{ role.copy_payload.end_day }}</textarea>
+            <textarea id="role-end-year-{{ role.id }}" class="copy-source">{{ role.copy_payload.end_year }}</textarea>
             <textarea id="role-description-{{ role.id }}" class="copy-source">{{ role.copy_payload.description }}</textarea>
             <textarea id="role-tasks-{{ role.id }}" class="copy-source">{{ role.copy_payload.tasks }}</textarea>
             <textarea id="role-skills-{{ role.id }}" class="copy-source">{{ role.copy_payload.skills }}</textarea>
@@ -194,6 +353,36 @@
             const isHidden = details.classList.contains("hidden");
             details.classList.toggle("hidden");
             button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".address-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Address" : "Show Address";
+        });
+    });
+
+    document.querySelectorAll(".date-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Dates" : "Show Dates";
         });
     });
 </script>

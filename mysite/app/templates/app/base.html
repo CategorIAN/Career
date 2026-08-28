@@ -237,6 +237,10 @@
             margin-bottom: 1rem;
         }
 
+        .utility-field-full {
+            grid-column: 1 / -1;
+        }
+
         .utility-field-header {
             display: flex;
             justify-content: space-between;
@@ -262,6 +266,70 @@
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 0.75rem 1rem;
             margin-bottom: 1rem;
+        }
+
+        .utility-subfields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.5rem 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .utility-subfields-two-column {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 700px) {
+            .utility-subfields-two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .utility-subfield {
+            padding: 0.75rem;
+            border: 1px solid #d2d2d2;
+            background: #ffffff;
+            min-width: 0;
+        }
+
+        .utility-subfield-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .date-blocks {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1.5rem;
+        }
+
+        .date-block {
+            min-width: 0;
+            width: 100%;
+        }
+
+        .date-block-end {
+            margin-left: 0;
+        }
+
+        .date-part-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        @media (max-width: 700px) {
+            .date-part-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .utility-list {

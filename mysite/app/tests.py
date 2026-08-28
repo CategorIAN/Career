@@ -312,7 +312,12 @@ class ApplicationReferencePageTests(TestCase):
             country=self.country,
         )
         self.city = City.objects.create(name="Helena", state=self.state)
-        self.address = Address.objects.create(street_1="1 Main St", city=self.city)
+        self.address = Address.objects.create(
+            street_1="1 Main St",
+            street_2="Suite 200",
+            city=self.city,
+            postal_code="59601",
+        )
         self.company = Company.objects.create(name="Carroll College", address=self.address)
         self.school = School.objects.create(name="State University", city=self.city)
         self.education = Education.objects.create(
@@ -359,8 +364,31 @@ class ApplicationReferencePageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         roles = list(response.context["roles"])
         self.assertEqual([item.pk for item in roles], [role.pk, earlier_role.pk])
-        self.assertContains(response, "Helena, MT")
+        self.assertContains(response, "1 Main St")
+        self.assertContains(response, "Suite 200")
+        self.assertContains(response, ">City<", html=False)
+        self.assertContains(response, "Montana")
+        self.assertContains(response, ">State<", html=False)
+        self.assertContains(response, "59601")
+        self.assertContains(response, "Copy Address")
+        self.assertContains(response, "Show Address")
+        self.assertNotContains(response, "Copy Location")
+        self.assertNotContains(response, "Helena, MT")
+        self.assertContains(response, 'id="role-street-1-')
+        self.assertContains(response, 'id="role-street-2-')
+        self.assertContains(response, 'id="role-city-')
+        self.assertContains(response, 'id="role-state-name-')
+        self.assertContains(response, 'id="role-postal-code-')
         self.assertContains(response, "August 2024 - March 2026")
+        self.assertContains(response, "Show Dates")
+        self.assertContains(response, "August 1, 2024")
+        self.assertContains(response, "March 1, 2026")
+        self.assertContains(response, 'id="role-start-month-')
+        self.assertContains(response, 'id="role-start-day-')
+        self.assertContains(response, 'id="role-start-year-')
+        self.assertContains(response, 'id="role-end-month-')
+        self.assertContains(response, 'id="role-end-day-')
+        self.assertContains(response, 'id="role-end-year-')
         self.assertContains(response, "Led reporting and analytics projects.")
         self.assertContains(response, "<li>First task</li>", html=True)
         self.assertContains(response, "<li>Second task</li>", html=True)

@@ -66,6 +66,23 @@ def _format_date_range(start_date, end_date=None, is_current=False):
     return end_text
 
 
+def _build_date_copy_payload(date_value):
+    if not date_value:
+        return {
+            "display": "",
+            "month": "",
+            "day": "",
+            "year": "",
+        }
+
+    return {
+        "display": f"{date_value.strftime('%B')} {date_value.day}, {date_value.year}",
+        "month": date_value.strftime("%B"),
+        "day": str(date_value.day),
+        "year": str(date_value.year),
+    }
+
+
 def _format_location_from_company(company):
     address = getattr(company, "address", None)
     city = getattr(address, "city", None) if address else None
@@ -78,6 +95,42 @@ def _format_location_from_company(company):
     return ""
 
 
+def _build_company_address_copy_payload(company):
+    address = getattr(company, "address", None)
+    city = getattr(address, "city", None) if address else None
+    state = getattr(city, "state", None) if city else None
+
+    street_1 = address.street_1.strip() if address and address.street_1 else ""
+    street_2 = address.street_2.strip() if address and address.street_2 else ""
+    city_name = city.name.strip() if city and city.name else ""
+    state_name = state.name.strip() if state and state.name else ""
+    state_code = state.abbreviation.strip() if state and state.abbreviation else ""
+    postal_code = address.postal_code.strip() if address and address.postal_code else ""
+
+    return {
+        "street_1": street_1,
+        "street_2": street_2,
+        "city": city_name,
+        "state_name": state_name,
+        "state": state_code,
+        "postal_code": postal_code,
+        "location": ", ".join(part for part in [city_name, state_code] if part),
+        "full": _join_copy_parts(
+            [
+                street_1,
+                street_2,
+                (
+                    f"{city_name}, {state_code} {postal_code}".strip()
+                    if city_name and state_code
+                    else " ".join(
+                        part for part in [city_name, state_code, postal_code] if part
+                    )
+                ),
+            ]
+        ),
+    }
+
+
 def _format_pay_amount(amount):
     if not amount:
         return ""
@@ -87,8 +140,20 @@ def _format_pay_amount(amount):
 def _build_role_copy_payload(role):
     task_lines = [f"- {task.description}" for task in role.tasks.all()]
     skills_text = ", ".join(skill.name for skill in role.skills.all())
-    location_text = _format_location_from_company(role.company)
+    address_payload = _build_company_address_copy_payload(role.company)
+    location_text = address_payload["location"]
     date_range = _format_date_range(role.start_date, role.end_date, role.current)
+    start_date_payload = _build_date_copy_payload(role.start_date)
+    end_date_payload = (
+        {
+            "display": "Present",
+            "month": "",
+            "day": "",
+            "year": "",
+        }
+        if role.current
+        else _build_date_copy_payload(role.end_date)
+    )
     starting_pay = _format_pay_amount(role.starting_pay)
     ending_pay = _format_pay_amount(role.ending_pay)
     pay_frequency = role.get_pay_frequency_display()
@@ -140,8 +205,23 @@ def _build_role_copy_payload(role):
     return {
         "title": role.title,
         "company": role.company.name,
+        "street_1": address_payload["street_1"],
+        "street_2": address_payload["street_2"],
+        "city": address_payload["city"],
+        "state_name": address_payload["state_name"],
+        "state": address_payload["state"],
+        "postal_code": address_payload["postal_code"],
+        "address": address_payload["full"],
         "location": location_text,
         "date_range": date_range,
+        "start_date": start_date_payload["display"],
+        "start_month": start_date_payload["month"],
+        "start_day": start_date_payload["day"],
+        "start_year": start_date_payload["year"],
+        "end_date": end_date_payload["display"],
+        "end_month": end_date_payload["month"],
+        "end_day": end_date_payload["day"],
+        "end_year": end_date_payload["year"],
         "description": role.description.strip(),
         "tasks": "\n".join(task_lines),
         "skills": skills_text,
