@@ -147,7 +147,7 @@
             zoom: 0.79;
             width: auto;
             transform: none;
-            break-inside: avoid-page;
+            /* break-inside: avoid-page; */
         }
 
         .resume-page,
@@ -227,11 +227,11 @@
             {% endif %}
             {% if profile.linkedin_url %}
                 {% if profile.location or profile.email or profile.phone %}<span class="contact-separator" style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span><a href="{{ profile.linkedin_url }}">{{ profile.linkedin_url }}</a></span>
+                <span><a href="{{ profile.linkedin_url }}">LinkedIn</a></span>
             {% endif %}
             {% if profile.github_url %}
                 {% if profile.location or profile.email or profile.phone or profile.linkedin_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span><a href="{{ profile.github_url }}">{{ profile.github_url }}</a></span>
+                <span><a href="{{ profile.github_url }}">GitHub</a></span>
             {% endif %}
         </p>
     </header>
@@ -302,7 +302,15 @@
         {% for project in projects %}
             <article>
                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
-                    <h3 style="margin: 0;">{{ project.title }}</h3>
+                    <div style="display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
+                        <h3 style="margin: 0;">{{ project.title }}</h3>
+                        {% if project.github_url %}
+                            <a href="{{ project.github_url }}">[GitHub]</a>
+                        {% endif %}
+                        {% if project.live_url %}
+                            <a href="{{ project.live_url }}">[Live]</a>
+                        {% endif %}
+                    </div>
                     <p style="margin: 0; text-align: right; white-space: nowrap;">
                         {% if project.start_date %}
                             {{ project.start_date|date:"M Y" }}

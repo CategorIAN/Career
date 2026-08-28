@@ -1,0 +1,200 @@
+{% extends "app/base.html" %}
+
+{% block title %}Experience{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Work Experience</h1>
+    <p class="utility-page-intro">Complete stored role history for copying into applications.</p>
+
+    {% for role in roles %}
+        <article class="utility-card">
+            <div class="utility-card-header">
+                <h2>{{ role.title }}</h2>
+                <div class="utility-copy-actions">
+                    <button
+                        type="button"
+                        class="copy-button role-toggle-button"
+                        data-target="role-details-{{ role.id }}"
+                    >
+                        Show
+                    </button>
+                    <button type="button" class="copy-button" data-copy-source="role-all-{{ role.id }}">Copy All</button>
+                </div>
+            </div>
+
+            <div id="role-details-{{ role.id }}" class="hidden">
+            <div class="utility-meta">
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Job title</strong>
+                        <button type="button" class="copy-button" data-copy-source="role-title-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.title }}</div>
+                </div>
+
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Company</strong>
+                        <button type="button" class="copy-button" data-copy-source="role-company-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.company.name }}</div>
+                </div>
+
+                {% if role.copy_payload.location %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Location</strong>
+                            <button type="button" class="copy-button" data-copy-source="role-location-{{ role.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ role.copy_payload.location }}</div>
+                    </div>
+                {% endif %}
+
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Dates</strong>
+                        <button type="button" class="copy-button" data-copy-source="role-dates-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.copy_payload.date_range }}</div>
+                </div>
+            </div>
+
+            {% if role.description %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Description</h3>
+                        <button type="button" class="copy-button" data-copy-source="role-description-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.description }}</div>
+                </div>
+            {% endif %}
+
+            {% if role.tasks.all %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Responsibilities</h3>
+                        <button type="button" class="copy-button" data-copy-source="role-tasks-{{ role.id }}">Copy</button>
+                    </div>
+                    <ul class="utility-list">
+                        {% for task in role.tasks.all %}
+                            <li>{{ task.description }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {% if role.skills.all %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Skills</h3>
+                        <button type="button" class="copy-button" data-copy-source="role-skills-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.copy_payload.skills }}</div>
+                </div>
+            {% endif %}
+
+            {% if role.reason_for_leaving %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Reason for Leaving</h3>
+                        <button type="button" class="copy-button" data-copy-source="role-reason-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ role.reason_for_leaving }}</div>
+                </div>
+            {% endif %}
+
+            {% if role.copy_payload.pay %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Pay</h3>
+                        <button type="button" class="copy-button" data-copy-source="role-pay-{{ role.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body" style="display: flex; flex-wrap: wrap; gap: 1rem;">
+                        {% if role.copy_payload.starting_pay %}<span><strong>Starting pay</strong>: {{ role.copy_payload.starting_pay }}</span>{% endif %}
+                        {% if role.copy_payload.ending_pay %}<span><strong>Ending pay</strong>: {{ role.copy_payload.ending_pay }}</span>{% endif %}
+                        {% if role.copy_payload.pay_frequency %}<span><strong>Pay frequency</strong>: {{ role.copy_payload.pay_frequency }}</span>{% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if role.supervisors.all %}
+                <div class="utility-field" style="margin-bottom: 0.25rem;">
+                    <div class="utility-field-header"
+                         style="margin: 0; padding: 0; align-items: flex-start;">
+                        <h3 style="margin: 0; padding: 0; line-height: 1.1;">Supervisors</h3>
+
+                        <button type="button"
+                                class="copy-button"
+                                data-copy-source="role-supervisors-{{ role.id }}">
+                            Copy
+                        </button>
+                    </div>
+
+                    <div class="utility-field-body"
+                         style="margin: 0.15rem 0 0 0; padding: 0; line-height: 1.1;">
+                        {% for supervisor in role.supervisors.all %}
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 0 0 0.15rem 0; padding: 0; line-height: 1.1;">
+                                <div style="margin: 0; padding: 0; width: 100%; text-align: left;"><strong>{{ supervisor.name }}</strong></div>
+
+                                <div style="
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    width: 100%;
+                                    gap: 0.1rem 0.9rem;
+                                    margin: 0;
+                                    padding: 0;
+                                    line-height: 1.1;
+                                ">
+                                    {% if supervisor.title %}
+                                        <span><strong>Title</strong>: {{ supervisor.title }}</span>
+                                    {% endif %}
+
+                                    {% if supervisor.email %}
+                                        <span><strong>Email</strong>: {{ supervisor.email }}</span>
+                                    {% endif %}
+
+                                    {% if supervisor.phone %}
+                                        <span><strong>Phone</strong>: {{ supervisor.phone }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <textarea id="role-title-{{ role.id }}" class="copy-source">{{ role.copy_payload.title }}</textarea>
+            <textarea id="role-company-{{ role.id }}" class="copy-source">{{ role.copy_payload.company }}</textarea>
+            <textarea id="role-location-{{ role.id }}" class="copy-source">{{ role.copy_payload.location }}</textarea>
+            <textarea id="role-dates-{{ role.id }}" class="copy-source">{{ role.copy_payload.date_range }}</textarea>
+            <textarea id="role-description-{{ role.id }}" class="copy-source">{{ role.copy_payload.description }}</textarea>
+            <textarea id="role-tasks-{{ role.id }}" class="copy-source">{{ role.copy_payload.tasks }}</textarea>
+            <textarea id="role-skills-{{ role.id }}" class="copy-source">{{ role.copy_payload.skills }}</textarea>
+            <textarea id="role-reason-{{ role.id }}" class="copy-source">{{ role.copy_payload.reason_for_leaving }}</textarea>
+            <textarea id="role-pay-{{ role.id }}" class="copy-source">{{ role.copy_payload.pay }}</textarea>
+            <textarea id="role-supervisors-{{ role.id }}" class="copy-source">{{ role.copy_payload.supervisors }}</textarea>
+            <textarea id="role-all-{{ role.id }}" class="copy-source">{{ role.copy_payload.all }}</textarea>
+            </div>
+        </article>
+    {% empty %}
+        <p>No roles found.</p>
+    {% endfor %}
+</section>
+<script>
+    document.querySelectorAll(".role-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+</script>
+{% endblock %}

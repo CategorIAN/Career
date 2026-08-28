@@ -177,6 +177,109 @@
         .pagination a:hover {
             background: #e7e7e7;
         }
+
+        .utility-page {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .utility-page h1 {
+            margin-top: 0;
+        }
+
+        .utility-page-intro {
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .utility-card {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border: 1px solid #b9b9b9;
+            background: #f7f7f7;
+        }
+
+        .utility-card h2 {
+            margin: 0;
+        }
+
+        .utility-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .utility-copy-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .copy-button {
+            padding: 0.35rem 0.75rem;
+            border: 1px solid #7d7d7d;
+            background: #f2f2f2;
+            color: #222;
+            cursor: pointer;
+        }
+
+        .copy-button:hover {
+            background: #e7e7e7;
+        }
+
+        .copy-button.copied {
+            background: #d9ead3;
+        }
+
+        .utility-field {
+            margin-bottom: 1rem;
+        }
+
+        .utility-field-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .utility-field-header h3,
+        .utility-field-header h4,
+        .utility-field-header strong,
+        .utility-field-header span {
+            margin: 0;
+        }
+
+        .utility-field-body {
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .utility-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.75rem 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .utility-list {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+
+        .utility-list li + li {
+            margin-top: 0.35rem;
+        }
+
+        .utility-links a + a {
+            margin-left: 0.75rem;
+        }
+
+        .copy-source {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -186,6 +289,9 @@
             <a class="nav-link" href="{% url 'search' %}">Search</a>
             <a class="nav-link" href="{% url 'resume' %}">Resume</a>
             <a class="nav-link" href="{% url 'references' %}">References</a>
+            <a class="nav-link" href="{% url 'experience' %}">Experience</a>
+            <a class="nav-link" href="{% url 'projects' %}">Projects</a>
+            <a class="nav-link" href="{% url 'courses' %}">Courses</a>
         </nav>
 
         <main class="page-content">
@@ -241,6 +347,35 @@
             const isHidden = skillsRow.classList.contains("hidden");
             skillsRow.classList.toggle("hidden");
             button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".copy-button").forEach(button => {
+        button.addEventListener("click", async () => {
+            const sourceId = button.dataset.copySource;
+            const source = sourceId ? document.getElementById(sourceId) : null;
+
+            if (!source) {
+                return;
+            }
+
+            const text = "value" in source ? source.value : source.textContent;
+            if (!text.trim() || !navigator.clipboard || !navigator.clipboard.writeText) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(text.trim());
+                const originalText = button.textContent;
+                button.textContent = "Copied";
+                button.classList.add("copied");
+                window.setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove("copied");
+                }, 1200);
+            } catch (error) {
+                console.error("Clipboard copy failed.", error);
+            }
         });
     });
 </script>

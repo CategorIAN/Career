@@ -1,20 +1,224 @@
+from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import F
+from django.db.models import F, Prefetch
 from django.conf import settings
+from django.urls import reverse
 from datetime import datetime, UTC
+import hashlib
+import logging
+import re
+from django.views.decorators.http import require_POST
 from urllib.parse import urlencode
 
 from .forms import SkillForm, SkillFormSet
-from .models import Skill, Education, Role, ProfileSetting, Project, Reference
+from .models import (
+    Course,
+    Skill,
+    Education,
+    Role,
+    ProfileSetting,
+    Project,
+    Reference,
+    FreelancerProject,
+    FreelancerSkill,
+    ProjectTask,
+    RoleTask,
+    Supervisor,
+)
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
+from freelancersdk.resources.projects.exceptions import ProjectsNotFoundException
 from freelancersdk.resources.projects.helpers import create_get_projects_project_details_object
 
 
 SEARCH_PAGE_SIZE = 10
-SEARCH_API_BATCH_SIZE = 100
+SEARCH_API_RESULT_LIMIT = 50
+SEARCH_CACHE_TIMEOUT = 60 * 60
+FREELANCER_RATE_LIMIT_MESSAGE = (
+    "Freelancer has temporarily rate-limited project searches. Please try again later."
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+def _join_copy_parts(parts):
+    return "\n".join(part for part in parts if part).strip()
+
+
+def _format_month_year(date_value):
+    if not date_value:
+        return ""
+    return date_value.strftime("%B %Y")
+
+
+def _format_date_range(start_date, end_date=None, is_current=False):
+    start_text = _format_month_year(start_date)
+    end_text = "Present" if is_current else _format_month_year(end_date)
+
+    if start_text and end_text:
+        return f"{start_text} - {end_text}"
+    if start_text:
+        return start_text
+    return end_text
+
+
+def _format_location_from_company(company):
+    address = getattr(company, "address", None)
+    city = getattr(address, "city", None) if address else None
+    state = getattr(city, "state", None) if city else None
+
+    if city and state:
+        return f"{city.name}, {state.abbreviation}"
+    if city:
+        return city.name
+    return ""
+
+
+def _format_pay_amount(amount):
+    if not amount:
+        return ""
+    return f"${amount:,.2f}"
+
+
+def _build_role_copy_payload(role):
+    task_lines = [f"- {task.description}" for task in role.tasks.all()]
+    skills_text = ", ".join(skill.name for skill in role.skills.all())
+    location_text = _format_location_from_company(role.company)
+    date_range = _format_date_range(role.start_date, role.end_date, role.current)
+    starting_pay = _format_pay_amount(role.starting_pay)
+    ending_pay = _format_pay_amount(role.ending_pay)
+    pay_frequency = role.get_pay_frequency_display()
+    pay_lines = [
+        f"Starting pay: {starting_pay}" if starting_pay else "",
+        f"Ending pay: {ending_pay}" if ending_pay else "",
+        f"Pay frequency: {pay_frequency}" if pay_frequency else "",
+    ]
+    pay_text = "\n".join(line for line in pay_lines if line)
+    supervisor_lines = []
+
+    for supervisor in role.supervisors.all():
+        supervisor_parts = [
+            supervisor.name,
+            supervisor.title,
+            supervisor.email,
+            supervisor.phone,
+        ]
+        supervisor_text = " | ".join(part for part in supervisor_parts if part)
+        if supervisor_text:
+            supervisor_lines.append(supervisor_text)
+
+    supervisors_text = "\n".join(supervisor_lines)
+
+    copy_all = _join_copy_parts(
+        [
+            role.title,
+            role.company.name,
+            location_text,
+            date_range,
+            "",
+            f"Description:\n{role.description}" if role.description else "",
+            (
+                "Responsibilities:\n" + "\n".join(task_lines)
+                if task_lines
+                else ""
+            ),
+            f"Skills:\n{skills_text}" if skills_text else "",
+            (
+                f"Reason for leaving:\n{role.reason_for_leaving}"
+                if role.reason_for_leaving
+                else ""
+            ),
+            f"Pay:\n{pay_text}" if pay_text else "",
+            f"Supervisors:\n{supervisors_text}" if supervisors_text else "",
+        ]
+    )
+
+    return {
+        "title": role.title,
+        "company": role.company.name,
+        "location": location_text,
+        "date_range": date_range,
+        "description": role.description.strip(),
+        "tasks": "\n".join(task_lines),
+        "skills": skills_text,
+        "reason_for_leaving": role.reason_for_leaving.strip(),
+        "starting_pay": starting_pay,
+        "ending_pay": ending_pay,
+        "pay_frequency": pay_frequency,
+        "pay": pay_text,
+        "supervisors": supervisors_text,
+        "all": copy_all,
+    }
+
+
+def _build_project_copy_payload(project):
+    task_lines = [f"- {task.description}" for task in project.tasks.all()]
+    skills_text = ", ".join(skill.name for skill in project.skills.all())
+    date_range = _format_date_range(project.start_date, project.end_date, not project.end_date)
+
+    copy_all = _join_copy_parts(
+        [
+            project.title,
+            date_range,
+            "",
+            f"Short description:\n{project.short_description}"
+            if project.short_description
+            else "",
+            f"Description:\n{project.description}" if project.description else "",
+            f"GitHub URL:\n{project.github_url}" if project.github_url else "",
+            f"Live URL:\n{project.live_url}" if project.live_url else "",
+            "Tasks:\n" + "\n".join(task_lines) if task_lines else "",
+            f"Skills:\n{skills_text}" if skills_text else "",
+        ]
+    )
+
+    return {
+        "title": project.title,
+        "date_range": date_range,
+        "short_description": project.short_description.strip(),
+        "description": project.description.strip(),
+        "github_url": project.github_url.strip(),
+        "live_url": project.live_url.strip(),
+        "tasks": "\n".join(task_lines),
+        "skills": skills_text,
+        "all": copy_all,
+    }
+
+
+def _build_course_copy_payload(course):
+    education = course.education
+    school_name = education.school.name
+    program_name = ", ".join(
+        part for part in [education.degree, education.field_of_study] if part
+    )
+    skills_text = ", ".join(skill.name for skill in course.skills.all())
+
+    copy_all = _join_copy_parts(
+        [
+            course.title,
+            f"Course code:\n{course.code}" if course.code else "",
+            f"School:\n{school_name}",
+            f"Program:\n{program_name}" if program_name else "",
+            f"Description:\n{course.description}" if course.description else "",
+            f"Grade:\n{course.grade}" if course.grade else "",
+            f"Skills:\n{skills_text}" if skills_text else "",
+        ]
+    )
+
+    return {
+        "title": course.title,
+        "code": course.code.strip(),
+        "school": school_name,
+        "program": program_name,
+        "description": course.description.strip(),
+        "grade": course.grade.strip(),
+        "skills": skills_text,
+        "all": copy_all,
+    }
 
 
 def home_view(request):
@@ -59,42 +263,192 @@ def skill_formset_view(request):
     )
 
 
-def _fetch_all_projects(query):
+def _normalize_search_query(query):
+    return re.sub(r"\s+", " ", query.strip()).casefold()
+
+
+def _build_search_cache_key(query):
+    normalized_query = _normalize_search_query(query)
+    query_hash = hashlib.sha256(normalized_query.encode("utf-8")).hexdigest()
+    return f"freelancer-project-search:{query_hash}"
+
+
+def _build_search_redirect_url(query, page_number=None):
+    query_params = {"query": query}
+    if page_number:
+        query_params["page"] = page_number
+    return f"{reverse('search')}?{urlencode(query_params)}"
+
+
+def _timestamp_to_datetime(timestamp):
+    if timestamp is None:
+        return None
+    return datetime.fromtimestamp(timestamp, UTC)
+
+
+def _get_cached_projects_for_query(query):
+    normalized_query = _normalize_search_query(query)
+    cache_key = _build_search_cache_key(normalized_query)
+    return normalized_query, cache.get(cache_key)
+
+
+def _get_project_from_cached_results(query, freelancer_project_id):
+    normalized_query, cached_projects = _get_cached_projects_for_query(query)
+    logger.info(
+        "Freelancer project save cache lookup",
+        extra={
+            "normalized_query": normalized_query,
+            "freelancer_project_id": freelancer_project_id,
+            "results_from_cache": cached_projects is not None,
+        },
+    )
+    if cached_projects is None:
+        return normalized_query, None
+
+    selected_project = next(
+        (
+            project
+            for project in cached_projects
+            if str(project.get("id")) == str(freelancer_project_id)
+        ),
+        None,
+    )
+    return normalized_query, selected_project
+
+
+def _save_freelancer_project(project_data):
+    freelancer_project_id = project_data["id"]
+    budget = project_data.get("budget") or {}
+    bid_stats = project_data.get("bid_stats") or {}
+    upgrades = project_data.get("upgrades") or {}
+    jobs = project_data.get("jobs") or []
+
+    freelancer_project, _ = FreelancerProject.objects.update_or_create(
+        freelancer_id=freelancer_project_id,
+        defaults={
+            "title": project_data.get("title", ""),
+            "description": project_data.get("description") or "",
+            "status": project_data.get("status", ""),
+            "deleted": project_data.get("deleted", False),
+            "project_type": project_data.get("type", ""),
+            "submitted_at": _timestamp_to_datetime(project_data.get("submitdate")),
+            "bid_period_days": project_data.get("bidperiod"),
+            "free_bids_expire_at": _timestamp_to_datetime(
+                project_data.get("freebids_expire")
+            ),
+            "budget_min": budget.get("minimum"),
+            "budget_max": budget.get("maximum"),
+            "bid_count": bid_stats.get("bid_count"),
+            "bid_avg": bid_stats.get("bid_avg"),
+            "urgent": upgrades.get("urgent", False),
+            "featured": upgrades.get("featured", False),
+            "nonpublic": upgrades.get("nonpublic", False),
+            "enterprise": upgrades.get("enterprise", False),
+            "premium": upgrades.get("premium", False),
+            "sealed": upgrades.get("sealed", False),
+            "nda_required": upgrades.get("NDA", False),
+            "raw_json": project_data,
+        },
+    )
+
+    freelancer_skills = []
+    for job in jobs:
+        job_id = job.get("id")
+        if job_id is None:
+            continue
+
+        freelancer_skill, _ = FreelancerSkill.objects.update_or_create(
+            id=job_id,
+            defaults={
+                "name": job.get("name", ""),
+                "category_id": job.get("category", {}).get("id"),
+                "category_name": job.get("category", {}).get("name"),
+            },
+        )
+        freelancer_skills.append(freelancer_skill)
+
+    freelancer_project.freelancer_skills.set(freelancer_skills)
+    return freelancer_project
+
+
+def _fetch_all_projects_from_api(query):
     session = Session(oauth_token=settings.FREELANCER_TOKEN)
     project_details = create_get_projects_project_details_object(
         full_description=True,
         jobs=True,
     )
-    projects = []
-    offset = 0
-
-    while True:
-        response = search_projects(
-            session,
-            query=query,
-            project_details=project_details,
-            limit=SEARCH_API_BATCH_SIZE,
-            offset=offset,
-        )
-        batch = response.get("projects", [])
-
-        if not batch:
-            break
-
-        projects.extend(batch)
-
-        if len(batch) < SEARCH_API_BATCH_SIZE:
-            break
-
-        offset += SEARCH_API_BATCH_SIZE
+    logger.info("Freelancer search API request", extra={"normalized_query": query})
+    response = search_projects(
+        session,
+        query=query,
+        project_details=project_details,
+        limit=SEARCH_API_RESULT_LIMIT,
+        offset=0,
+    )
+    projects = response.get("projects", [])
 
     for project in projects:
-        project["submitdate_datetime"] = str(datetime.fromtimestamp(
-            project["submitdate"],
-            UTC,
-        ).date())
+        submitdate = project.get("submitdate")
+        project["submitdate_datetime"] = (
+            str(datetime.fromtimestamp(submitdate, UTC).date())
+            if submitdate is not None
+            else ""
+        )
 
+    logger.info(
+        "Freelancer search API response",
+        extra={
+            "normalized_query": query,
+            "project_count": len(projects),
+        },
+    )
     return projects
+
+
+def _fetch_all_projects(query, force_refresh=False):
+    normalized_query = _normalize_search_query(query)
+    cache_key = _build_search_cache_key(normalized_query)
+    logger.info(
+        "Freelancer search cache lookup",
+        extra={
+            "normalized_query": normalized_query,
+            "results_from_cache": not force_refresh,
+            "force_refresh": force_refresh,
+        },
+    )
+
+    if not force_refresh:
+        cached_projects = cache.get(cache_key)
+        if cached_projects is not None:
+            logger.info(
+                "Freelancer search cache hit",
+                extra={
+                    "normalized_query": normalized_query,
+                    "results_from_cache": True,
+                    "project_count": len(cached_projects),
+                },
+            )
+            return cached_projects, True
+
+    logger.info(
+        "Freelancer search cache miss",
+        extra={
+            "normalized_query": normalized_query,
+            "results_from_cache": False,
+            "force_refresh": force_refresh,
+        },
+    )
+    projects = _fetch_all_projects_from_api(normalized_query)
+    cache.set(cache_key, projects, SEARCH_CACHE_TIMEOUT)
+    logger.info(
+        "Freelancer search cache store",
+        extra={
+            "normalized_query": normalized_query,
+            "results_from_cache": False,
+            "project_count": len(projects),
+        },
+    )
+    return projects, False
 
 
 def search_view(request):
@@ -107,24 +461,110 @@ def search_view(request):
 
     query = request.GET.get("query", "").strip()
     page_number = request.GET.get("page") or 1
+    force_refresh = request.GET.get("refresh") == "1"
     all_projects = []
     page_obj = None
+    results_from_cache = False
+    search_error_message = ""
 
     if query:
-        all_projects = _fetch_all_projects(query)
-        paginator = Paginator(all_projects, SEARCH_PAGE_SIZE)
-        page_obj = paginator.get_page(page_number)
+        try:
+            all_projects, results_from_cache = _fetch_all_projects(
+                query,
+                force_refresh=force_refresh,
+            )
+        except ProjectsNotFoundException as exc:
+            error_message = str(exc)
+            if "You have made too many of these requests" in error_message:
+                logger.warning(
+                    "Freelancer search rate limited",
+                    extra={"normalized_query": _normalize_search_query(query)},
+                )
+                search_error_message = FREELANCER_RATE_LIMIT_MESSAGE
+            else:
+                raise
+        else:
+            paginator = Paginator(all_projects, SEARCH_PAGE_SIZE)
+            page_obj = paginator.get_page(page_number)
+            project_ids = [
+                project.get("id")
+                for project in page_obj.object_list
+                if project.get("id") is not None
+            ]
+            saved_project_ids = set(
+                FreelancerProject.objects.filter(
+                    freelancer_id__in=project_ids,
+                ).values_list("freelancer_id", flat=True)
+            )
+            page_projects = [
+                {
+                    **project,
+                    "is_saved": project.get("id") in saved_project_ids,
+                }
+                for project in page_obj.object_list
+            ]
+    else:
+        page_projects = []
 
     return render(
         request,
         "app/search.html",
         {
             "query": query,
-            "projects": page_obj.object_list if page_obj else [],
+            "projects": page_projects if page_obj else [],
             "page_obj": page_obj,
             "total_projects": len(all_projects),
+            "results_from_cache": results_from_cache,
+            "search_error_message": search_error_message,
         }
     )
+
+
+@require_POST
+def save_freelancer_project_view(request):
+    freelancer_project_id = request.POST.get("project_id", "").strip()
+    query = request.POST.get("query", "").strip()
+    page_number = request.POST.get("page", "").strip()
+    redirect_url = _build_search_redirect_url(query, page_number or None)
+
+    if not freelancer_project_id or not query:
+        messages.error(
+            request,
+            "The selected Freelancer project could not be saved. Please try the search again.",
+        )
+        return redirect(redirect_url)
+
+    normalized_query, selected_project = _get_project_from_cached_results(
+        query,
+        freelancer_project_id,
+    )
+    if selected_project is None:
+        logger.warning(
+            "Freelancer project save failed: project not found in cache",
+            extra={
+                "normalized_query": normalized_query,
+                "freelancer_project_id": freelancer_project_id,
+            },
+        )
+        messages.error(
+            request,
+            "That Freelancer project is no longer available in the cached search results. Please search again.",
+        )
+        return redirect(redirect_url)
+
+    saved_project = _save_freelancer_project(selected_project)
+    logger.info(
+        "Freelancer project saved",
+        extra={
+            "normalized_query": normalized_query,
+            "freelancer_project_id": saved_project.freelancer_id,
+        },
+    )
+    messages.success(
+        request,
+        f'Saved "{saved_project.title}".',
+    )
+    return redirect(redirect_url)
 
 
 def resume_view(request):
@@ -199,4 +639,92 @@ def references_view(request):
         {
             "references": references,
         },
+    )
+
+
+def experience_view(request):
+    roles = (
+        Role.objects
+        .select_related(
+            "company",
+            "company__address",
+            "company__address__city",
+            "company__address__city__state",
+        )
+        .prefetch_related(
+            Prefetch(
+                "tasks",
+                queryset=RoleTask.objects.order_by("sort_order", "id"),
+            ),
+            Prefetch(
+                "skills",
+                queryset=Skill.objects.order_by("name"),
+            ),
+            Prefetch(
+                "supervisors",
+                queryset=Supervisor.objects.order_by("id"),
+            ),
+        )
+        .order_by("-start_date", "-id")
+    )
+
+    for role in roles:
+        role.copy_payload = _build_role_copy_payload(role)
+
+    return render(
+        request,
+        "app/experience.html",
+        {"roles": roles},
+    )
+
+
+def projects_view(request):
+    projects = (
+        Project.objects
+        .prefetch_related(
+            Prefetch(
+                "tasks",
+                queryset=ProjectTask.objects.order_by("sort_order", "id"),
+            ),
+            Prefetch(
+                "skills",
+                queryset=Skill.objects.order_by("name"),
+            ),
+        )
+        .order_by("sort_order", "-start_date", "title")
+    )
+
+    for project in projects:
+        project.copy_payload = _build_project_copy_payload(project)
+
+    return render(
+        request,
+        "app/projects.html",
+        {"projects": projects},
+    )
+
+
+def courses_view(request):
+    courses = (
+        Course.objects
+        .select_related(
+            "education",
+            "education__school",
+        )
+        .prefetch_related(
+            Prefetch(
+                "skills",
+                queryset=Skill.objects.order_by("name"),
+            ),
+        )
+        .order_by("sort_order", "title")
+    )
+
+    for course in courses:
+        course.copy_payload = _build_course_copy_payload(course)
+
+    return render(
+        request,
+        "app/courses.html",
+        {"courses": courses},
     )

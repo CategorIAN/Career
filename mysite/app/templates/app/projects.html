@@ -1,0 +1,119 @@
+{% extends "app/base.html" %}
+
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Projects</h1>
+    <p class="utility-page-intro">Complete stored project details for copying into applications.</p>
+
+    {% for project in projects %}
+        <article class="utility-card">
+            <div class="utility-card-header">
+                <h2>{{ project.title }}</h2>
+                <div class="utility-copy-actions">
+                    <button type="button" class="copy-button" data-copy-source="project-all-{{ project.id }}">Copy All</button>
+                </div>
+            </div>
+
+            <div class="utility-meta">
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Title</strong>
+                        <button type="button" class="copy-button" data-copy-source="project-title-{{ project.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ project.title }}</div>
+                </div>
+
+                {% if project.copy_payload.date_range %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Dates</strong>
+                            <button type="button" class="copy-button" data-copy-source="project-dates-{{ project.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ project.copy_payload.date_range }}</div>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if project.short_description %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Short Description</h3>
+                        <button type="button" class="copy-button" data-copy-source="project-short-description-{{ project.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ project.short_description }}</div>
+                </div>
+            {% endif %}
+
+            {% if project.description %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Long Description</h3>
+                        <button type="button" class="copy-button" data-copy-source="project-description-{{ project.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ project.description }}</div>
+                </div>
+            {% endif %}
+
+            {% if project.github_url or project.live_url %}
+                <div class="utility-field utility-links">
+                    <div class="utility-field-header">
+                        <h3>Links</h3>
+                    </div>
+                    <div class="utility-field-body">
+                        {% if project.github_url %}
+                            <div>
+                                <a href="{{ project.github_url }}">{{ project.github_url }}</a>
+                                <button type="button" class="copy-button" data-copy-source="project-github-{{ project.id }}">Copy GitHub URL</button>
+                            </div>
+                        {% endif %}
+                        {% if project.live_url %}
+                            <div style="margin-top: 0.5rem;">
+                                <a href="{{ project.live_url }}">{{ project.live_url }}</a>
+                                <button type="button" class="copy-button" data-copy-source="project-live-{{ project.id }}">Copy Live URL</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if project.tasks.all %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Tasks</h3>
+                        <button type="button" class="copy-button" data-copy-source="project-tasks-{{ project.id }}">Copy</button>
+                    </div>
+                    <ul class="utility-list">
+                        {% for task in project.tasks.all %}
+                            <li>{{ task.description }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {% if project.skills.all %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Skills</h3>
+                        <button type="button" class="copy-button" data-copy-source="project-skills-{{ project.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ project.copy_payload.skills }}</div>
+                </div>
+            {% endif %}
+
+            <textarea id="project-title-{{ project.id }}" class="copy-source">{{ project.copy_payload.title }}</textarea>
+            <textarea id="project-dates-{{ project.id }}" class="copy-source">{{ project.copy_payload.date_range }}</textarea>
+            <textarea id="project-short-description-{{ project.id }}" class="copy-source">{{ project.copy_payload.short_description }}</textarea>
+            <textarea id="project-description-{{ project.id }}" class="copy-source">{{ project.copy_payload.description }}</textarea>
+            <textarea id="project-github-{{ project.id }}" class="copy-source">{{ project.copy_payload.github_url }}</textarea>
+            <textarea id="project-live-{{ project.id }}" class="copy-source">{{ project.copy_payload.live_url }}</textarea>
+            <textarea id="project-tasks-{{ project.id }}" class="copy-source">{{ project.copy_payload.tasks }}</textarea>
+            <textarea id="project-skills-{{ project.id }}" class="copy-source">{{ project.copy_payload.skills }}</textarea>
+            <textarea id="project-all-{{ project.id }}" class="copy-source">{{ project.copy_payload.all }}</textarea>
+        </article>
+    {% empty %}
+        <p>No projects found.</p>
+    {% endfor %}
+</section>
+{% endblock %}

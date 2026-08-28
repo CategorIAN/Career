@@ -10,8 +10,21 @@
     <button type="submit">Search</button>
 </form>
 
+{% if messages %}
+    {% for message in messages %}
+    <p>{{ message }}</p>
+    {% endfor %}
+{% endif %}
+
 {% if query %}
 <p>{{ total_projects }} project{{ total_projects|pluralize }} found.</p>
+<p><a href="?query={{ query|urlencode }}&refresh=1">Refresh from Freelancer</a></p>
+{% if results_from_cache %}
+<p>Showing cached results. No Freelancer API request was made.</p>
+{% endif %}
+{% if search_error_message %}
+<p>{{ search_error_message }}</p>
+{% endif %}
 {% endif %}
 
 <table class="project-results">
@@ -27,6 +40,7 @@
         <th>Bid Period</th>
         <th>Urgent</th>
         <th>Featured</th>
+        <th>Save</th>
     </tr>
 
     {% for project in projects %}
@@ -89,9 +103,23 @@
                 No
             {% endif %}
         </td>
+
+        <td>
+            {% if project.is_saved %}
+                <span>Saved</span>
+            {% else %}
+                <form method="post" action="{% url 'save_freelancer_project' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="project_id" value="{{ project.id }}">
+                    <input type="hidden" name="query" value="{{ query }}">
+                    <input type="hidden" name="page" value="{{ page_obj.number }}">
+                    <button type="submit">Add</button>
+                </form>
+            {% endif %}
+        </td>
     </tr>
     <tr id="skills-{{ forloop.counter0 }}" class="skills-row hidden">
-        <td colspan="11">
+        <td colspan="12">
             <strong>Skills:</strong>
             {% for job in project.jobs %}
                 {{ job.name }}{% if not forloop.last %}, {% endif %}

@@ -1,0 +1,98 @@
+{% extends "app/base.html" %}
+
+{% block title %}Courses{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Courses</h1>
+    <p class="utility-page-intro">Complete stored course details for copying into applications.</p>
+
+    {% for course in courses %}
+        <article class="utility-card">
+            <div class="utility-card-header">
+                <h2>{{ course.title }}</h2>
+                <div class="utility-copy-actions">
+                    <button type="button" class="copy-button" data-copy-source="course-all-{{ course.id }}">Copy All</button>
+                </div>
+            </div>
+
+            <div class="utility-meta">
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Course title</strong>
+                        <button type="button" class="copy-button" data-copy-source="course-title-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.title }}</div>
+                </div>
+
+                {% if course.code %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Course code</strong>
+                            <button type="button" class="copy-button" data-copy-source="course-code-{{ course.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ course.code }}</div>
+                    </div>
+                {% endif %}
+
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>School</strong>
+                        <button type="button" class="copy-button" data-copy-source="course-school-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.education.school.name }}</div>
+                </div>
+
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <strong>Program</strong>
+                        <button type="button" class="copy-button" data-copy-source="course-program-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.copy_payload.program }}</div>
+                </div>
+            </div>
+
+            {% if course.description %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Description</h3>
+                        <button type="button" class="copy-button" data-copy-source="course-description-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.description }}</div>
+                </div>
+            {% endif %}
+
+            {% if course.grade %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Grade</h3>
+                        <button type="button" class="copy-button" data-copy-source="course-grade-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.grade }}</div>
+                </div>
+            {% endif %}
+
+            {% if course.skills.all %}
+                <div class="utility-field">
+                    <div class="utility-field-header">
+                        <h3>Skills</h3>
+                        <button type="button" class="copy-button" data-copy-source="course-skills-{{ course.id }}">Copy</button>
+                    </div>
+                    <div class="utility-field-body">{{ course.copy_payload.skills }}</div>
+                </div>
+            {% endif %}
+
+            <textarea id="course-title-{{ course.id }}" class="copy-source">{{ course.copy_payload.title }}</textarea>
+            <textarea id="course-code-{{ course.id }}" class="copy-source">{{ course.copy_payload.code }}</textarea>
+            <textarea id="course-school-{{ course.id }}" class="copy-source">{{ course.copy_payload.school }}</textarea>
+            <textarea id="course-program-{{ course.id }}" class="copy-source">{{ course.copy_payload.program }}</textarea>
+            <textarea id="course-description-{{ course.id }}" class="copy-source">{{ course.copy_payload.description }}</textarea>
+            <textarea id="course-grade-{{ course.id }}" class="copy-source">{{ course.copy_payload.grade }}</textarea>
+            <textarea id="course-skills-{{ course.id }}" class="copy-source">{{ course.copy_payload.skills }}</textarea>
+            <textarea id="course-all-{{ course.id }}" class="copy-source">{{ course.copy_payload.all }}</textarea>
+        </article>
+    {% empty %}
+        <p>No courses found.</p>
+    {% endfor %}
+</section>
+{% endblock %}
