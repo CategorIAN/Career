@@ -239,6 +239,17 @@ def _build_project_copy_payload(project):
     task_lines = [f"- {task.description}" for task in project.tasks.all()]
     skills_text = ", ".join(skill.name for skill in project.skills.all())
     date_range = _format_date_range(project.start_date, project.end_date, not project.end_date)
+    start_date_payload = _build_date_copy_payload(project.start_date)
+    end_date_payload = (
+        {
+            "display": "Present",
+            "month": "",
+            "day": "",
+            "year": "",
+        }
+        if not project.end_date
+        else _build_date_copy_payload(project.end_date)
+    )
 
     copy_all = _join_copy_parts(
         [
@@ -259,6 +270,14 @@ def _build_project_copy_payload(project):
     return {
         "title": project.title,
         "date_range": date_range,
+        "start_date": start_date_payload["display"],
+        "start_month": start_date_payload["month"],
+        "start_day": start_date_payload["day"],
+        "start_year": start_date_payload["year"],
+        "end_date": end_date_payload["display"],
+        "end_month": end_date_payload["month"],
+        "end_day": end_date_payload["day"],
+        "end_year": end_date_payload["year"],
         "short_description": project.short_description.strip(),
         "description": project.description.strip(),
         "github_url": project.github_url.strip(),

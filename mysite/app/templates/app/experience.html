@@ -236,7 +236,16 @@
                         <h3>Skills</h3>
                         <button type="button" class="copy-button" data-copy-source="role-skills-{{ role.id }}">Copy</button>
                     </div>
-                    <div class="utility-field-body">{{ role.copy_payload.skills }}</div>
+                    <div class="utility-skill-grid">
+                        {% for skill in role.skills.all %}
+                            <div class="utility-subfield">
+                                <div class="utility-subfield-header">
+                                    <strong>{{ skill.name }}</strong>
+                                    <button type="button" class="copy-button" data-copy-source="role-skill-{{ role.id }}-{{ skill.id }}">Copy</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
             {% endif %}
 
@@ -280,28 +289,79 @@
                     <div class="utility-field-body"
                          style="margin: 0.15rem 0 0 0; padding: 0; line-height: 1.1;">
                         {% for supervisor in role.supervisors.all %}
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 0 0 0.15rem 0; padding: 0; line-height: 1.1;">
-                                <div style="margin: 0; padding: 0; width: 100%; text-align: left;"><strong>{{ supervisor.name }}</strong></div>
+                            <div class="supervisor-row">
+                                <div class="supervisor-row-header">
+                                    <strong>{{ supervisor.name }}</strong>
+                                    <div class="utility-copy-actions">
+                                        <div class="supervisor-action-wrap">
+                                            <button
+                                                type="button"
+                                                class="copy-button supervisor-action-button supervisor-toggle-button"
+                                                data-target="role-supervisor-details-{{ role.id }}-{{ supervisor.id }}"
+                                            >
+                                                Show
+                                            </button>
+                                        </div>
+                                        <div class="supervisor-action-wrap">
+                                            <button
+                                                type="button"
+                                                class="copy-button supervisor-action-button"
+                                                data-copy-source="role-supervisor-{{ role.id }}-{{ supervisor.id }}"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                <div style="
-                                    display: flex;
-                                    flex-wrap: wrap;
-                                    width: 100%;
-                                    gap: 0.1rem 0.9rem;
-                                    margin: 0;
-                                    padding: 0;
-                                    line-height: 1.1;
-                                ">
+                                <div id="role-supervisor-details-{{ role.id }}-{{ supervisor.id }}"
+                                     class="supervisor-details hidden">
                                     {% if supervisor.title %}
-                                        <span><strong>Title</strong>: {{ supervisor.title }}</span>
+                                        <div class="supervisor-detail-item">
+                                            <strong>Title</strong>
+                                            <span>{{ supervisor.title }}</span>
+                                            <div class="supervisor-detail-copy-wrap">
+                                                <button
+                                                    type="button"
+                                                    class="copy-button supervisor-detail-copy-button"
+                                                    data-copy-source="role-supervisor-title-{{ role.id }}-{{ supervisor.id }}"
+                                                >
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
                                     {% endif %}
 
                                     {% if supervisor.email %}
-                                        <span><strong>Email</strong>: {{ supervisor.email }}</span>
+                                        <div class="supervisor-detail-item">
+                                            <strong>Email</strong>
+                                            <span>{{ supervisor.email }}</span>
+                                            <div class="supervisor-detail-copy-wrap">
+                                                <button
+                                                    type="button"
+                                                    class="copy-button supervisor-detail-copy-button"
+                                                    data-copy-source="role-supervisor-email-{{ role.id }}-{{ supervisor.id }}"
+                                                >
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
                                     {% endif %}
 
                                     {% if supervisor.phone %}
-                                        <span><strong>Phone</strong>: {{ supervisor.phone }}</span>
+                                        <div class="supervisor-detail-item">
+                                            <strong>Phone</strong>
+                                            <span>{{ supervisor.phone }}</span>
+                                            <div class="supervisor-detail-copy-wrap">
+                                                <button
+                                                    type="button"
+                                                    class="copy-button supervisor-detail-copy-button"
+                                                    data-copy-source="role-supervisor-phone-{{ role.id }}-{{ supervisor.id }}"
+                                                >
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -330,9 +390,20 @@
             <textarea id="role-description-{{ role.id }}" class="copy-source">{{ role.copy_payload.description }}</textarea>
             <textarea id="role-tasks-{{ role.id }}" class="copy-source">{{ role.copy_payload.tasks }}</textarea>
             <textarea id="role-skills-{{ role.id }}" class="copy-source">{{ role.copy_payload.skills }}</textarea>
+            {% for skill in role.skills.all %}
+                <textarea id="role-skill-{{ role.id }}-{{ skill.id }}" class="copy-source">{{ skill.name }}</textarea>
+            {% endfor %}
             <textarea id="role-reason-{{ role.id }}" class="copy-source">{{ role.copy_payload.reason_for_leaving }}</textarea>
             <textarea id="role-pay-{{ role.id }}" class="copy-source">{{ role.copy_payload.pay }}</textarea>
             <textarea id="role-supervisors-{{ role.id }}" class="copy-source">{{ role.copy_payload.supervisors }}</textarea>
+            {% for supervisor in role.supervisors.all %}
+                <textarea id="role-supervisor-{{ role.id }}-{{ supervisor.id }}" class="copy-source">{% if supervisor.title %}{{ supervisor.title }}
+{% endif %}{% if supervisor.email %}{{ supervisor.email }}
+{% endif %}{% if supervisor.phone %}{{ supervisor.phone }}{% endif %}</textarea>
+                <textarea id="role-supervisor-title-{{ role.id }}-{{ supervisor.id }}" class="copy-source">{{ supervisor.title }}</textarea>
+                <textarea id="role-supervisor-email-{{ role.id }}-{{ supervisor.id }}" class="copy-source">{{ supervisor.email }}</textarea>
+                <textarea id="role-supervisor-phone-{{ role.id }}-{{ supervisor.id }}" class="copy-source">{{ supervisor.phone }}</textarea>
+            {% endfor %}
             <textarea id="role-all-{{ role.id }}" class="copy-source">{{ role.copy_payload.all }}</textarea>
             </div>
         </article>
@@ -383,6 +454,21 @@
             const isHidden = details.classList.contains("hidden");
             details.classList.toggle("hidden");
             button.textContent = isHidden ? "Hide Dates" : "Show Dates";
+        });
+    });
+
+    document.querySelectorAll(".supervisor-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
         });
     });
 </script>

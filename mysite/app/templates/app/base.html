@@ -345,6 +345,97 @@
             margin-left: 0.75rem;
         }
 
+        .utility-link-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .utility-skill-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem 0.75rem;
+        }
+
+        @media (max-width: 700px) {
+            .utility-skill-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .supervisor-row {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin: 0 0 0.15rem 0;
+            padding: 0;
+            line-height: 1.1;
+        }
+
+        .supervisor-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+            width: 100%;
+            text-align: left;
+        }
+
+        .supervisor-details {
+            display: flex;
+            flex-wrap: wrap;
+            width: 100%;
+            gap: 0.35rem 0.9rem;
+            margin: 0.25rem 0 0 0;
+            padding: 0;
+            line-height: 1.1;
+        }
+
+        .supervisor-detail-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .supervisor-detail-copy-wrap {
+            display: inline-flex;
+            flex: 0 0 auto;
+            width: 3.5rem;
+        }
+
+        .supervisor-action-wrap {
+            display: inline-flex;
+            flex: 0 0 auto;
+            width: 3.5rem;
+        }
+
+        .supervisor-action-button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 3.5rem !important;
+            min-width: 3.5rem !important;
+            max-width: 3.5rem !important;
+            flex: 0 0 3.5rem !important;
+            white-space: nowrap !important;
+        }
+
+        .supervisor-detail-copy-button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 3.5rem !important;
+            min-width: 3.5rem !important;
+            max-width: 3.5rem !important;
+            flex: 0 0 3.5rem !important;
+            padding: 0.1rem 0.35rem !important;
+            font-size: 0.72rem !important;
+            line-height: 1.1 !important;
+            white-space: nowrap !important;
+        }
+
         .copy-source {
             display: none;
         }

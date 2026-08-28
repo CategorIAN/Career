@@ -12,10 +12,18 @@
             <div class="utility-card-header">
                 <h2>{{ project.title }}</h2>
                 <div class="utility-copy-actions">
+                    <button
+                        type="button"
+                        class="copy-button project-toggle-button"
+                        data-target="project-details-{{ project.id }}"
+                    >
+                        Show
+                    </button>
                     <button type="button" class="copy-button" data-copy-source="project-all-{{ project.id }}">Copy All</button>
                 </div>
             </div>
 
+            <div id="project-details-{{ project.id }}" class="hidden">
             <div class="utility-meta">
                 <div class="utility-field">
                     <div class="utility-field-header">
@@ -26,12 +34,101 @@
                 </div>
 
                 {% if project.copy_payload.date_range %}
-                    <div class="utility-field">
+                    <div class="utility-field utility-field-full">
                         <div class="utility-field-header">
                             <strong>Dates</strong>
-                            <button type="button" class="copy-button" data-copy-source="project-dates-{{ project.id }}">Copy</button>
+                            <div class="utility-copy-actions">
+                                <button
+                                    type="button"
+                                    class="copy-button project-date-toggle-button"
+                                    data-target="project-date-components-{{ project.id }}"
+                                >
+                                    Show Dates
+                                </button>
+                                <button type="button" class="copy-button" data-copy-source="project-dates-{{ project.id }}">Copy</button>
+                            </div>
                         </div>
                         <div class="utility-field-body">{{ project.copy_payload.date_range }}</div>
+                        <div id="project-date-components-{{ project.id }}" class="date-blocks hidden">
+                            {% if project.copy_payload.start_date %}
+                                <div class="utility-subfield date-block">
+                                    <div class="utility-subfield-header">
+                                        <strong>Start date</strong>
+                                        <button type="button" class="copy-button" data-copy-source="project-start-date-{{ project.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ project.copy_payload.start_date }}</div>
+                                    <div class="date-part-grid">
+                                        {% if project.copy_payload.start_month %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Month</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="project-start-month-{{ project.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ project.copy_payload.start_month }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if project.copy_payload.start_day %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Day</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="project-start-day-{{ project.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ project.copy_payload.start_day }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if project.copy_payload.start_year %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Year</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="project-start-year-{{ project.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ project.copy_payload.start_year }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% if project.copy_payload.end_date %}
+                                <div class="utility-subfield date-block date-block-end">
+                                    <div class="utility-subfield-header">
+                                        <strong>End date</strong>
+                                        <button type="button" class="copy-button" data-copy-source="project-end-date-{{ project.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ project.copy_payload.end_date }}</div>
+                                    {% if project.copy_payload.end_month or project.copy_payload.end_day or project.copy_payload.end_year %}
+                                        <div class="date-part-grid">
+                                            {% if project.copy_payload.end_month %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Month</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="project-end-month-{{ project.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ project.copy_payload.end_month }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if project.copy_payload.end_day %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Day</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="project-end-day-{{ project.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ project.copy_payload.end_day }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if project.copy_payload.end_year %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Year</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="project-end-year-{{ project.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ project.copy_payload.end_year }}</div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -61,7 +158,7 @@
                     <div class="utility-field-header">
                         <h3>Links</h3>
                     </div>
-                    <div class="utility-field-body">
+                    <div class="utility-field-body utility-link-list">
                         {% if project.github_url %}
                             <div>
                                 <a href="{{ project.github_url }}">{{ project.github_url }}</a>
@@ -69,7 +166,7 @@
                             </div>
                         {% endif %}
                         {% if project.live_url %}
-                            <div style="margin-top: 0.5rem;">
+                            <div>
                                 <a href="{{ project.live_url }}">{{ project.live_url }}</a>
                                 <button type="button" class="copy-button" data-copy-source="project-live-{{ project.id }}">Copy Live URL</button>
                             </div>
@@ -98,22 +195,74 @@
                         <h3>Skills</h3>
                         <button type="button" class="copy-button" data-copy-source="project-skills-{{ project.id }}">Copy</button>
                     </div>
-                    <div class="utility-field-body">{{ project.copy_payload.skills }}</div>
+                    <div class="utility-skill-grid">
+                        {% for skill in project.skills.all %}
+                            <div class="utility-subfield">
+                                <div class="utility-subfield-header">
+                                    <strong>{{ skill.name }}</strong>
+                                    <button type="button" class="copy-button" data-copy-source="project-skill-{{ project.id }}-{{ skill.id }}">Copy</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
             {% endif %}
 
             <textarea id="project-title-{{ project.id }}" class="copy-source">{{ project.copy_payload.title }}</textarea>
             <textarea id="project-dates-{{ project.id }}" class="copy-source">{{ project.copy_payload.date_range }}</textarea>
+            <textarea id="project-start-date-{{ project.id }}" class="copy-source">{{ project.copy_payload.start_date }}</textarea>
+            <textarea id="project-start-month-{{ project.id }}" class="copy-source">{{ project.copy_payload.start_month }}</textarea>
+            <textarea id="project-start-day-{{ project.id }}" class="copy-source">{{ project.copy_payload.start_day }}</textarea>
+            <textarea id="project-start-year-{{ project.id }}" class="copy-source">{{ project.copy_payload.start_year }}</textarea>
+            <textarea id="project-end-date-{{ project.id }}" class="copy-source">{{ project.copy_payload.end_date }}</textarea>
+            <textarea id="project-end-month-{{ project.id }}" class="copy-source">{{ project.copy_payload.end_month }}</textarea>
+            <textarea id="project-end-day-{{ project.id }}" class="copy-source">{{ project.copy_payload.end_day }}</textarea>
+            <textarea id="project-end-year-{{ project.id }}" class="copy-source">{{ project.copy_payload.end_year }}</textarea>
             <textarea id="project-short-description-{{ project.id }}" class="copy-source">{{ project.copy_payload.short_description }}</textarea>
             <textarea id="project-description-{{ project.id }}" class="copy-source">{{ project.copy_payload.description }}</textarea>
             <textarea id="project-github-{{ project.id }}" class="copy-source">{{ project.copy_payload.github_url }}</textarea>
             <textarea id="project-live-{{ project.id }}" class="copy-source">{{ project.copy_payload.live_url }}</textarea>
             <textarea id="project-tasks-{{ project.id }}" class="copy-source">{{ project.copy_payload.tasks }}</textarea>
             <textarea id="project-skills-{{ project.id }}" class="copy-source">{{ project.copy_payload.skills }}</textarea>
+            {% for skill in project.skills.all %}
+                <textarea id="project-skill-{{ project.id }}-{{ skill.id }}" class="copy-source">{{ skill.name }}</textarea>
+            {% endfor %}
             <textarea id="project-all-{{ project.id }}" class="copy-source">{{ project.copy_payload.all }}</textarea>
+            </div>
         </article>
     {% empty %}
         <p>No projects found.</p>
     {% endfor %}
 </section>
+<script>
+    document.querySelectorAll(".project-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".project-date-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Dates" : "Show Dates";
+        });
+    });
+</script>
 {% endblock %}
