@@ -822,8 +822,70 @@ def courses_view(request):
     for course in courses:
         course.copy_payload = _build_course_copy_payload(course)
 
+    grouped_courses_by_program = {}
+    program_order = []
+
+    for course in courses:
+        program_name = course.copy_payload["program"] or "Other"
+        if program_name not in grouped_courses_by_program:
+            grouped_courses_by_program[program_name] = []
+            program_order.append(program_name)
+        grouped_courses_by_program[program_name].append(course)
+
+    grouped_courses = [
+        {
+            "program": program_name,
+            "courses": grouped_courses_by_program[program_name],
+            "education": grouped_courses_by_program[program_name][0].education,
+            "degree": grouped_courses_by_program[program_name][0].education.degree,
+            "field_of_study": grouped_courses_by_program[program_name][0].education.field_of_study,
+            "start_date_payload": _build_date_copy_payload(
+                grouped_courses_by_program[program_name][0].education.start_date
+            ),
+            "end_date_payload": _build_date_copy_payload(
+                grouped_courses_by_program[program_name][0].education.end_date
+            ),
+            "gpa": (
+                str(grouped_courses_by_program[program_name][0].education.gpa)
+                if grouped_courses_by_program[program_name][0].education.gpa is not None
+                else ""
+            ),
+            "honors": grouped_courses_by_program[program_name][0].education.honors.strip(),
+            "description": grouped_courses_by_program[program_name][0].education.description.strip(),
+            "sort_date": max(
+                (
+                    course.education.end_date
+                    or course.education.start_date
+                    or course.id
+                )
+                for course in grouped_courses_by_program[program_name]
+            ),
+        }
+        for program_name in program_order
+    ]
+    for group in grouped_courses:
+        group["date_range"] = _format_date_range(
+            group["education"].start_date,
+            group["education"].end_date,
+            not group["education"].end_date,
+        )
+        group["start_date"] = group["start_date_payload"]["display"]
+        group["start_month"] = group["start_date_payload"]["month"]
+        group["start_day"] = group["start_date_payload"]["day"]
+        group["start_year"] = group["start_date_payload"]["year"]
+        group["end_date"] = (
+            "Present" if not group["education"].end_date else group["end_date_payload"]["display"]
+        )
+        group["end_month"] = "" if not group["education"].end_date else group["end_date_payload"]["month"]
+        group["end_day"] = "" if not group["education"].end_date else group["end_date_payload"]["day"]
+        group["end_year"] = "" if not group["education"].end_date else group["end_date_payload"]["year"]
+    grouped_courses.sort(key=lambda group: group["sort_date"], reverse=True)
+
     return render(
         request,
         "app/courses.html",
-        {"courses": courses},
+        {
+            "courses": courses,
+            "course_groups": grouped_courses,
+        },
     )

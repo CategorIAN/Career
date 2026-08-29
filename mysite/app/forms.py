@@ -9,7 +9,10 @@ class SkillForm(forms.ModelForm):
         model = Skill
         fields = ["name", "type", "rating", "updated"]
         widgets = {
-            "updated": forms.DateInput(attrs={"type": "date"}),
+            "updated": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"type": "date"},
+            ),
         }
 
     def __init__(self, *args, **kwargs):

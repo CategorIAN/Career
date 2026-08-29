@@ -1,8 +1,10 @@
 {% extends "app/base.html" %}
 
-{% block title %}Skill Formset{% endblock %}
+{% block title %}Skills{% endblock %}
 
 {% block content %}
+<section class="utility-page">
+    <h1>Skills</h1>
 <form method="post">
     {% csrf_token %}
     {{ formset.management_form }}
@@ -74,4 +76,5 @@
         <a href="?page={{ page_obj.next_page_number }}">Next</a>
     {% endif %}
 </div>
+</section>
 {% endblock %}

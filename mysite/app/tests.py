@@ -324,6 +324,11 @@ class ApplicationReferencePageTests(TestCase):
             school=self.school,
             degree="Master of Science",
             field_of_study="Data Science",
+            start_date="2023-08-15",
+            end_date="2025-05-20",
+            gpa="3.95",
+            honors="Graduate Honors",
+            description="Focused on advanced analytics and machine learning.",
         )
         self.python_skill = Skill.objects.create(name="Python", type="Language")
         self.sql_skill = Skill.objects.create(name="SQL", type="Technology")
@@ -492,11 +497,61 @@ class ApplicationReferencePageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         courses = list(response.context["courses"])
+        course_groups = response.context["course_groups"]
         self.assertEqual([item.pk for item in courses], [earlier_course.pk, later_course.pk])
+        self.assertEqual(len(course_groups), 1)
+        self.assertEqual(course_groups[0]["program"], "Master of Science, Data Science")
+        self.assertEqual(course_groups[0]["degree"], "Master of Science")
+        self.assertEqual(course_groups[0]["field_of_study"], "Data Science")
+        self.assertEqual(course_groups[0]["date_range"], "August 2023 - May 2025")
+        self.assertEqual(course_groups[0]["start_date"], "August 15, 2023")
+        self.assertEqual(course_groups[0]["end_date"], "May 20, 2025")
+        self.assertEqual(course_groups[0]["gpa"], "3.95")
+        self.assertEqual(course_groups[0]["honors"], "Graduate Honors")
+        self.assertEqual(
+            course_groups[0]["description"],
+            "Focused on advanced analytics and machine learning.",
+        )
+        self.assertEqual(
+            [item.pk for item in course_groups[0]["courses"]],
+            [earlier_course.pk, later_course.pk],
+        )
+        self.assertContains(response, 'class="copy-button course-group-toggle-button"')
+        self.assertContains(response, 'id="course-group-')
+        self.assertContains(response, 'class="copy-button course-list-toggle-button"')
+        self.assertContains(response, 'id="course-list-')
+        self.assertContains(response, ">Courses<", html=False)
+        self.assertContains(response, 'id="course-details-')
+        self.assertContains(response, ">Show<", html=False)
         self.assertContains(response, "DS 610")
         self.assertContains(response, "State University")
         self.assertContains(response, "Master of Science, Data Science")
+        self.assertContains(response, "Master of Science")
+        self.assertContains(response, "Data Science")
+        self.assertContains(response, "August 2023 - May 2025")
+        self.assertContains(response, "August 15, 2023")
+        self.assertContains(response, "May 20, 2025")
+        self.assertContains(response, "3.95")
+        self.assertContains(response, "Graduate Honors")
+        self.assertContains(response, "Show Dates")
+        self.assertContains(response, 'id="program-degree-')
+        self.assertContains(response, 'id="program-field-of-study-')
+        self.assertContains(response, 'id="program-gpa-')
+        self.assertContains(response, 'id="program-honors-')
+        self.assertContains(response, 'id="program-description-')
+        self.assertContains(response, 'id="program-start-month-')
+        self.assertContains(response, 'id="program-start-day-')
+        self.assertContains(response, 'id="program-start-year-')
+        self.assertContains(response, 'id="program-end-month-')
+        self.assertContains(response, 'id="program-end-day-')
+        self.assertContains(response, 'id="program-end-year-')
+        self.assertContains(
+            response,
+            "Focused on advanced analytics and machine learning.",
+        )
         self.assertContains(response, "Applied analytics course.")
         self.assertContains(response, "A")
         self.assertContains(response, "Python, Research")
+        self.assertContains(response, 'class="utility-skill-grid"')
+        self.assertContains(response, 'id="course-skill-')
         self.assertContains(response, "Program:\nMaster of Science, Data Science", html=False)

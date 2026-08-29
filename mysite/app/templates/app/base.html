@@ -237,10 +237,6 @@
             margin-bottom: 1rem;
         }
 
-        .utility-field-full {
-            grid-column: 1 / -1;
-        }
-
         .utility-field-header {
             display: flex;
             justify-content: space-between;
@@ -444,13 +440,13 @@
 <body>
     <div class="app-layout">
         <nav class="sidebar">
-            <a class="nav-link" href="{% url 'skills' %}">Skill Table</a>
+            <a class="nav-link" href="{% url 'skills' %}">Skills</a>
             <a class="nav-link" href="{% url 'search' %}">Search</a>
             <a class="nav-link" href="{% url 'resume' %}">Resume</a>
             <a class="nav-link" href="{% url 'references' %}">References</a>
             <a class="nav-link" href="{% url 'experience' %}">Experience</a>
             <a class="nav-link" href="{% url 'projects' %}">Projects</a>
-            <a class="nav-link" href="{% url 'courses' %}">Courses</a>
+            <a class="nav-link" href="{% url 'courses' %}">Education</a>
         </nav>
 
         <main class="page-content">

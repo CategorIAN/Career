@@ -1,98 +1,380 @@
 {% extends "app/base.html" %}
 
-{% block title %}Courses{% endblock %}
+{% block title %}Education{% endblock %}
 
 {% block content %}
 <section class="utility-page">
-    <h1>Courses</h1>
+    <h1>Education</h1>
     <p class="utility-page-intro">Complete stored course details for copying into applications.</p>
 
-    {% for course in courses %}
-        <article class="utility-card">
+    {% for course_group in course_groups %}
+        <section class="utility-card">
             <div class="utility-card-header">
-                <h2>{{ course.title }}</h2>
+                <h2>{{ course_group.program }}</h2>
                 <div class="utility-copy-actions">
-                    <button type="button" class="copy-button" data-copy-source="course-all-{{ course.id }}">Copy All</button>
+                    <button
+                        type="button"
+                        class="copy-button course-group-toggle-button"
+                        data-target="course-group-{{ forloop.counter }}"
+                    >
+                        Show
+                    </button>
                 </div>
             </div>
 
-            <div class="utility-meta">
-                <div class="utility-field">
-                    <div class="utility-field-header">
-                        <strong>Course title</strong>
-                        <button type="button" class="copy-button" data-copy-source="course-title-{{ course.id }}">Copy</button>
-                    </div>
-                    <div class="utility-field-body">{{ course.title }}</div>
+            <div id="course-group-{{ forloop.counter }}" class="hidden">
+                <div class="utility-meta">
+                    {% if course_group.degree %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>Degree</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-degree-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.degree }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if course_group.field_of_study %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>Field of study</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-field-of-study-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.field_of_study }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if course_group.gpa %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>GPA</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-gpa-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.gpa }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if course_group.honors %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>Honors</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-honors-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.honors }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if course_group.date_range %}
+                        <div class="utility-field utility-field-full">
+                            <div class="utility-field-header">
+                                <strong>Dates</strong>
+                                <div class="utility-copy-actions">
+                                    <button
+                                        type="button"
+                                        class="copy-button program-date-toggle-button"
+                                        data-target="program-date-components-{{ forloop.counter }}"
+                                    >
+                                        Show Dates
+                                    </button>
+                                    <button type="button" class="copy-button" data-copy-source="program-dates-{{ forloop.counter }}">Copy</button>
+                                </div>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.date_range }}</div>
+                            <div id="program-date-components-{{ forloop.counter }}" class="date-blocks hidden">
+                                {% if course_group.start_date %}
+                                    <div class="utility-subfield date-block">
+                                        <div class="utility-subfield-header">
+                                            <strong>Start date</strong>
+                                            <button type="button" class="copy-button" data-copy-source="program-start-date-{{ forloop.counter }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ course_group.start_date }}</div>
+                                        <div class="date-part-grid">
+                                            {% if course_group.start_month %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Month</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="program-start-month-{{ forloop.counter }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ course_group.start_month }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if course_group.start_day %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Day</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="program-start-day-{{ forloop.counter }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ course_group.start_day }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if course_group.start_year %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Year</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="program-start-year-{{ forloop.counter }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ course_group.start_year }}</div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if course_group.end_date %}
+                                    <div class="utility-subfield date-block date-block-end">
+                                        <div class="utility-subfield-header">
+                                            <strong>End date</strong>
+                                            <button type="button" class="copy-button" data-copy-source="program-end-date-{{ forloop.counter }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ course_group.end_date }}</div>
+                                        {% if course_group.end_month or course_group.end_day or course_group.end_year %}
+                                            <div class="date-part-grid">
+                                                {% if course_group.end_month %}
+                                                    <div class="utility-subfield">
+                                                        <div class="utility-subfield-header">
+                                                            <strong>Month</strong>
+                                                            <button type="button" class="copy-button" data-copy-source="program-end-month-{{ forloop.counter }}">Copy</button>
+                                                        </div>
+                                                        <div class="utility-field-body">{{ course_group.end_month }}</div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if course_group.end_day %}
+                                                    <div class="utility-subfield">
+                                                        <div class="utility-subfield-header">
+                                                            <strong>Day</strong>
+                                                            <button type="button" class="copy-button" data-copy-source="program-end-day-{{ forloop.counter }}">Copy</button>
+                                                        </div>
+                                                        <div class="utility-field-body">{{ course_group.end_day }}</div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if course_group.end_year %}
+                                                    <div class="utility-subfield">
+                                                        <div class="utility-subfield-header">
+                                                            <strong>Year</strong>
+                                                            <button type="button" class="copy-button" data-copy-source="program-end-year-{{ forloop.counter }}">Copy</button>
+                                                        </div>
+                                                        <div class="utility-field-body">{{ course_group.end_year }}</div>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
 
-                {% if course.code %}
+                {% if course_group.description %}
                     <div class="utility-field">
                         <div class="utility-field-header">
-                            <strong>Course code</strong>
-                            <button type="button" class="copy-button" data-copy-source="course-code-{{ course.id }}">Copy</button>
+                            <strong>Description</strong>
+                            <button type="button" class="copy-button" data-copy-source="program-description-{{ forloop.counter }}">Copy</button>
                         </div>
-                        <div class="utility-field-body">{{ course.code }}</div>
+                        <div class="utility-field-body">{{ course_group.description }}</div>
                     </div>
                 {% endif %}
 
-                <div class="utility-field">
-                    <div class="utility-field-header">
-                        <strong>School</strong>
-                        <button type="button" class="copy-button" data-copy-source="course-school-{{ course.id }}">Copy</button>
-                    </div>
-                    <div class="utility-field-body">{{ course.education.school.name }}</div>
-                </div>
+                <textarea id="program-degree-{{ forloop.counter }}" class="copy-source">{{ course_group.degree }}</textarea>
+                <textarea id="program-field-of-study-{{ forloop.counter }}" class="copy-source">{{ course_group.field_of_study }}</textarea>
+                <textarea id="program-gpa-{{ forloop.counter }}" class="copy-source">{{ course_group.gpa }}</textarea>
+                <textarea id="program-honors-{{ forloop.counter }}" class="copy-source">{{ course_group.honors }}</textarea>
+                <textarea id="program-description-{{ forloop.counter }}" class="copy-source">{{ course_group.description }}</textarea>
+                <textarea id="program-dates-{{ forloop.counter }}" class="copy-source">{{ course_group.date_range }}</textarea>
+                <textarea id="program-start-date-{{ forloop.counter }}" class="copy-source">{{ course_group.start_date }}</textarea>
+                <textarea id="program-start-month-{{ forloop.counter }}" class="copy-source">{{ course_group.start_month }}</textarea>
+                <textarea id="program-start-day-{{ forloop.counter }}" class="copy-source">{{ course_group.start_day }}</textarea>
+                <textarea id="program-start-year-{{ forloop.counter }}" class="copy-source">{{ course_group.start_year }}</textarea>
+                <textarea id="program-end-date-{{ forloop.counter }}" class="copy-source">{{ course_group.end_date }}</textarea>
+                <textarea id="program-end-month-{{ forloop.counter }}" class="copy-source">{{ course_group.end_month }}</textarea>
+                <textarea id="program-end-day-{{ forloop.counter }}" class="copy-source">{{ course_group.end_day }}</textarea>
+                <textarea id="program-end-year-{{ forloop.counter }}" class="copy-source">{{ course_group.end_year }}</textarea>
 
                 <div class="utility-field">
                     <div class="utility-field-header">
-                        <strong>Program</strong>
-                        <button type="button" class="copy-button" data-copy-source="course-program-{{ course.id }}">Copy</button>
+                        <strong>Courses</strong>
+                        <button
+                            type="button"
+                            class="copy-button course-list-toggle-button"
+                            data-target="course-list-{{ forloop.counter }}"
+                        >
+                            Show
+                        </button>
                     </div>
-                    <div class="utility-field-body">{{ course.copy_payload.program }}</div>
+                </div>
+
+                <div id="course-list-{{ forloop.counter }}" class="hidden">
+                    {% for course in course_group.courses %}
+                        <article class="utility-card">
+                            <div class="utility-card-header">
+                                <h3>{{ course.title }}</h3>
+                                <div class="utility-copy-actions">
+                                    <button
+                                        type="button"
+                                        class="copy-button course-toggle-button"
+                                        data-target="course-details-{{ course.id }}"
+                                    >
+                                        Show
+                                    </button>
+                                    <button type="button" class="copy-button" data-copy-source="course-all-{{ course.id }}">Copy All</button>
+                                </div>
+                            </div>
+
+                            <div id="course-details-{{ course.id }}" class="hidden">
+                            <div class="utility-meta">
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <strong>Course title</strong>
+                                        <button type="button" class="copy-button" data-copy-source="course-title-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ course.title }}</div>
+                                </div>
+
+                                {% if course.code %}
+                                    <div class="utility-field">
+                                        <div class="utility-field-header">
+                                            <strong>Course code</strong>
+                                            <button type="button" class="copy-button" data-copy-source="course-code-{{ course.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ course.code }}</div>
+                                    </div>
+                                {% endif %}
+
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <strong>School</strong>
+                                        <button type="button" class="copy-button" data-copy-source="course-school-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ course.education.school.name }}</div>
+                                </div>
+
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <strong>Program</strong>
+                                        <button type="button" class="copy-button" data-copy-source="course-program-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ course.copy_payload.program }}</div>
+                                </div>
+                            </div>
+
+                            {% if course.description %}
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <h3>Description</h3>
+                                        <button type="button" class="copy-button" data-copy-source="course-description-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ course.description }}</div>
+                                </div>
+                            {% endif %}
+
+                            {% if course.grade %}
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <h3>Grade</h3>
+                                        <button type="button" class="copy-button" data-copy-source="course-grade-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ course.grade }}</div>
+                                </div>
+                            {% endif %}
+
+                            {% if course.skills.all %}
+                                <div class="utility-field">
+                                    <div class="utility-field-header">
+                                        <h3>Skills</h3>
+                                        <button type="button" class="copy-button" data-copy-source="course-skills-{{ course.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-skill-grid">
+                                        {% for skill in course.skills.all %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>{{ skill.name }}</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="course-skill-{{ course.id }}-{{ skill.id }}">Copy</button>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <textarea id="course-title-{{ course.id }}" class="copy-source">{{ course.copy_payload.title }}</textarea>
+                            <textarea id="course-code-{{ course.id }}" class="copy-source">{{ course.copy_payload.code }}</textarea>
+                            <textarea id="course-school-{{ course.id }}" class="copy-source">{{ course.copy_payload.school }}</textarea>
+                            <textarea id="course-program-{{ course.id }}" class="copy-source">{{ course.copy_payload.program }}</textarea>
+                            <textarea id="course-description-{{ course.id }}" class="copy-source">{{ course.copy_payload.description }}</textarea>
+                            <textarea id="course-grade-{{ course.id }}" class="copy-source">{{ course.copy_payload.grade }}</textarea>
+                            <textarea id="course-skills-{{ course.id }}" class="copy-source">{{ course.copy_payload.skills }}</textarea>
+                            {% for skill in course.skills.all %}
+                                <textarea id="course-skill-{{ course.id }}-{{ skill.id }}" class="copy-source">{{ skill.name }}</textarea>
+                            {% endfor %}
+                            <textarea id="course-all-{{ course.id }}" class="copy-source">{{ course.copy_payload.all }}</textarea>
+                            </div>
+                        </article>
+                    {% endfor %}
                 </div>
             </div>
-
-            {% if course.description %}
-                <div class="utility-field">
-                    <div class="utility-field-header">
-                        <h3>Description</h3>
-                        <button type="button" class="copy-button" data-copy-source="course-description-{{ course.id }}">Copy</button>
-                    </div>
-                    <div class="utility-field-body">{{ course.description }}</div>
-                </div>
-            {% endif %}
-
-            {% if course.grade %}
-                <div class="utility-field">
-                    <div class="utility-field-header">
-                        <h3>Grade</h3>
-                        <button type="button" class="copy-button" data-copy-source="course-grade-{{ course.id }}">Copy</button>
-                    </div>
-                    <div class="utility-field-body">{{ course.grade }}</div>
-                </div>
-            {% endif %}
-
-            {% if course.skills.all %}
-                <div class="utility-field">
-                    <div class="utility-field-header">
-                        <h3>Skills</h3>
-                        <button type="button" class="copy-button" data-copy-source="course-skills-{{ course.id }}">Copy</button>
-                    </div>
-                    <div class="utility-field-body">{{ course.copy_payload.skills }}</div>
-                </div>
-            {% endif %}
-
-            <textarea id="course-title-{{ course.id }}" class="copy-source">{{ course.copy_payload.title }}</textarea>
-            <textarea id="course-code-{{ course.id }}" class="copy-source">{{ course.copy_payload.code }}</textarea>
-            <textarea id="course-school-{{ course.id }}" class="copy-source">{{ course.copy_payload.school }}</textarea>
-            <textarea id="course-program-{{ course.id }}" class="copy-source">{{ course.copy_payload.program }}</textarea>
-            <textarea id="course-description-{{ course.id }}" class="copy-source">{{ course.copy_payload.description }}</textarea>
-            <textarea id="course-grade-{{ course.id }}" class="copy-source">{{ course.copy_payload.grade }}</textarea>
-            <textarea id="course-skills-{{ course.id }}" class="copy-source">{{ course.copy_payload.skills }}</textarea>
-            <textarea id="course-all-{{ course.id }}" class="copy-source">{{ course.copy_payload.all }}</textarea>
-        </article>
+        </section>
     {% empty %}
         <p>No courses found.</p>
     {% endfor %}
 </section>
+<script>
+    document.querySelectorAll(".course-group-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".program-date-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Dates" : "Show Dates";
+        });
+    });
+
+    document.querySelectorAll(".course-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".course-list-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+</script>
 {% endblock %}

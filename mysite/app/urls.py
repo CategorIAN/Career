@@ -10,5 +10,5 @@ urlpatterns = [
     path("references/", views.references_view, name="references"),
     path("experience/", views.experience_view, name="experience"),
     path("projects/", views.projects_view, name="projects"),
-    path("courses/", views.courses_view, name="courses"),
+    path("education/", views.courses_view, name="courses"),
 ]
