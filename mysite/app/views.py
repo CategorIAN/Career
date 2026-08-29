@@ -17,6 +17,7 @@ from .models import (
     Course,
     Skill,
     Education,
+    Residency,
     Role,
     ProfileSetting,
     Project,
@@ -84,7 +85,10 @@ def _build_date_copy_payload(date_value):
 
 
 def _format_location_from_company(company):
-    address = getattr(company, "address", None)
+    return _format_location_from_address(getattr(company, "address", None))
+
+
+def _format_location_from_address(address):
     city = getattr(address, "city", None) if address else None
     state = getattr(city, "state", None) if city else None
 
@@ -95,8 +99,7 @@ def _format_location_from_company(company):
     return ""
 
 
-def _build_company_address_copy_payload(company):
-    address = getattr(company, "address", None)
+def _build_address_copy_payload(address):
     city = getattr(address, "city", None) if address else None
     state = getattr(city, "state", None) if city else None
 
@@ -129,6 +132,10 @@ def _build_company_address_copy_payload(company):
             ]
         ),
     }
+
+
+def _build_company_address_copy_payload(company):
+    return _build_address_copy_payload(getattr(company, "address", None))
 
 
 def _format_pay_amount(amount):
@@ -231,6 +238,58 @@ def _build_role_copy_payload(role):
         "pay_frequency": pay_frequency,
         "pay": pay_text,
         "supervisors": supervisors_text,
+        "all": copy_all,
+    }
+
+
+def _build_residency_copy_payload(residency):
+    address_payload = _build_address_copy_payload(residency.address)
+    location_text = address_payload["location"]
+    date_range = _format_date_range(
+        residency.start_date,
+        residency.end_date,
+        residency.current,
+    )
+    start_date_payload = _build_date_copy_payload(residency.start_date)
+    end_date_payload = (
+        {
+            "display": "Present",
+            "month": "",
+            "day": "",
+            "year": "",
+        }
+        if residency.current
+        else _build_date_copy_payload(residency.end_date)
+    )
+
+    copy_all = _join_copy_parts(
+        [
+            location_text,
+            date_range,
+            f"Address:\n{address_payload['full']}" if address_payload["full"] else "",
+            f"Notes:\n{residency.notes}" if residency.notes else "",
+        ]
+    )
+
+    return {
+        "street_1": address_payload["street_1"],
+        "street_2": address_payload["street_2"],
+        "city": address_payload["city"],
+        "state_name": address_payload["state_name"],
+        "state": address_payload["state"],
+        "postal_code": address_payload["postal_code"],
+        "address": address_payload["full"],
+        "location": location_text,
+        "date_range": date_range,
+        "start_date": start_date_payload["display"],
+        "start_month": start_date_payload["month"],
+        "start_day": start_date_payload["day"],
+        "start_year": start_date_payload["year"],
+        "end_date": end_date_payload["display"],
+        "end_month": end_date_payload["month"],
+        "end_day": end_date_payload["day"],
+        "end_year": end_date_payload["year"],
+        "notes": residency.notes.strip(),
         "all": copy_all,
     }
 
@@ -774,6 +833,27 @@ def experience_view(request):
         request,
         "app/experience.html",
         {"roles": roles},
+    )
+
+
+def residencies_view(request):
+    residencies = (
+        Residency.objects
+        .select_related(
+            "address",
+            "address__city",
+            "address__city__state",
+        )
+        .order_by("-start_date", "-id")
+    )
+
+    for residency in residencies:
+        residency.copy_payload = _build_residency_copy_payload(residency)
+
+    return render(
+        request,
+        "app/residencies.html",
+        {"residencies": residencies},
     )
 
 

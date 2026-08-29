@@ -1,0 +1,270 @@
+{% extends "app/base.html" %}
+
+{% block title %}Residencies{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Residencies</h1>
+    <p class="utility-page-intro">Residence history in reverse chronological order for applications and background checks.</p>
+
+    {% for residency in residencies %}
+        <article class="utility-card">
+            <div class="utility-card-header">
+                <h2>{{ residency.copy_payload.street_1|default:"Address on file" }} ({{ residency.copy_payload.date_range }})</h2>
+                <div class="utility-copy-actions">
+                    <button
+                        type="button"
+                        class="copy-button residency-toggle-button"
+                        data-target="residency-details-{{ residency.id }}"
+                    >
+                        Show
+                    </button>
+                    <button type="button" class="copy-button" data-copy-source="residency-all-{{ residency.id }}">Copy All</button>
+                </div>
+            </div>
+
+            <div id="residency-details-{{ residency.id }}" class="hidden">
+                <div class="utility-meta">
+                    {% if residency.copy_payload.address %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>Location</strong>
+                                <div class="utility-copy-actions">
+                                    <button
+                                        type="button"
+                                        class="copy-button residency-address-toggle-button"
+                                        data-target="residency-address-components-{{ residency.id }}"
+                                    >
+                                        Show Address
+                                    </button>
+                                    <button type="button" class="copy-button" data-copy-source="residency-address-{{ residency.id }}">Copy Address</button>
+                                </div>
+                            </div>
+                            <div id="residency-address-components-{{ residency.id }}" class="utility-subfields hidden">
+                                {% if residency.copy_payload.street_1 %}
+                                    <div class="utility-subfield">
+                                        <div class="utility-subfield-header">
+                                            <strong>Street 1</strong>
+                                            <button type="button" class="copy-button" data-copy-source="residency-street-1-{{ residency.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ residency.copy_payload.street_1 }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if residency.copy_payload.street_2 %}
+                                    <div class="utility-subfield">
+                                        <div class="utility-subfield-header">
+                                            <strong>Street 2</strong>
+                                            <button type="button" class="copy-button" data-copy-source="residency-street-2-{{ residency.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ residency.copy_payload.street_2 }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if residency.copy_payload.city %}
+                                    <div class="utility-subfield">
+                                        <div class="utility-subfield-header">
+                                            <strong>City</strong>
+                                            <button type="button" class="copy-button" data-copy-source="residency-city-{{ residency.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ residency.copy_payload.city }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if residency.copy_payload.state_name %}
+                                    <div class="utility-subfield">
+                                        <div class="utility-subfield-header">
+                                            <strong>State</strong>
+                                            <button type="button" class="copy-button" data-copy-source="residency-state-name-{{ residency.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ residency.copy_payload.state_name }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if residency.copy_payload.postal_code %}
+                                    <div class="utility-subfield">
+                                        <div class="utility-subfield-header">
+                                            <strong>Postal code</strong>
+                                            <button type="button" class="copy-button" data-copy-source="residency-postal-code-{{ residency.id }}">Copy</button>
+                                        </div>
+                                        <div class="utility-field-body">{{ residency.copy_payload.postal_code }}</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Dates</strong>
+                            <div class="utility-copy-actions">
+                                <button
+                                    type="button"
+                                    class="copy-button residency-date-toggle-button"
+                                    data-target="residency-date-components-{{ residency.id }}"
+                                >
+                                    Show Dates
+                                </button>
+                                <button type="button" class="copy-button" data-copy-source="residency-dates-{{ residency.id }}">Copy</button>
+                            </div>
+                        </div>
+                        <div class="utility-field-body">{{ residency.copy_payload.date_range }}</div>
+                        <div id="residency-date-components-{{ residency.id }}" class="date-blocks hidden">
+                            {% if residency.copy_payload.start_date %}
+                                <div class="utility-subfield date-block">
+                                    <div class="utility-subfield-header">
+                                        <strong>Start date</strong>
+                                        <button type="button" class="copy-button" data-copy-source="residency-start-date-{{ residency.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ residency.copy_payload.start_date }}</div>
+                                    <div class="date-part-grid">
+                                        {% if residency.copy_payload.start_month %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Month</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="residency-start-month-{{ residency.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ residency.copy_payload.start_month }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if residency.copy_payload.start_day %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Day</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="residency-start-day-{{ residency.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ residency.copy_payload.start_day }}</div>
+                                            </div>
+                                        {% endif %}
+                                        {% if residency.copy_payload.start_year %}
+                                            <div class="utility-subfield">
+                                                <div class="utility-subfield-header">
+                                                    <strong>Year</strong>
+                                                    <button type="button" class="copy-button" data-copy-source="residency-start-year-{{ residency.id }}">Copy</button>
+                                                </div>
+                                                <div class="utility-field-body">{{ residency.copy_payload.start_year }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% if residency.copy_payload.end_date %}
+                                <div class="utility-subfield date-block date-block-end">
+                                    <div class="utility-subfield-header">
+                                        <strong>End date</strong>
+                                        <button type="button" class="copy-button" data-copy-source="residency-end-date-{{ residency.id }}">Copy</button>
+                                    </div>
+                                    <div class="utility-field-body">{{ residency.copy_payload.end_date }}</div>
+                                    {% if residency.copy_payload.end_month or residency.copy_payload.end_day or residency.copy_payload.end_year %}
+                                        <div class="date-part-grid">
+                                            {% if residency.copy_payload.end_month %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Month</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="residency-end-month-{{ residency.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ residency.copy_payload.end_month }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if residency.copy_payload.end_day %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Day</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="residency-end-day-{{ residency.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ residency.copy_payload.end_day }}</div>
+                                                </div>
+                                            {% endif %}
+                                            {% if residency.copy_payload.end_year %}
+                                                <div class="utility-subfield">
+                                                    <div class="utility-subfield-header">
+                                                        <strong>Year</strong>
+                                                        <button type="button" class="copy-button" data-copy-source="residency-end-year-{{ residency.id }}">Copy</button>
+                                                    </div>
+                                                    <div class="utility-field-body">{{ residency.copy_payload.end_year }}</div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if residency.copy_payload.notes %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <h3>Notes</h3>
+                            <button type="button" class="copy-button" data-copy-source="residency-notes-{{ residency.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ residency.copy_payload.notes }}</div>
+                    </div>
+                {% endif %}
+
+                <textarea id="residency-address-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.address }}</textarea>
+                <textarea id="residency-street-1-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.street_1 }}</textarea>
+                <textarea id="residency-street-2-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.street_2 }}</textarea>
+                <textarea id="residency-city-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.city }}</textarea>
+                <textarea id="residency-state-name-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.state_name }}</textarea>
+                <textarea id="residency-postal-code-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.postal_code }}</textarea>
+                <textarea id="residency-dates-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.date_range }}</textarea>
+                <textarea id="residency-start-date-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.start_date }}</textarea>
+                <textarea id="residency-start-month-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.start_month }}</textarea>
+                <textarea id="residency-start-day-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.start_day }}</textarea>
+                <textarea id="residency-start-year-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.start_year }}</textarea>
+                <textarea id="residency-end-date-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.end_date }}</textarea>
+                <textarea id="residency-end-month-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.end_month }}</textarea>
+                <textarea id="residency-end-day-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.end_day }}</textarea>
+                <textarea id="residency-end-year-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.end_year }}</textarea>
+                <textarea id="residency-notes-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.notes }}</textarea>
+                <textarea id="residency-all-{{ residency.id }}" class="copy-source">{{ residency.copy_payload.all }}</textarea>
+            </div>
+        </article>
+    {% empty %}
+        <p>No residencies found.</p>
+    {% endfor %}
+</section>
+<script>
+    document.querySelectorAll(".residency-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".residency-address-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Address" : "Show Address";
+        });
+    });
+
+    document.querySelectorAll(".residency-date-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = button.dataset.target;
+            const details = document.getElementById(targetId);
+
+            if (!details) {
+                return;
+            }
+
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide Dates" : "Show Dates";
+        });
+    });
+</script>
+{% endblock %}

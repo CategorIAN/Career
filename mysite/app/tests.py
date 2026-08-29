@@ -18,6 +18,7 @@ from .models import (
     FreelancerSkill,
     Project,
     ProjectTask,
+    Residency,
     Role,
     RoleTask,
     School,
@@ -426,6 +427,54 @@ class ApplicationReferencePageTests(TestCase):
             "Supervisor Name | Director | boss@example.com | 555-123-4567",
             html=False,
         )
+
+    def test_residencies_page_shows_reverse_chronological_address_history(self):
+        earlier_residency = Residency.objects.create(
+            address=self.address,
+            start_date="2022-01-01",
+            end_date="2024-01-01",
+            notes="Earlier residence.",
+        )
+        newer_residency = Residency.objects.create(
+            address=self.address,
+            start_date="2024-08-01",
+            end_date="2026-03-01",
+            notes="Most recent residence.",
+        )
+
+        response = self.client.get(reverse("residencies"))
+
+        self.assertEqual(response.status_code, 200)
+        residencies = list(response.context["residencies"])
+        self.assertEqual([item.pk for item in residencies], [newer_residency.pk, earlier_residency.pk])
+        self.assertContains(response, "Residence history in reverse chronological order")
+        self.assertContains(response, "Copy All")
+        self.assertContains(response, "Show Address")
+        self.assertContains(response, "Show Dates")
+        self.assertContains(response, "Copy Address")
+        self.assertContains(response, "1 Main St")
+        self.assertContains(response, "Suite 200")
+        self.assertContains(response, ">City<", html=False)
+        self.assertContains(response, "Montana")
+        self.assertContains(response, ">State<", html=False)
+        self.assertContains(response, "59601")
+        self.assertContains(response, 'id="residency-street-1-')
+        self.assertContains(response, 'id="residency-street-2-')
+        self.assertContains(response, 'id="residency-city-')
+        self.assertContains(response, 'id="residency-state-name-')
+        self.assertContains(response, 'id="residency-postal-code-')
+        self.assertContains(response, "August 2024 - March 2026")
+        self.assertContains(response, "August 1, 2024")
+        self.assertContains(response, "March 1, 2026")
+        self.assertContains(response, 'id="residency-start-month-')
+        self.assertContains(response, 'id="residency-start-day-')
+        self.assertContains(response, 'id="residency-start-year-')
+        self.assertContains(response, 'id="residency-end-month-')
+        self.assertContains(response, 'id="residency-end-day-')
+        self.assertContains(response, 'id="residency-end-year-')
+        self.assertContains(response, "Most recent residence.")
+        self.assertContains(response, "Address:\n1 Main St\nSuite 200\nHelena, MT 59601", html=False)
+        self.assertContains(response, "Notes:\nMost recent residence.", html=False)
 
     def test_projects_page_uses_ordered_tasks_and_complete_project_fields(self):
         project = Project.objects.create(
