@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import modelformset_factory
 
-from .models import Skill
+from .models import Platform, Skill
 
 
 class SkillForm(forms.ModelForm):
@@ -31,6 +31,28 @@ class SkillForm(forms.ModelForm):
 SkillFormSet = modelformset_factory(
     Skill,
     form=SkillForm,
+    extra=0,
+    can_delete=True,
+)
+
+
+class PlatformForm(forms.ModelForm):
+    class Meta:
+        model = Platform
+        fields = ["name", "url", "max_skills"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+    def clean_name(self):
+        return self.cleaned_data.get("name") or ""
+
+
+PlatformFormSet = modelformset_factory(
+    Platform,
+    form=PlatformForm,
     extra=0,
     can_delete=True,
 )

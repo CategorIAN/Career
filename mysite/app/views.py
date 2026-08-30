@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import F, Prefetch
 from django.conf import settings
 from django.urls import reverse
@@ -12,9 +13,11 @@ import re
 from django.views.decorators.http import require_POST
 from urllib.parse import urlencode
 
-from .forms import SkillForm, SkillFormSet
+from .forms import PlatformForm, PlatformFormSet, SkillForm, SkillFormSet
 from .models import (
     Course,
+    Platform,
+    PlatformSkill,
     Skill,
     Education,
     Residency,
@@ -383,6 +386,32 @@ def home_view(request):
     return render(request, "app/home.html")
 
 
+def _create_platform_skills_for_platform(platform):
+    skills = Skill.objects.all()
+    PlatformSkill.objects.bulk_create(
+        [
+            PlatformSkill(
+                platform=platform,
+                skill=skill,
+            )
+            for skill in skills
+        ]
+    )
+
+
+def _create_platform_skills_for_skill(skill):
+    platforms = Platform.objects.all()
+    PlatformSkill.objects.bulk_create(
+        [
+            PlatformSkill(
+                platform=platform,
+                skill=skill,
+            )
+            for platform in platforms
+        ]
+    )
+
+
 def skill_formset_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Skill.objects.all().order_by(
@@ -400,10 +429,11 @@ def skill_formset_view(request):
         is_new_form_valid = new_form.is_valid() if new_form_has_data else True
         is_formset_valid = formset.is_valid()
 
-        if is_new_form_valid and new_form_has_data:
-            new_form.save()
-
         if is_formset_valid and is_new_form_valid:
+            if new_form_has_data:
+                with transaction.atomic():
+                    skill = new_form.save()
+                    _create_platform_skills_for_skill(skill)
             formset.save()
             return redirect(f"{request.path}?page={page_obj.number}")
     else:
@@ -413,6 +443,42 @@ def skill_formset_view(request):
     return render(
         request,
         "app/skill_formset.html",
+        {
+            "new_form": new_form,
+            "formset": formset,
+            "page_obj": page_obj,
+        },
+    )
+
+
+def platform_formset_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    queryset = Platform.objects.all().order_by("name")
+    paginator = Paginator(queryset, 8)
+    page_obj = paginator.get_page(page_number)
+    page_queryset = page_obj.object_list
+
+    if request.method == "POST":
+        new_form = PlatformForm(request.POST, prefix="new")
+        formset = PlatformFormSet(request.POST, queryset=page_queryset)
+        new_form_has_data = new_form.has_changed()
+        is_new_form_valid = new_form.is_valid() if new_form_has_data else True
+        is_formset_valid = formset.is_valid()
+
+        if is_formset_valid and is_new_form_valid:
+            if new_form_has_data:
+                with transaction.atomic():
+                    platform = new_form.save()
+                    _create_platform_skills_for_platform(platform)
+            formset.save()
+            return redirect(f"{request.path}?page={page_obj.number}")
+    else:
+        new_form = PlatformForm(prefix="new")
+        formset = PlatformFormSet(queryset=page_queryset)
+
+    return render(
+        request,
+        "app/platform_formset.html",
         {
             "new_form": new_form,
             "formset": formset,

@@ -1,0 +1,71 @@
+{% extends "app/base.html" %}
+
+{% block title %}Platforms{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Platforms</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <input type="hidden" name="page" value="{{ page_obj.number }}">
+    <table border="1" cellpadding="8" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Max Skills</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    {{ new_form.name.errors }}
+                    {{ new_form.name }}
+                </td>
+                <td>
+                    {{ new_form.url.errors }}
+                    {{ new_form.url }}
+                </td>
+                <td>
+                    {{ new_form.max_skills.errors }}
+                    {{ new_form.max_skills }}
+                </td>
+                <td>New</td>
+            </tr>
+            {% for form in formset %}
+                <tr>
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+                    <td>
+                        {{ form.name.errors }}
+                        {{ form.name }}
+                    </td>
+                    <td>
+                        {{ form.url.errors }}
+                        {{ form.url }}
+                    </td>
+                    <td>
+                        {{ form.max_skills.errors }}
+                        {{ form.max_skills }}
+                    </td>
+                    <td>{{ form.DELETE }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Save</button>
+</form>
+<div style="margin-top: 1rem;">
+    {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+</div>
+</section>
+{% endblock %}

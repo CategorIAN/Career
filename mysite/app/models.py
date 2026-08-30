@@ -199,6 +199,15 @@ class Company(models.Model):
 
     website = models.URLField(blank=True)
 
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    email = models.EmailField(
+        blank=True,
+    )
+
     description = models.TextField(blank=True)
 
     def __str__(self):
@@ -504,6 +513,70 @@ class ProfileSetting(models.Model):
 
     def __str__(self):
         return self.key
+
+
+class Platform(models.Model):
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+    )
+
+    url = models.URLField(
+        blank=True,
+    )
+
+    max_skills = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+
+    skills = models.ManyToManyField(
+        "Skill",
+        through="PlatformSkill",
+        related_name="platforms",
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class PlatformSkill(models.Model):
+    platform = models.ForeignKey(
+        "Platform",
+        on_delete=models.CASCADE,
+    )
+
+    skill = models.ForeignKey(
+        "Skill",
+        on_delete=models.CASCADE,
+    )
+
+    available = models.BooleanField(
+        blank=True,
+        null=True
+    )
+
+    listed = models.BooleanField(
+        blank=True,
+        null=True
+    )
+
+    updated = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform", "skill"],
+                name="unique_platform_skill",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.platform} - {self.skill}"
 
 
 
