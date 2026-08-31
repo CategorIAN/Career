@@ -13,7 +13,13 @@ import re
 from django.views.decorators.http import require_POST
 from urllib.parse import urlencode
 
-from .forms import PlatformForm, PlatformFormSet, SkillForm, SkillFormSet
+from .forms import (
+    PlatformForm,
+    PlatformFormSet,
+    PlatformSkillFormSet,
+    SkillForm,
+    SkillFormSet,
+)
 from .models import (
     Course,
     Platform,
@@ -481,6 +487,35 @@ def platform_formset_view(request):
         "app/platform_formset.html",
         {
             "new_form": new_form,
+            "formset": formset,
+            "page_obj": page_obj,
+        },
+    )
+
+
+def platform_skill_formset_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    queryset = PlatformSkill.objects.select_related("platform", "skill").order_by(
+        F("updated").asc(nulls_first=True),
+        "platform__name",
+        "skill__name",
+    )
+    paginator = Paginator(queryset, 8)
+    page_obj = paginator.get_page(page_number)
+    page_queryset = page_obj.object_list
+
+    if request.method == "POST":
+        formset = PlatformSkillFormSet(request.POST, queryset=page_queryset)
+        if formset.is_valid():
+            formset.save()
+            return redirect(f"{request.path}?page={page_obj.number}")
+    else:
+        formset = PlatformSkillFormSet(queryset=page_queryset)
+
+    return render(
+        request,
+        "app/platform_skill_formset.html",
+        {
             "formset": formset,
             "page_obj": page_obj,
         },

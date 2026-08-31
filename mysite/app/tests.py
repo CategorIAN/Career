@@ -16,6 +16,8 @@ from .models import (
     Education,
     FreelancerProject,
     FreelancerSkill,
+    Platform,
+    PlatformSkill,
     Project,
     ProjectTask,
     Residency,
@@ -604,3 +606,75 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, 'class="utility-skill-grid"')
         self.assertContains(response, 'id="course-skill-')
         self.assertContains(response, "Program:\nMaster of Science, Data Science", html=False)
+
+    def test_platform_skills_page_uses_paginated_formset_and_updates_existing_rows(self):
+        platform_alpha = Platform.objects.create(name="Alpha Platform")
+        platform_beta = Platform.objects.create(name="Beta Platform")
+
+        platform_skill_null = PlatformSkill.objects.create(
+            platform=platform_alpha,
+            skill=self.python_skill,
+            available=None,
+            listed=None,
+            updated=None,
+        )
+        platform_skill_dated = PlatformSkill.objects.create(
+            platform=platform_beta,
+            skill=self.sql_skill,
+            available=True,
+            listed=False,
+            updated="2026-08-15",
+        )
+
+        response = self.client.get(reverse("platform_skills"))
+
+        self.assertEqual(response.status_code, 200)
+        page_items = list(response.context["page_obj"].object_list)
+        self.assertEqual(
+            [item.pk for item in page_items],
+            [platform_skill_null.pk, platform_skill_dated.pk],
+        )
+        self.assertContains(response, "Platform Skills")
+        self.assertContains(response, "Alpha Platform")
+        self.assertContains(response, "Python")
+        self.assertContains(response, "Beta Platform")
+        self.assertContains(response, "SQL")
+        self.assertContains(response, 'name="form-0-available"')
+        self.assertContains(response, 'name="form-0-listed"')
+        self.assertContains(response, 'name="form-0-updated"')
+        self.assertContains(response, ">Unknown<", html=False)
+        self.assertNotContains(response, "Delete")
+        self.assertNotContains(response, ">New<", html=False)
+
+        post_data = {
+            "form-TOTAL_FORMS": "2",
+            "form-INITIAL_FORMS": "2",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "page": "1",
+            "form-0-id": str(platform_skill_null.pk),
+            "form-0-available": "false",
+            "form-0-listed": "true",
+            "form-0-updated": "2026-08-20",
+            "form-1-id": str(platform_skill_dated.pk),
+            "form-1-available": "true",
+            "form-1-listed": "false",
+            "form-1-updated": "2026-08-15",
+        }
+
+        post_response = self.client.post(reverse("platform_skills"), data=post_data)
+
+        self.assertRedirects(post_response, f"{reverse('platform_skills')}?page=1")
+
+        platform_skill_null.refresh_from_db()
+        platform_skill_dated.refresh_from_db()
+
+        self.assertFalse(platform_skill_null.available)
+        self.assertTrue(platform_skill_null.listed)
+        self.assertEqual(str(platform_skill_null.updated), "2026-08-20")
+        self.assertEqual(platform_skill_null.platform, platform_alpha)
+        self.assertEqual(platform_skill_null.skill, self.python_skill)
+        self.assertTrue(platform_skill_dated.available)
+        self.assertFalse(platform_skill_dated.listed)
+        self.assertEqual(str(platform_skill_dated.updated), "2026-08-15")
+        self.assertEqual(PlatformSkill.objects.count(), 2)

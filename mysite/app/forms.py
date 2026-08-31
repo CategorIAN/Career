@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import modelformset_factory
 
-from .models import Platform, Skill
+from .models import Platform, PlatformSkill, Skill
 
 
 class SkillForm(forms.ModelForm):
@@ -11,7 +11,11 @@ class SkillForm(forms.ModelForm):
         widgets = {
             "updated": forms.DateInput(
                 format="%Y-%m-%d",
-                attrs={"type": "date"},
+                attrs={
+                    "type": "date",
+                    "autocomplete": "off",
+                    "data-form-type": "other",
+                },
             ),
         }
 
@@ -55,4 +59,69 @@ PlatformFormSet = modelformset_factory(
     form=PlatformForm,
     extra=0,
     can_delete=True,
+)
+
+
+NULL_BOOLEAN_CHOICES = (
+    ("", "Unknown"),
+    ("true", "Yes"),
+    ("false", "No"),
+)
+
+
+class PlatformSkillForm(forms.ModelForm):
+    available = forms.TypedChoiceField(
+        choices=NULL_BOOLEAN_CHOICES,
+        coerce=lambda value: {
+            "true": True,
+            "false": False,
+            "": None,
+            None: None,
+        }.get(value, None),
+        empty_value=None,
+        required=False,
+    )
+    listed = forms.TypedChoiceField(
+        choices=NULL_BOOLEAN_CHOICES,
+        coerce=lambda value: {
+            "true": True,
+            "false": False,
+            "": None,
+            None: None,
+        }.get(value, None),
+        empty_value=None,
+        required=False,
+    )
+
+    class Meta:
+        model = PlatformSkill
+        fields = ["available", "listed", "updated"]
+        widgets = {
+            "updated": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={
+                    "type": "date",
+                    "autocomplete": "off",
+                    "data-form-type": "other",
+                },
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+        for field_name in ("available", "listed"):
+            value = getattr(self.instance, field_name, None)
+            self.initial[field_name] = (
+                "true" if value is True else "false" if value is False else ""
+            )
+
+
+PlatformSkillFormSet = modelformset_factory(
+    PlatformSkill,
+    form=PlatformSkillForm,
+    extra=0,
+    can_delete=False,
 )
