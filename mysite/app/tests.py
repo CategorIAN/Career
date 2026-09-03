@@ -776,6 +776,7 @@ class SkillPageTests(TestCase):
         self.assertContains(response, "<td>Manager</td>", html=True)
         self.assertContains(response, 'name="role_without_skill_')
         self.assertContains(response, 'name="role_with_skill_')
+        self.assertContains(response, "Projects")
 
     def test_displayed_skill_is_used_for_role_tables_when_no_skill_is_selected(self):
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
@@ -806,6 +807,106 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(response, "<td>Analyst</td>", html=True)
         self.assertContains(response, "<td>Engineer</td>", html=True)
+
+    def test_selected_skill_shows_projects_without_and_with_skill(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        other_skill = Skill.objects.create(name="Python", type="Language")
+        project_without_skill = Project.objects.create(title="Alpha Project")
+        project_with_skill = Project.objects.create(title="Beta Project")
+        project_with_other_skill = Project.objects.create(title="Gamma Project")
+        project_with_skill.skills.add(selected_skill)
+        project_with_other_skill.skills.add(other_skill)
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [project.pk for project in response.context["projects_without_skill"]],
+            [project_without_skill.pk, project_with_other_skill.pk],
+        )
+        self.assertEqual(
+            [project.pk for project in response.context["projects_with_skill"]],
+            [project_with_skill.pk],
+        )
+        self.assertContains(response, "Projects Without Skill")
+        self.assertContains(response, "Projects With Skill")
+        self.assertContains(response, "<td>Alpha Project</td>", html=True)
+        self.assertContains(response, "<td>Beta Project</td>", html=True)
+        self.assertContains(response, "<td>Gamma Project</td>", html=True)
+        self.assertContains(response, 'name="project_without_skill_')
+        self.assertContains(response, 'name="project_with_skill_')
+
+    def test_selected_skill_shows_courses_grouped_by_education(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        school_one = School.objects.create(name="School One")
+        school_two = School.objects.create(name="School Two")
+        education_one = Education.objects.create(
+            school=school_one,
+            degree="Bachelor of Science",
+            field_of_study="Computer Science",
+        )
+        education_two = Education.objects.create(
+            school=school_two,
+            degree="Master of Science",
+            field_of_study="Analytics",
+        )
+        course_without_skill = Course.objects.create(
+            education=education_one,
+            title="Algorithms",
+            sort_order=1,
+        )
+        course_with_skill = Course.objects.create(
+            education=education_one,
+            title="Databases",
+            sort_order=2,
+        )
+        other_education_course = Course.objects.create(
+            education=education_two,
+            title="Statistics",
+            sort_order=1,
+        )
+        course_with_skill.skills.add(selected_skill)
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["course_groups"]), 2)
+        first_group = next(
+            group for group in response.context["course_groups"]
+            if group["education"].pk == education_one.pk
+        )
+        second_group = next(
+            group for group in response.context["course_groups"]
+            if group["education"].pk == education_two.pk
+        )
+        self.assertEqual(
+            [course.pk for course in first_group["courses_without_skill"]],
+            [course_without_skill.pk],
+        )
+        self.assertEqual(
+            [course.pk for course in first_group["courses_with_skill"]],
+            [course_with_skill.pk],
+        )
+        self.assertEqual(
+            [course.pk for course in second_group["courses_without_skill"]],
+            [other_education_course.pk],
+        )
+        self.assertEqual(
+            [course.pk for course in second_group["courses_with_skill"]],
+            [],
+        )
+        self.assertContains(response, "Courses")
+        self.assertContains(response, "Courses Without Skill")
+        self.assertContains(response, "Courses With Skill")
+        self.assertContains(response, "School One | Bachelor of Science | Computer Science")
+        self.assertContains(response, "School Two | Master of Science | Analytics")
+        self.assertContains(response, f'name="swap_courses" value="{education_one.pk}"', html=False)
+        self.assertContains(response, f'name="swap_courses" value="{education_two.pk}"', html=False)
+        self.assertContains(response, "<td>Algorithms</td>", html=True)
+        self.assertContains(response, "<td>Databases</td>", html=True)
+        self.assertContains(response, "<td>Statistics</td>", html=True)
+        self.assertContains(response, 'name="course_without_skill_')
+        self.assertContains(response, 'name="course_with_skill_')
 
     def test_swap_button_adds_and_removes_selected_skill_for_checked_roles(self):
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
@@ -882,6 +983,76 @@ class SkillPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('skills')}?page=1")
         self.assertTrue(role_without_skill.skills.filter(pk=displayed_skill.pk).exists())
         self.assertFalse(role_with_skill.skills.filter(pk=displayed_skill.pk).exists())
+
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_projects(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        project_without_skill = Project.objects.create(title="Alpha Project")
+        project_with_skill = Project.objects.create(title="Beta Project")
+        project_with_skill.skills.add(selected_skill)
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(selected_skill.pk),
+                "form-0-name": selected_skill.name,
+                "form-0-type": selected_skill.type,
+                "form-0-rating": str(selected_skill.rating),
+                "skill_id": str(selected_skill.pk),
+                "page": "1",
+                "swap_projects": "1",
+                f"project_without_skill_{project_without_skill.pk}": "on",
+                f"project_with_skill_{project_with_skill.pk}": "on",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?skill_id={selected_skill.pk}")
+        self.assertTrue(project_without_skill.skills.filter(pk=selected_skill.pk).exists())
+        self.assertFalse(project_with_skill.skills.filter(pk=selected_skill.pk).exists())
+
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_courses(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        school = School.objects.create(name="School One")
+        education = Education.objects.create(
+            school=school,
+            degree="Bachelor of Science",
+            field_of_study="Computer Science",
+        )
+        course_without_skill = Course.objects.create(
+            education=education,
+            title="Algorithms",
+        )
+        course_with_skill = Course.objects.create(
+            education=education,
+            title="Databases",
+        )
+        course_with_skill.skills.add(selected_skill)
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(selected_skill.pk),
+                "form-0-name": selected_skill.name,
+                "form-0-type": selected_skill.type,
+                "form-0-rating": str(selected_skill.rating),
+                "skill_id": str(selected_skill.pk),
+                "page": "1",
+                "swap_courses": str(education.pk),
+                f"course_without_skill_{course_without_skill.pk}": "on",
+                f"course_with_skill_{course_with_skill.pk}": "on",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?skill_id={selected_skill.pk}")
+        self.assertTrue(course_without_skill.skills.filter(pk=selected_skill.pk).exists())
+        self.assertFalse(course_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
     def test_add_skill_button_creates_skill_and_redirects(self):
         response = self.client.post(

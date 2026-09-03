@@ -103,9 +103,12 @@
     <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <h2 style="margin: 0;">Roles</h2>
-        <button type="submit" name="swap_roles" value="1">Swap</button>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" class="roles-toggle-button" data-target="roles-section-body">Hide</button>
+            <button type="submit" name="swap_roles" value="1">Swap</button>
+        </div>
     </div>
-    <div style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+    <div id="roles-section-body" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
         <div style="flex: 1; padding-right: 0.5rem;">
             <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
                 <thead>
@@ -153,6 +156,136 @@
         </div>
     </div>
 </form>
+<form method="post" style="margin-top: 1.5rem;">
+    {% csrf_token %}
+    <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+    <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+        <h2 style="margin: 0;">Projects</h2>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" class="roles-toggle-button" data-target="projects-section-body">Hide</button>
+            <button type="submit" name="swap_projects" value="1">Swap</button>
+        </div>
+    </div>
+    <div id="projects-section-body" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+        <div style="flex: 1; padding-right: 0.5rem;">
+            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Projects Without Skill</th>
+                        <th>Swap</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects_without_skill %}
+                        <tr>
+                            <td>{{ project.title }}</td>
+                            <td><input type="checkbox" name="project_without_skill_{{ project.pk }}"></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2"></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
+        <div style="flex: 1; padding-left: 0.5rem;">
+            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Projects With Skill</th>
+                        <th>Swap</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects_with_skill %}
+                        <tr>
+                            <td>{{ project.title }}</td>
+                            <td><input type="checkbox" name="project_with_skill_{{ project.pk }}"></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2"></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+<div style="margin-top: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+        <h2 style="margin: 0;">Courses</h2>
+        <button type="button" class="roles-toggle-button" data-target="courses-section-body">Hide</button>
+    </div>
+    <div id="courses-section-body" style="margin-top: 1rem;">
+        {% for group in course_groups %}
+            <form method="post" style="margin-top: {% if not forloop.first %}1rem{% else %}0{% endif %};">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+                <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                    <h3 style="margin: 0;">{{ group.education.school.name }} | {{ group.education.degree }}{% if group.education.field_of_study %} | {{ group.education.field_of_study }}{% endif %}</h3>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button type="button" class="roles-toggle-button" data-target="course-education-{{ group.education.pk }}">Hide</button>
+                        <button type="submit" name="swap_courses" value="{{ group.education.pk }}">Swap</button>
+                    </div>
+                </div>
+                <div id="course-education-{{ group.education.pk }}" style="border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+                    <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                        <div style="flex: 1; padding-right: 0.5rem;">
+                            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Courses Without Skill</th>
+                                        <th>Swap</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for course in group.courses_without_skill %}
+                                        <tr>
+                                            <td>{{ course.title }}</td>
+                                            <td><input type="checkbox" name="course_without_skill_{{ course.pk }}"></td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
+                        <div style="flex: 1; padding-left: 0.5rem;">
+                            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Courses With Skill</th>
+                                        <th>Swap</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for course in group.courses_with_skill %}
+                                        <tr>
+                                            <td>{{ course.title }}</td>
+                                            <td><input type="checkbox" name="course_with_skill_{{ course.pk }}"></td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        {% endfor %}
+    </div>
+</div>
 </section>
 <script>
     (() => {
@@ -184,5 +317,18 @@
             }
         });
     })();
+
+    document.querySelectorAll(".roles-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const target = document.getElementById(button.dataset.target);
+            if (!target) {
+                return;
+            }
+
+            const isHidden = target.classList.contains("hidden");
+            target.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
 </script>
 {% endblock %}

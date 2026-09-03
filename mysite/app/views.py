@@ -452,9 +452,33 @@ def skill_formset_view(request):
     if displayed_skill is not None:
         roles_with_skill = Role.objects.filter(skills=displayed_skill).order_by("title", "id")
         roles_without_skill = Role.objects.exclude(skills=displayed_skill).order_by("title", "id")
+        projects_with_skill = Project.objects.filter(skills=displayed_skill).order_by("title", "id")
+        projects_without_skill = Project.objects.exclude(skills=displayed_skill).order_by("title", "id")
+        course_educations = (
+            Education.objects
+            .filter(courses__isnull=False)
+            .select_related("school")
+            .distinct()
+            .order_by("-end_date", "-start_date", "id")
+        )
     else:
         roles_with_skill = Role.objects.none()
         roles_without_skill = Role.objects.none()
+        projects_with_skill = Project.objects.none()
+        projects_without_skill = Project.objects.none()
+        course_educations = Education.objects.none()
+
+    course_groups = []
+    for education in course_educations:
+        courses_without_skill = education.courses.exclude(skills=displayed_skill).order_by("sort_order", "title", "id")
+        courses_with_skill = education.courses.filter(skills=displayed_skill).order_by("sort_order", "title", "id")
+        course_groups.append(
+            {
+                "education": education,
+                "courses_without_skill": courses_without_skill,
+                "courses_with_skill": courses_with_skill,
+            }
+        )
 
     redirect_params = {}
     if is_filtered:
@@ -468,6 +492,8 @@ def skill_formset_view(request):
         add_skill_requested = "add_skill" in request.POST
         delete_skill_id = request.POST.get("delete_skill", "").strip()
         swap_roles_requested = "swap_roles" in request.POST
+        swap_projects_requested = "swap_projects" in request.POST
+        swap_courses_education_id = request.POST.get("swap_courses", "").strip()
         invalid_name_message = ""
 
         if add_skill_requested:
@@ -499,6 +525,50 @@ def skill_formset_view(request):
                     for role in Role.objects.filter(pk__in=remove_role_ids):
                         role.skills.remove(displayed_skill)
             return redirect(f"{request.path}?{urlencode(redirect_params)}")
+        elif swap_projects_requested:
+            if displayed_skill is not None:
+                add_project_ids = [
+                    int(key.removeprefix("project_without_skill_"))
+                    for key in request.POST
+                    if key.startswith("project_without_skill_")
+                ]
+                remove_project_ids = [
+                    int(key.removeprefix("project_with_skill_"))
+                    for key in request.POST
+                    if key.startswith("project_with_skill_")
+                ]
+
+                with transaction.atomic():
+                    for project in Project.objects.filter(pk__in=add_project_ids):
+                        project.skills.add(displayed_skill)
+                    for project in Project.objects.filter(pk__in=remove_project_ids):
+                        project.skills.remove(displayed_skill)
+            return redirect(f"{request.path}?{urlencode(redirect_params)}")
+        elif swap_courses_education_id:
+            if displayed_skill is not None:
+                add_course_ids = [
+                    int(key.removeprefix("course_without_skill_"))
+                    for key in request.POST
+                    if key.startswith("course_without_skill_")
+                ]
+                remove_course_ids = [
+                    int(key.removeprefix("course_with_skill_"))
+                    for key in request.POST
+                    if key.startswith("course_with_skill_")
+                ]
+
+                with transaction.atomic():
+                    for course in Course.objects.filter(
+                        pk__in=add_course_ids,
+                        education_id=swap_courses_education_id,
+                    ):
+                        course.skills.add(displayed_skill)
+                    for course in Course.objects.filter(
+                        pk__in=remove_course_ids,
+                        education_id=swap_courses_education_id,
+                    ):
+                        course.skills.remove(displayed_skill)
+            return redirect(f"{request.path}?{urlencode(redirect_params)}")
         else:
             is_formset_valid = formset.is_valid()
 
@@ -529,6 +599,9 @@ def skill_formset_view(request):
             "invalid_name_message": invalid_name_message,
             "roles_with_skill": roles_with_skill,
             "roles_without_skill": roles_without_skill,
+            "projects_with_skill": projects_with_skill,
+            "projects_without_skill": projects_without_skill,
+            "course_groups": course_groups,
         },
     )
 
