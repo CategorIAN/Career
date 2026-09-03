@@ -6,12 +6,14 @@ from django.db import transaction
 from django.db.models import F, Prefetch
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from datetime import datetime, UTC
 import hashlib
 import logging
 import re
 from django.views.decorators.http import require_POST
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 from .forms import (
     PlatformForm,
@@ -53,6 +55,7 @@ FREELANCER_RATE_LIMIT_MESSAGE = (
 
 
 logger = logging.getLogger(__name__)
+USER_TIMEZONE = ZoneInfo("America/Denver")
 
 
 def _join_copy_parts(parts):
@@ -419,32 +422,98 @@ def _create_platform_skills_for_skill(skill):
 
 
 def skill_formset_view(request):
+    selected_skill_id = request.POST.get("skill_id") or request.GET.get("skill_id", "")
+    selected_skill_id = selected_skill_id.strip()
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Skill.objects.all().order_by(
         F("updated").asc(nulls_first=True),
         "name",
     )
-    paginator = Paginator(queryset, 8)
-    page_obj = paginator.get_page(page_number)
-    page_queryset = page_obj.object_list
+    all_skills = Skill.objects.all().order_by("name", "id")
+    selected_skill = None
+    is_filtered = False
+
+    if selected_skill_id:
+        selected_skill = all_skills.filter(pk=selected_skill_id).first()
+        if selected_skill is not None:
+            is_filtered = True
+            page_queryset = queryset.filter(pk=selected_skill.pk)
+            page_obj = None
+        else:
+            page_queryset = queryset.none()
+            page_obj = None
+    else:
+        paginator = Paginator(queryset, 1)
+        page_obj = paginator.get_page(page_number)
+        page_queryset = page_obj.object_list
+
+    displayed_skill = selected_skill or page_queryset.first()
+
+    if displayed_skill is not None:
+        roles_with_skill = Role.objects.filter(skills=displayed_skill).order_by("title", "id")
+        roles_without_skill = Role.objects.exclude(skills=displayed_skill).order_by("title", "id")
+    else:
+        roles_with_skill = Role.objects.none()
+        roles_without_skill = Role.objects.none()
+
+    redirect_params = {}
+    if is_filtered:
+        redirect_params["skill_id"] = selected_skill_id
+    elif page_obj is not None:
+        redirect_params["page"] = page_obj.number
 
     if request.method == "POST":
         new_form = SkillForm(request.POST, prefix="new")
         formset = SkillFormSet(request.POST, queryset=page_queryset)
-        new_form_has_data = new_form.has_changed()
-        is_new_form_valid = new_form.is_valid() if new_form_has_data else True
-        is_formset_valid = formset.is_valid()
+        add_skill_requested = "add_skill" in request.POST
+        delete_skill_id = request.POST.get("delete_skill", "").strip()
+        swap_roles_requested = "swap_roles" in request.POST
+        invalid_name_message = ""
 
-        if is_formset_valid and is_new_form_valid:
-            if new_form_has_data:
+        if add_skill_requested:
+            if new_form.is_valid():
                 with transaction.atomic():
                     skill = new_form.save()
                     _create_platform_skills_for_skill(skill)
-            formset.save()
-            return redirect(f"{request.path}?page={page_obj.number}")
+                return redirect(f"{request.path}?{urlencode({'skill_id': skill.pk})}")
+            invalid_name_message = "Invalid Name"
+        elif delete_skill_id:
+            Skill.objects.filter(pk=delete_skill_id).delete()
+            return redirect(request.path)
+        elif swap_roles_requested:
+            if displayed_skill is not None:
+                add_role_ids = [
+                    int(key.removeprefix("role_without_skill_"))
+                    for key in request.POST
+                    if key.startswith("role_without_skill_")
+                ]
+                remove_role_ids = [
+                    int(key.removeprefix("role_with_skill_"))
+                    for key in request.POST
+                    if key.startswith("role_with_skill_")
+                ]
+
+                with transaction.atomic():
+                    for role in Role.objects.filter(pk__in=add_role_ids):
+                        role.skills.add(displayed_skill)
+                    for role in Role.objects.filter(pk__in=remove_role_ids):
+                        role.skills.remove(displayed_skill)
+            return redirect(f"{request.path}?{urlencode(redirect_params)}")
+        else:
+            is_formset_valid = formset.is_valid()
+
+            if is_formset_valid:
+                with transaction.atomic():
+                    current_date = timezone.now().astimezone(USER_TIMEZONE).date()
+                    for form in formset.forms:
+                        skill = form.save(commit=False)
+                        skill.updated = current_date
+                        skill.save()
+                return redirect(f"{request.path}?{urlencode(redirect_params)}")
     else:
         new_form = SkillForm(prefix="new")
         formset = SkillFormSet(queryset=page_queryset)
+        invalid_name_message = ""
 
     return render(
         request,
@@ -453,6 +522,13 @@ def skill_formset_view(request):
             "new_form": new_form,
             "formset": formset,
             "page_obj": page_obj,
+            "all_skills": all_skills,
+            "selected_skill": selected_skill,
+            "selected_skill_id": selected_skill_id,
+            "is_filtered": is_filtered,
+            "invalid_name_message": invalid_name_message,
+            "roles_with_skill": roles_with_skill,
+            "roles_without_skill": roles_without_skill,
         },
     )
 

@@ -8,7 +8,6 @@ from .models import (Company, Role, RoleTask, Address, City,
 class RoleTaskInline(admin.TabularInline):
     model = RoleTask
     extra = 1
-    filter_horizontal = ("skills",)
 
 
 @admin.register(Country)
@@ -63,7 +62,7 @@ class RoleAdmin(admin.ModelAdmin):
     list_filter = ("current", "is_public", "company")
     search_fields = ("title", "company__name", "description")
     filter_horizontal = ("skills",)
-    inlines = [RoleTaskInline, SupervisorInline]
+    inlines = [SupervisorInline]
 
 
 @admin.register(Company)
@@ -95,7 +94,6 @@ class EducationAdmin(admin.ModelAdmin):
 class ProjectTaskInline(admin.TabularInline):
     model = ProjectTask
     extra = 1
-    filter_horizontal = ("skills",)
 
 
 @admin.register(Skill)
@@ -118,7 +116,6 @@ class ProjectTaskAdmin(admin.ModelAdmin):
     list_display = ("project", "short_description", "resume_ready", "sort_order")
     list_filter = ("resume_ready", "project")
     search_fields = ("description", "project__title")
-    filter_horizontal = ("skills",)
 
     @staticmethod
     def short_description(obj):

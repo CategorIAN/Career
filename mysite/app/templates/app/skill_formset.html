@@ -8,73 +8,181 @@
 <form method="post">
     {% csrf_token %}
     {{ formset.management_form }}
-    <input type="hidden" name="page" value="{{ page_obj.number }}">
-    <table border="1" cellpadding="8" cellspacing="0">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Rating</th>
-                <th>Updated</th>
-                <th>Delete</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    {{ new_form.name.errors }}
-                    {{ new_form.name }}
-                </td>
-                <td>
-                    {{ new_form.type.errors }}
-                    {{ new_form.type }}
-                </td>
-                <td>
-                    {{ new_form.rating.errors }}
-                    {{ new_form.rating }}
-                </td>
-                <td>
-                    {{ new_form.updated.errors }}
-                    {{ new_form.updated }}
-                </td>
-                <td>New</td>
-            </tr>
-            {% for form in formset %}
-                <tr>
-                    {% for hidden in form.hidden_fields %}
-                        {{ hidden }}
+    <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+    <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+        <div>
+            <table border="1" cellpadding="8" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Rating</th>
+                        <th>Add/Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            {{ new_form.name }}
+                        </td>
+                        <td>
+                            {{ new_form.type }}
+                        </td>
+                        <td>
+                            {{ new_form.rating }}
+                        </td>
+                        <td>
+                            <button type="submit" name="add_skill" value="1">Add</button>
+                        </td>
+                    </tr>
+                    {% for form in formset %}
+                        <tr>
+                            {% for hidden in form.hidden_fields %}
+                                {{ hidden }}
+                            {% endfor %}
+                            <td>
+                                {{ form.name.errors }}
+                                {{ form.name }}
+                            </td>
+                            <td>
+                                {{ form.type.errors }}
+                                {{ form.type }}
+                            </td>
+                            <td>
+                                {{ form.rating.errors }}
+                                {{ form.rating }}
+                            </td>
+                            <td>
+                                <button type="submit" name="delete_skill" value="{{ form.instance.pk }}">Delete</button>
+                            </td>
+                        </tr>
                     {% endfor %}
-                    <td>
-                        {{ form.name.errors }}
-                        {{ form.name }}
-                    </td>
-                    <td>
-                        {{ form.type.errors }}
-                        {{ form.type }}
-                    </td>
-                    <td>
-                        {{ form.rating.errors }}
-                        {{ form.rating }}
-                    </td>
-                    <td>
-                        {{ form.updated.errors }}
-                        {{ form.updated }}
-                    </td>
-                    <td>{{ form.DELETE }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </tbody>
+            </table>
+            {% if not is_filtered %}
+                <div style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous skill">&larr;</a>
+                    {% endif %}
+                    <span>Skill {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" aria-label="Next skill">&rarr;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        {% if invalid_name_message %}
+            <div style="color: red;">{{ invalid_name_message }}</div>
+        {% endif %}
+    </div>
     <button type="submit">Save</button>
 </form>
-<div style="margin-top: 1rem;">
-    {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
-    {% endif %}
-    <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
-    {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}">Next</a>
-    {% endif %}
-</div>
+<form method="get" style="margin-top: 1rem;">
+    <label for="skill-search">Search Skill</label>
+    <input
+        id="skill-search"
+        type="text"
+        list="skill-search-options"
+        value="{% if selected_skill %}{{ selected_skill.name }}{% endif %}"
+        autocomplete="off"
+        style="width: 20rem;"
+    >
+    <datalist id="skill-search-options">
+        {% for skill in all_skills %}
+            <option value="{{ skill.name }}" data-skill-id="{{ skill.pk }}"></option>
+        {% endfor %}
+    </datalist>
+    <input id="skill-id-input" type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <button type="submit">Search</button>
+    <button type="button" onclick="window.location.href='{% url 'skills' %}'">Clear</button>
+</form>
+<form method="post" style="margin-top: 1.5rem;">
+    {% csrf_token %}
+    <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+    <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+        <h2 style="margin: 0;">Roles</h2>
+        <button type="submit" name="swap_roles" value="1">Swap</button>
+    </div>
+    <div style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+        <div style="flex: 1; padding-right: 0.5rem;">
+            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Roles Without Skill</th>
+                        <th>Swap</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for role in roles_without_skill %}
+                        <tr>
+                            <td>{{ role.title }}</td>
+                            <td><input type="checkbox" name="role_without_skill_{{ role.pk }}"></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2"></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
+        <div style="flex: 1; padding-left: 0.5rem;">
+            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Roles With Skill</th>
+                        <th>Swap</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for role in roles_with_skill %}
+                        <tr>
+                            <td>{{ role.title }}</td>
+                            <td><input type="checkbox" name="role_with_skill_{{ role.pk }}"></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2"></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
 </section>
+<script>
+    (() => {
+        const searchInput = document.getElementById("skill-search");
+        const skillIdInput = document.getElementById("skill-id-input");
+        const skillOptions = document.querySelectorAll("#skill-search-options option");
+
+        if (!searchInput || !skillIdInput || !skillOptions.length) {
+            return;
+        }
+
+        const skillIdByName = new Map();
+        skillOptions.forEach(option => {
+            if (!skillIdByName.has(option.value)) {
+                skillIdByName.set(option.value, option.dataset.skillId || "");
+            }
+        });
+
+        const syncSkillId = () => {
+            skillIdInput.value = skillIdByName.get(searchInput.value) || "";
+        };
+
+        searchInput.addEventListener("input", syncSkillId);
+        searchInput.addEventListener("change", syncSkillId);
+        searchInput.form?.addEventListener("submit", () => {
+            syncSkillId();
+            if (!skillIdInput.value) {
+                skillIdInput.disabled = true;
+            }
+        });
+    })();
+</script>
 {% endblock %}

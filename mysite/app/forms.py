@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.forms import modelformset_factory
 
 from .models import Platform, PlatformSkill, Skill
@@ -9,6 +10,11 @@ class SkillForm(forms.ModelForm):
         model = Skill
         fields = ["name", "type", "rating", "updated"]
         widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "style": "width: 20rem;",
+                },
+            ),
             "updated": forms.DateInput(
                 format="%Y-%m-%d",
                 attrs={
@@ -25,7 +31,10 @@ class SkillForm(forms.ModelForm):
             field.required = False
 
     def clean_name(self):
-        return self.cleaned_data.get("name") or ""
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Invalid Name")
+        return name
 
     def clean_rating(self):
         rating = self.cleaned_data.get("rating")

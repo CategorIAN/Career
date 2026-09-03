@@ -678,3 +678,337 @@ class ApplicationReferencePageTests(TestCase):
         self.assertFalse(platform_skill_dated.listed)
         self.assertEqual(str(platform_skill_dated.updated), "2026-08-15")
         self.assertEqual(PlatformSkill.objects.count(), 2)
+
+
+class SkillPageTests(TestCase):
+    def test_skills_page_shows_add_delete_header_and_add_button(self):
+        Skill.objects.create(name="Python", type="Language")
+
+        response = self.client.get(reverse("skills"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "Skill 1 of 1")
+        self.assertContains(response, 'name="add_skill" value="1"', html=False)
+        self.assertContains(response, 'name="delete_skill"', html=False)
+        self.assertNotContains(response, ">New<", html=False)
+        self.assertNotContains(response, ">Updated<", html=False)
+        self.assertNotContains(response, 'type="checkbox"', html=False)
+
+    def test_skills_page_uses_arrow_navigation_labels(self):
+        Skill.objects.create(name="Alpha", type="Language")
+        Skill.objects.create(name="Beta", type="Technology")
+
+        response = self.client.get(reverse("skills"), {"page": 1})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Skill 1 of 2")
+        self.assertContains(response, 'aria-label="Next skill"', html=False)
+        self.assertContains(response, "&rarr;", html=False)
+        self.assertNotContains(response, '">Next<', html=False)
+        self.assertNotContains(response, '">Previous<', html=False)
+
+    def test_search_skill_form_filters_table_by_skill_id_without_pagination(self):
+        python_skill = Skill.objects.create(name="Python", type="Language")
+        sql_skill = Skill.objects.create(name="SQL", type="Technology")
+
+        response = self.client.get(reverse("skills"), {"skill_id": sql_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Search Skill")
+        self.assertContains(response, f'name="skill_id" value="{sql_skill.pk}"', html=False)
+        self.assertContains(response, 'list="skill-search-options"', html=False)
+        self.assertContains(response, f'<option value="Python" data-skill-id="{python_skill.pk}"></option>', html=False)
+        self.assertContains(response, f'<option value="SQL" data-skill-id="{sql_skill.pk}"></option>', html=False)
+        self.assertContains(response, "SQL")
+        self.assertNotContains(response, "Skill 1 of", html=False)
+        self.assertNotContains(response, 'aria-label="Next skill"', html=False)
+
+    def test_search_skill_options_are_alphabetized_by_name(self):
+        Skill.objects.create(name="Zulu", type="Technology")
+        Skill.objects.create(name="Alpha", type="Language")
+        Skill.objects.create(name="Mike", type="Domain")
+
+        response = self.client.get(reverse("skills"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(content.index('<option value="Alpha"'), content.index('<option value="Mike"'))
+        self.assertLess(content.index('<option value="Mike"'), content.index('<option value="Zulu"'))
+
+    def test_selected_skill_shows_roles_without_and_with_skill_in_side_by_side_tables(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        other_skill = Skill.objects.create(name="Python", type="Language")
+        company = Company.objects.create(name="Example Company")
+        role_without_skill = Role.objects.create(
+            company=company,
+            title="Analyst",
+            start_date="2024-01-01",
+        )
+        role_with_skill = Role.objects.create(
+            company=company,
+            title="Engineer",
+            start_date="2024-01-01",
+        )
+        role_with_other_skill = Role.objects.create(
+            company=company,
+            title="Manager",
+            start_date="2024-01-01",
+        )
+        role_with_skill.skills.add(selected_skill)
+        role_with_other_skill.skills.add(other_skill)
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [role.pk for role in response.context["roles_without_skill"]],
+            [role_without_skill.pk, role_with_other_skill.pk],
+        )
+        self.assertEqual(
+            [role.pk for role in response.context["roles_with_skill"]],
+            [role_with_skill.pk],
+        )
+        self.assertContains(response, "Roles Without Skill")
+        self.assertContains(response, "Roles With Skill")
+        self.assertContains(response, "<td>Analyst</td>", html=True)
+        self.assertContains(response, "<td>Engineer</td>", html=True)
+        self.assertContains(response, "<td>Manager</td>", html=True)
+        self.assertContains(response, 'name="role_without_skill_')
+        self.assertContains(response, 'name="role_with_skill_')
+
+    def test_displayed_skill_is_used_for_role_tables_when_no_skill_is_selected(self):
+        displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
+        Skill.objects.create(name="Zulu", type="Language")
+        company = Company.objects.create(name="Example Company")
+        role_without_skill = Role.objects.create(
+            company=company,
+            title="Analyst",
+            start_date="2024-01-01",
+        )
+        role_with_skill = Role.objects.create(
+            company=company,
+            title="Engineer",
+            start_date="2024-01-01",
+        )
+        role_with_skill.skills.add(displayed_skill)
+
+        response = self.client.get(reverse("skills"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [role.pk for role in response.context["roles_without_skill"]],
+            [role_without_skill.pk],
+        )
+        self.assertEqual(
+            [role.pk for role in response.context["roles_with_skill"]],
+            [role_with_skill.pk],
+        )
+        self.assertContains(response, "<td>Analyst</td>", html=True)
+        self.assertContains(response, "<td>Engineer</td>", html=True)
+
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_roles(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        company = Company.objects.create(name="Example Company")
+        role_without_skill = Role.objects.create(
+            company=company,
+            title="Analyst",
+            start_date="2024-01-01",
+        )
+        role_with_skill = Role.objects.create(
+            company=company,
+            title="Engineer",
+            start_date="2024-01-01",
+        )
+        role_with_skill.skills.add(selected_skill)
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(selected_skill.pk),
+                "form-0-name": selected_skill.name,
+                "form-0-type": selected_skill.type,
+                "form-0-rating": str(selected_skill.rating),
+                "skill_id": str(selected_skill.pk),
+                "page": "1",
+                "swap_roles": "1",
+                f"role_without_skill_{role_without_skill.pk}": "on",
+                f"role_with_skill_{role_with_skill.pk}": "on",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?skill_id={selected_skill.pk}")
+        self.assertTrue(role_without_skill.skills.filter(pk=selected_skill.pk).exists())
+        self.assertFalse(role_with_skill.skills.filter(pk=selected_skill.pk).exists())
+
+    def test_swap_button_uses_displayed_skill_when_no_selected_skill_is_provided(self):
+        displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
+        Skill.objects.create(name="Zulu", type="Language")
+        company = Company.objects.create(name="Example Company")
+        role_without_skill = Role.objects.create(
+            company=company,
+            title="Analyst",
+            start_date="2024-01-01",
+        )
+        role_with_skill = Role.objects.create(
+            company=company,
+            title="Engineer",
+            start_date="2024-01-01",
+        )
+        role_with_skill.skills.add(displayed_skill)
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(displayed_skill.pk),
+                "form-0-name": displayed_skill.name,
+                "form-0-type": displayed_skill.type,
+                "form-0-rating": str(displayed_skill.rating),
+                "page": "1",
+                "swap_roles": "1",
+                f"role_without_skill_{role_without_skill.pk}": "on",
+                f"role_with_skill_{role_with_skill.pk}": "on",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?page=1")
+        self.assertTrue(role_without_skill.skills.filter(pk=displayed_skill.pk).exists())
+        self.assertFalse(role_with_skill.skills.filter(pk=displayed_skill.pk).exists())
+
+    def test_add_skill_button_creates_skill_and_redirects(self):
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "new-name": "Python",
+                "new-type": "Language",
+                "new-rating": "5",
+                "add_skill": "1",
+            },
+        )
+
+        created_skill = Skill.objects.get(name="Python")
+        self.assertRedirects(response, f"{reverse('skills')}?skill_id={created_skill.pk}")
+        self.assertEqual(created_skill.type, "Language")
+        self.assertEqual(created_skill.rating, 5)
+        self.assertIsNone(created_skill.updated)
+
+    def test_add_skill_with_invalid_name_returns_error_on_page(self):
+        existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(existing_skill.pk),
+                "form-0-name": existing_skill.name,
+                "form-0-type": existing_skill.type,
+                "form-0-rating": str(existing_skill.rating),
+                "form-0-updated": "",
+                "page": "1",
+                "new-name": "   ",
+                "new-type": "Language",
+                "new-rating": "3",
+                "new-updated": "",
+                "add_skill": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid Name")
+        self.assertContains(response, 'style="color: red;"', html=False)
+        self.assertEqual(Skill.objects.filter(name="Existing Skill").count(), 1)
+        self.assertEqual(Skill.objects.count(), 1)
+
+    def test_delete_skill_button_removes_existing_skill(self):
+        existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(existing_skill.pk),
+                "form-0-name": existing_skill.name,
+                "form-0-type": existing_skill.type,
+                "form-0-rating": str(existing_skill.rating),
+                "form-0-updated": "",
+                "page": "1",
+                "skill_id": str(existing_skill.pk),
+                "delete_skill": str(existing_skill.pk),
+            },
+        )
+
+        self.assertRedirects(response, reverse("skills"))
+        self.assertFalse(Skill.objects.filter(pk=existing_skill.pk).exists())
+
+    def test_save_button_does_not_add_top_row_skill_and_sets_updated_on_existing_skill(self):
+        existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(existing_skill.pk),
+                "form-0-name": "Edited Skill",
+                "form-0-type": "Domain",
+                "form-0-rating": "4",
+                "page": "1",
+                "new-name": "Should Not Be Added",
+                "new-type": "Language",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?page=1")
+        existing_skill.refresh_from_db()
+        self.assertEqual(existing_skill.name, "Edited Skill")
+        self.assertEqual(existing_skill.type, "Domain")
+        self.assertEqual(existing_skill.rating, 4)
+        self.assertEqual(str(existing_skill.updated), "2026-09-02")
+        self.assertFalse(Skill.objects.filter(name="Should Not Be Added").exists())
+
+    def test_save_button_sets_updated_on_unchanged_existing_skill(self):
+        existing_skill = Skill.objects.create(
+            name="Existing Skill",
+            type="Technology",
+            updated=None,
+        )
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(existing_skill.pk),
+                "form-0-name": existing_skill.name,
+                "form-0-type": existing_skill.type,
+                "form-0-rating": str(existing_skill.rating),
+                "page": "1",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?page=1")
+        existing_skill.refresh_from_db()
+        self.assertEqual(str(existing_skill.updated), "2026-09-02")

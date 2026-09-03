@@ -4,7 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Skill(models.Model):
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
 
     SKILL_TYPES = [(x, x) for x in ["Language", "Technology", "Domain", "Other"]]
 
@@ -273,7 +273,6 @@ class Role(models.Model):
 class RoleTask(models.Model):
     role = models.ForeignKey("Role", related_name="tasks", on_delete=models.CASCADE)
     description = models.TextField()
-    skills = models.ManyToManyField("Skill", blank=True)
     resume_ready = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
 
@@ -382,12 +381,6 @@ class ProjectTask(models.Model):
     resume_ready = models.BooleanField(default=False)
 
     sort_order = models.PositiveIntegerField(default=0)
-
-    skills = models.ManyToManyField(
-        "Skill",
-        blank=True,
-        related_name="project_tasks",
-    )
 
 
 class Course(models.Model):
