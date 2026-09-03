@@ -3,7 +3,7 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import F, Prefetch
+from django.db.models import F, Prefetch, Q
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
@@ -424,13 +424,17 @@ def _create_platform_skills_for_skill(skill):
 def skill_formset_view(request):
     selected_skill_id = request.POST.get("skill_id") or request.GET.get("skill_id", "")
     selected_skill_id = selected_skill_id.strip()
+    selected_platform_id = request.POST.get("platform_id") or request.GET.get("platform_id", "")
+    selected_platform_id = selected_platform_id.strip()
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Skill.objects.all().order_by(
         F("updated").asc(nulls_first=True),
         "name",
     )
     all_skills = Skill.objects.all().order_by("name", "id")
+    all_platforms = Platform.objects.all().order_by("name", "id")
     selected_skill = None
+    selected_platform = all_platforms.filter(pk=selected_platform_id).first() if selected_platform_id else None
     is_filtered = False
 
     if selected_skill_id:
@@ -468,6 +472,75 @@ def skill_formset_view(request):
         projects_without_skill = Project.objects.none()
         course_educations = Education.objects.none()
 
+    available_not_listed_filter = (
+        (Q(available=True) | Q(available__isnull=True))
+        & (Q(listed=False) | Q(listed__isnull=True))
+    )
+    listed_filter = Q(
+        available=True,
+        listed=True,
+    )
+    visible_platform_skill_filter = available_not_listed_filter | listed_filter
+
+    if displayed_skill is not None:
+        platforms_not_listed = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(skill=displayed_skill)
+            .filter(available_not_listed_filter)
+            .order_by("platform__name", "platform__id")
+        )
+        platforms_listed = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(skill=displayed_skill)
+            .filter(listed_filter)
+            .order_by("platform__name", "platform__id")
+        )
+    else:
+        platforms_not_listed = PlatformSkill.objects.none()
+        platforms_listed = PlatformSkill.objects.none()
+
+    if displayed_skill is not None and selected_platform is not None:
+        skills_not_listed = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(platform=selected_platform)
+            .filter(available_not_listed_filter)
+            .order_by("-skill__rating", "skill__name", "skill__id")
+        )
+        skills_listed = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(platform=selected_platform)
+            .filter(listed_filter)
+            .order_by("skill__rating", "skill__name", "skill__id")
+        )
+        editable_platform_skills = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(platform=selected_platform)
+            .filter(visible_platform_skill_filter)
+        )
+    else:
+        skills_not_listed = PlatformSkill.objects.none()
+        skills_listed = PlatformSkill.objects.none()
+        editable_platform_skills = PlatformSkill.objects.none()
+
+    if displayed_skill is not None:
+        selected_skill_platform_skills = (
+            PlatformSkill.objects
+            .select_related("platform", "skill")
+            .filter(skill=displayed_skill)
+            .order_by(
+                F("updated").asc(nulls_first=True),
+                "platform__name",
+                "skill__name",
+            )
+        )
+    else:
+        selected_skill_platform_skills = PlatformSkill.objects.none()
+
     course_groups = []
     for education in course_educations:
         courses_without_skill = education.courses.exclude(skills=displayed_skill).order_by("sort_order", "title", "id")
@@ -483,8 +556,15 @@ def skill_formset_view(request):
     redirect_params = {}
     if is_filtered:
         redirect_params["skill_id"] = selected_skill_id
+    if selected_platform is not None:
+        redirect_params["platform_id"] = selected_platform.pk
     elif page_obj is not None:
         redirect_params["page"] = page_obj.number
+
+    def _build_redirect_url(params):
+        if params:
+            return f"{request.path}?{urlencode(params)}"
+        return request.path
 
     if request.method == "POST":
         new_form = SkillForm(request.POST, prefix="new")
@@ -494,6 +574,15 @@ def skill_formset_view(request):
         swap_roles_requested = "swap_roles" in request.POST
         swap_projects_requested = "swap_projects" in request.POST
         swap_courses_education_id = request.POST.get("swap_courses", "").strip()
+        save_platform_skills_requested = "save_platform_skills" in request.POST
+        save_selected_skill_platform_skills_requested = (
+            "save_selected_skill_platform_skills" in request.POST
+        )
+        selected_skill_platform_skill_formset = PlatformSkillFormSet(
+            request.POST,
+            queryset=selected_skill_platform_skills,
+            prefix="selected-skill-platform-skills",
+        )
         invalid_name_message = ""
 
         if add_skill_requested:
@@ -501,11 +590,17 @@ def skill_formset_view(request):
                 with transaction.atomic():
                     skill = new_form.save()
                     _create_platform_skills_for_skill(skill)
-                return redirect(f"{request.path}?{urlencode({'skill_id': skill.pk})}")
+                add_redirect_params = {"skill_id": skill.pk}
+                if selected_platform is not None:
+                    add_redirect_params["platform_id"] = selected_platform.pk
+                return redirect(_build_redirect_url(add_redirect_params))
             invalid_name_message = "Invalid Name"
         elif delete_skill_id:
             Skill.objects.filter(pk=delete_skill_id).delete()
-            return redirect(request.path)
+            delete_redirect_params = {}
+            if selected_platform is not None:
+                delete_redirect_params["platform_id"] = selected_platform.pk
+            return redirect(_build_redirect_url(delete_redirect_params))
         elif swap_roles_requested:
             if displayed_skill is not None:
                 add_role_ids = [
@@ -524,7 +619,7 @@ def skill_formset_view(request):
                         role.skills.add(displayed_skill)
                     for role in Role.objects.filter(pk__in=remove_role_ids):
                         role.skills.remove(displayed_skill)
-            return redirect(f"{request.path}?{urlencode(redirect_params)}")
+            return redirect(_build_redirect_url(redirect_params))
         elif swap_projects_requested:
             if displayed_skill is not None:
                 add_project_ids = [
@@ -543,7 +638,7 @@ def skill_formset_view(request):
                         project.skills.add(displayed_skill)
                     for project in Project.objects.filter(pk__in=remove_project_ids):
                         project.skills.remove(displayed_skill)
-            return redirect(f"{request.path}?{urlencode(redirect_params)}")
+            return redirect(_build_redirect_url(redirect_params))
         elif swap_courses_education_id:
             if displayed_skill is not None:
                 add_course_ids = [
@@ -568,7 +663,59 @@ def skill_formset_view(request):
                         education_id=swap_courses_education_id,
                     ):
                         course.skills.remove(displayed_skill)
-            return redirect(f"{request.path}?{urlencode(redirect_params)}")
+            return redirect(_build_redirect_url(redirect_params))
+        elif save_platform_skills_requested:
+            if selected_platform is not None:
+                with transaction.atomic():
+                    current_date = timezone.now().astimezone(USER_TIMEZONE).date()
+                    for platform_skill in editable_platform_skills:
+                        name_key = f"platform_skill_name_{platform_skill.pk}"
+                        rating_key = f"platform_skill_rating_{platform_skill.pk}"
+                        available_key = f"platform_skill_available_{platform_skill.pk}"
+                        not_listed_swap_key = f"platform_skill_not_listed_{platform_skill.pk}"
+                        listed_swap_key = f"platform_skill_listed_{platform_skill.pk}"
+
+                        platform_skill.skill.name = request.POST.get(
+                            name_key,
+                            platform_skill.skill.name,
+                        ).strip()
+
+                        rating_value = request.POST.get(
+                            rating_key,
+                            platform_skill.skill.rating,
+                        )
+                        try:
+                            platform_skill.skill.rating = int(rating_value)
+                        except (TypeError, ValueError):
+                            platform_skill.skill.rating = platform_skill.skill.rating
+
+                        available_value = request.POST.get(available_key, "")
+                        platform_skill.available = {
+                            "true": True,
+                            "false": False,
+                            "": None,
+                        }.get(available_value, None)
+
+                        was_swapped = False
+                        if request.POST.get(not_listed_swap_key):
+                            platform_skill.listed = True
+                            was_swapped = True
+                        elif request.POST.get(listed_swap_key):
+                            platform_skill.listed = False
+                            was_swapped = True
+
+                        if was_swapped:
+                            platform_skill.updated = current_date
+
+                        if displayed_skill is not None and platform_skill.skill_id == displayed_skill.pk:
+                            platform_skill.updated = current_date
+                        platform_skill.skill.save()
+                        platform_skill.save()
+            return redirect(_build_redirect_url(redirect_params))
+        elif save_selected_skill_platform_skills_requested:
+            if selected_skill_platform_skill_formset.is_valid():
+                selected_skill_platform_skill_formset.save()
+                return redirect(_build_redirect_url(redirect_params))
         else:
             is_formset_valid = formset.is_valid()
 
@@ -579,10 +726,14 @@ def skill_formset_view(request):
                         skill = form.save(commit=False)
                         skill.updated = current_date
                         skill.save()
-                return redirect(f"{request.path}?{urlencode(redirect_params)}")
+                return redirect(_build_redirect_url(redirect_params))
     else:
         new_form = SkillForm(prefix="new")
         formset = SkillFormSet(queryset=page_queryset)
+        selected_skill_platform_skill_formset = PlatformSkillFormSet(
+            queryset=selected_skill_platform_skills,
+            prefix="selected-skill-platform-skills",
+        )
         invalid_name_message = ""
 
     return render(
@@ -595,6 +746,9 @@ def skill_formset_view(request):
             "all_skills": all_skills,
             "selected_skill": selected_skill,
             "selected_skill_id": selected_skill_id,
+            "displayed_skill": displayed_skill,
+            "selected_platform": selected_platform,
+            "selected_platform_id": selected_platform_id,
             "is_filtered": is_filtered,
             "invalid_name_message": invalid_name_message,
             "roles_with_skill": roles_with_skill,
@@ -602,6 +756,12 @@ def skill_formset_view(request):
             "projects_with_skill": projects_with_skill,
             "projects_without_skill": projects_without_skill,
             "course_groups": course_groups,
+            "platforms_not_listed": platforms_not_listed,
+            "platforms_listed": platforms_listed,
+            "skills_not_listed": skills_not_listed,
+            "skills_listed": skills_listed,
+            "selected_skill_platform_skill_formset": selected_skill_platform_skill_formset,
+            "current_date": timezone.now().astimezone(USER_TIMEZONE).date(),
         },
     )
 

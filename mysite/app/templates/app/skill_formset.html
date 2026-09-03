@@ -10,6 +10,7 @@
     {{ formset.management_form }}
     <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
     <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
         <div>
             <table border="1" cellpadding="8" cellspacing="0">
@@ -94,6 +95,7 @@
         {% endfor %}
     </datalist>
     <input id="skill-id-input" type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
     <button type="submit">Search</button>
     <button type="button" onclick="window.location.href='{% url 'skills' %}'">Clear</button>
 </form>
@@ -101,14 +103,15 @@
     {% csrf_token %}
     <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
     <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <h2 style="margin: 0;">Roles</h2>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" class="roles-toggle-button" data-target="roles-section-body">Hide</button>
+            <button type="button" class="roles-toggle-button" data-target="roles-section-body">Show</button>
             <button type="submit" name="swap_roles" value="1">Swap</button>
         </div>
     </div>
-    <div id="roles-section-body" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+    <div id="roles-section-body" class="hidden" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
         <div style="flex: 1; padding-right: 0.5rem;">
             <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
                 <thead>
@@ -160,14 +163,15 @@
     {% csrf_token %}
     <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
     <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+    <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <h2 style="margin: 0;">Projects</h2>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" class="roles-toggle-button" data-target="projects-section-body">Hide</button>
+            <button type="button" class="roles-toggle-button" data-target="projects-section-body">Show</button>
             <button type="submit" name="swap_projects" value="1">Swap</button>
         </div>
     </div>
-    <div id="projects-section-body" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+    <div id="projects-section-body" class="hidden" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
         <div style="flex: 1; padding-right: 0.5rem;">
             <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
                 <thead>
@@ -218,22 +222,23 @@
 <div style="margin-top: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <h2 style="margin: 0;">Courses</h2>
-        <button type="button" class="roles-toggle-button" data-target="courses-section-body">Hide</button>
+        <button type="button" class="roles-toggle-button" data-target="courses-section-body">Show</button>
     </div>
-    <div id="courses-section-body" style="margin-top: 1rem;">
+    <div id="courses-section-body" class="hidden" style="margin-top: 1rem;">
         {% for group in course_groups %}
             <form method="post" style="margin-top: {% if not forloop.first %}1rem{% else %}0{% endif %};">
                 {% csrf_token %}
                 <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
                 <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+                <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
                     <h3 style="margin: 0;">{{ group.education.school.name }} | {{ group.education.degree }}{% if group.education.field_of_study %} | {{ group.education.field_of_study }}{% endif %}</h3>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <button type="button" class="roles-toggle-button" data-target="course-education-{{ group.education.pk }}">Hide</button>
+                        <button type="button" class="roles-toggle-button" data-target="course-education-{{ group.education.pk }}">Show</button>
                         <button type="submit" name="swap_courses" value="{{ group.education.pk }}">Swap</button>
                     </div>
                 </div>
-                <div id="course-education-{{ group.education.pk }}" style="border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+                <div id="course-education-{{ group.education.pk }}" class="hidden" style="border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
                     <div style="display: flex; gap: 1rem; align-items: flex-start;">
                         <div style="flex: 1; padding-right: 0.5rem;">
                             <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
@@ -286,6 +291,214 @@
         {% endfor %}
     </div>
 </div>
+<div style="margin-top: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+        <h2 style="margin: 0;">Platforms</h2>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" class="roles-toggle-button" data-target="platforms-section-body">Show</button>
+            <button type="submit" form="platform-skills-form" name="save_platform_skills" value="1">Save</button>
+        </div>
+    </div>
+    <div id="platforms-section-body" class="hidden">
+    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+            <h3 style="margin: 0 0 1rem 0;">Available / Not Listed</h3>
+            {% if formset.forms %}
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    {% for platform_skill in platforms_not_listed %}
+                        <a
+                            href="{% url 'skills' %}?{% if selected_skill %}skill_id={{ selected_skill.pk }}&{% elif page_obj %}page={{ page_obj.number }}&{% endif %}platform_id={{ platform_skill.platform.pk }}"
+                            class="platform-link-button"
+                            data-platform-url="{{ platform_skill.platform.url }}"
+                            style="{% if selected_platform and selected_platform.pk == platform_skill.platform.pk %}background: #d9ead3;{% else %}background: #f2f2f2;{% endif %} border: 1px solid #7d7d7d; padding: 0.35rem 0.75rem; cursor: pointer; text-decoration: none; color: #222;"
+                        >{{ platform_skill.platform.name }}</a>
+                    {% empty %}
+                        <div>No platforms.</div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div>Select a skill.</div>
+            {% endif %}
+        </div>
+        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+            <h3 style="margin: 0 0 1rem 0;">Available / Listed</h3>
+            {% if formset.forms %}
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    {% for platform_skill in platforms_listed %}
+                        <a
+                            href="{% url 'skills' %}?{% if selected_skill %}skill_id={{ selected_skill.pk }}&{% elif page_obj %}page={{ page_obj.number }}&{% endif %}platform_id={{ platform_skill.platform.pk }}"
+                            class="platform-link-button"
+                            data-platform-url="{{ platform_skill.platform.url }}"
+                            style="{% if selected_platform and selected_platform.pk == platform_skill.platform.pk %}background: #d9ead3;{% else %}background: #f2f2f2;{% endif %} border: 1px solid #7d7d7d; padding: 0.35rem 0.75rem; cursor: pointer; text-decoration: none; color: #222;"
+                        >{{ platform_skill.platform.name }}</a>
+                    {% empty %}
+                        <div>No platforms.</div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div>Select a skill.</div>
+            {% endif %}
+        </div>
+    </div>
+    <form id="platform-skills-form" method="post" style="display: flex; gap: 1rem; margin-top: 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+        <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+        <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
+        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+            <h3 style="margin: 0 0 1rem 0;">Skills Not Listed</h3>
+            {% if formset.forms and selected_platform %}
+                <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Available</th>
+                            <th>Swap</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for platform_skill in skills_not_listed %}
+                        <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
+                            <td>
+                                <input
+                                    type="text"
+                                    name="platform_skill_name_{{ platform_skill.pk }}"
+                                    value="{{ platform_skill.skill.name }}"
+                                    style="width: 100%;"
+                                >
+                            </td>
+                            <td>
+                                <select name="platform_skill_available_{{ platform_skill.pk }}">
+                                    <option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option>
+                                    <option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option>
+                                    <option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="checkbox" name="platform_skill_not_listed_{{ platform_skill.pk }}">
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3">No skills.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% elif formset.forms %}
+                <div>Select a platform.</div>
+            {% else %}
+                <div>Select a skill.</div>
+            {% endif %}
+        </div>
+        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+            <h3 style="margin: 0 0 1rem 0;">Skills Listed</h3>
+            {% if formset.forms and selected_platform %}
+                <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Available</th>
+                            <th>Swap</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for platform_skill in skills_listed %}
+                        <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
+                            <td>
+                                <input
+                                    type="text"
+                                    name="platform_skill_name_{{ platform_skill.pk }}"
+                                    value="{{ platform_skill.skill.name }}"
+                                    style="width: 100%;"
+                                >
+                            </td>
+                            <td>
+                                <select name="platform_skill_available_{{ platform_skill.pk }}">
+                                    <option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option>
+                                    <option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option>
+                                    <option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="checkbox" name="platform_skill_listed_{{ platform_skill.pk }}">
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3">No skills.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% elif formset.forms %}
+                <div>Select a platform.</div>
+            {% else %}
+                <div>Select a skill.</div>
+            {% endif %}
+        </div>
+    </form>
+    <form method="post" style="margin-top: 1rem;">
+        {% csrf_token %}
+        {{ selected_skill_platform_skill_formset.management_form }}
+        <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+        <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+        <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
+        <div style="margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Platform Skills</h3>
+                <button type="submit" name="save_selected_skill_platform_skills" value="1">Save</button>
+            </div>
+            {% if displayed_skill %}
+                <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Platform</th>
+                            <th>Available</th>
+                            <th>Listed</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for platform_skill_form in selected_skill_platform_skill_formset %}
+                            <tr{% if platform_skill_form.instance.updated == current_date %} style="background: #d9ead3;"{% elif not platform_skill_form.instance.updated or platform_skill_form.instance.updated < current_date %} style="background: #f4cccc;"{% endif %}>
+                                {% for hidden in platform_skill_form.hidden_fields %}
+                                    {{ hidden }}
+                                {% endfor %}
+                                <td>
+                                    {% if platform_skill_form.instance.platform.url %}
+                                        <a href="{{ platform_skill_form.instance.platform.url }}" target="_blank" rel="noopener noreferrer">{{ platform_skill_form.instance.platform }}</a>
+                                    {% else %}
+                                        {{ platform_skill_form.instance.platform }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ platform_skill_form.available.errors }}
+                                    {{ platform_skill_form.available }}
+                                </td>
+                                <td>
+                                    {{ platform_skill_form.listed.errors }}
+                                    {{ platform_skill_form.listed }}
+                                </td>
+                                <td>
+                                    {{ platform_skill_form.updated.errors }}
+                                    {{ platform_skill_form.updated }}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">No platform skills.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div>Select a skill.</div>
+            {% endif %}
+        </div>
+    </form>
+    </div>
+</div>
 </section>
 <script>
     (() => {
@@ -328,6 +541,16 @@
             const isHidden = target.classList.contains("hidden");
             target.classList.toggle("hidden");
             button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    document.querySelectorAll(".platform-link-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const platformUrl = button.dataset.platformUrl;
+            if (!platformUrl) {
+                return;
+            }
+            window.open(platformUrl, "_blank", "noopener");
         });
     });
 </script>

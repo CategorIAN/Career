@@ -836,6 +836,448 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="project_without_skill_')
         self.assertContains(response, 'name="project_with_skill_')
 
+    def test_selected_skill_shows_platform_boxes_using_platformskill_filters(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        platform_not_listed_true_false = Platform.objects.create(name="Alpha Platform")
+        platform_not_listed_null_null = Platform.objects.create(name="Beta Platform")
+        platform_listed = Platform.objects.create(name="Gamma Platform")
+        platform_unavailable = Platform.objects.create(name="Delta Platform")
+        platform_other_skill = Platform.objects.create(name="Epsilon Platform")
+        other_skill = Skill.objects.create(name="Python", type="Language")
+
+        PlatformSkill.objects.create(
+            platform=platform_not_listed_true_false,
+            skill=selected_skill,
+            available=True,
+            listed=False,
+        )
+        PlatformSkill.objects.create(
+            platform=platform_not_listed_null_null,
+            skill=selected_skill,
+            available=None,
+            listed=None,
+        )
+        PlatformSkill.objects.create(
+            platform=platform_listed,
+            skill=selected_skill,
+            available=True,
+            listed=True,
+        )
+        PlatformSkill.objects.create(
+            platform=platform_unavailable,
+            skill=selected_skill,
+            available=False,
+            listed=False,
+        )
+        PlatformSkill.objects.create(
+            platform=platform_other_skill,
+            skill=other_skill,
+            available=True,
+            listed=False,
+        )
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item.platform.pk for item in response.context["platforms_not_listed"]],
+            [platform_not_listed_true_false.pk, platform_not_listed_null_null.pk],
+        )
+        self.assertEqual(
+            [item.platform.pk for item in response.context["platforms_listed"]],
+            [platform_listed.pk],
+        )
+        self.assertContains(response, "Platforms")
+        self.assertContains(response, "Available / Not Listed")
+        self.assertContains(response, "Available / Listed")
+        self.assertContains(response, "Alpha Platform")
+        self.assertContains(response, "Beta Platform")
+        self.assertContains(response, "Gamma Platform")
+        self.assertNotContains(response, "Delta Platform")
+        self.assertContains(
+            response,
+            f'href="{reverse("skills")}?skill_id={selected_skill.pk}&platform_id={platform_listed.pk}"',
+            html=False,
+        )
+
+    def test_displayed_skill_is_used_for_platform_boxes_when_no_skill_is_selected(self):
+        displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
+        Skill.objects.create(name="Zulu", type="Language")
+        platform_not_listed = Platform.objects.create(name="Alpha Platform")
+        platform_listed = Platform.objects.create(name="Beta Platform")
+
+        PlatformSkill.objects.create(
+            platform=platform_not_listed,
+            skill=displayed_skill,
+            available=True,
+            listed=False,
+        )
+        PlatformSkill.objects.create(
+            platform=platform_listed,
+            skill=displayed_skill,
+            available=True,
+            listed=True,
+        )
+
+        response = self.client.get(reverse("skills"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item.platform.pk for item in response.context["platforms_not_listed"]],
+            [platform_not_listed.pk],
+        )
+        self.assertEqual(
+            [item.platform.pk for item in response.context["platforms_listed"]],
+            [platform_listed.pk],
+        )
+        self.assertContains(response, "Alpha Platform")
+        self.assertContains(response, "Beta Platform")
+
+    def test_selected_skill_and_platform_show_bottom_skill_boxes_with_requested_ordering(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
+        platform = Platform.objects.create(name="Target Platform")
+        high_rating_not_listed = Skill.objects.create(name="Python", type="Language", rating=5)
+        same_rating_not_listed_a = Skill.objects.create(name="AWS", type="Technology", rating=4)
+        same_rating_not_listed_b = Skill.objects.create(name="Django", type="Technology", rating=4)
+        listed_low = Skill.objects.create(name="Excel", type="Technology", rating=1)
+        listed_high = Skill.objects.create(name="Bash", type="Language", rating=3)
+        excluded_unavailable = Skill.objects.create(name="Cobol", type="Language", rating=5)
+
+        PlatformSkill.objects.create(platform=platform, skill=selected_skill, available=True, listed=True)
+        PlatformSkill.objects.create(platform=platform, skill=high_rating_not_listed, available=True, listed=False)
+        PlatformSkill.objects.create(platform=platform, skill=same_rating_not_listed_a, available=None, listed=False)
+        PlatformSkill.objects.create(platform=platform, skill=same_rating_not_listed_b, available=True, listed=None)
+        PlatformSkill.objects.create(platform=platform, skill=listed_low, available=True, listed=True)
+        PlatformSkill.objects.create(platform=platform, skill=listed_high, available=True, listed=True)
+        PlatformSkill.objects.create(platform=platform, skill=excluded_unavailable, available=False, listed=False)
+
+        response = self.client.get(
+            reverse("skills"),
+            {"skill_id": selected_skill.pk, "platform_id": platform.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item.skill.pk for item in response.context["skills_not_listed"]],
+            [
+                high_rating_not_listed.pk,
+                same_rating_not_listed_a.pk,
+                same_rating_not_listed_b.pk,
+            ],
+        )
+        self.assertEqual(
+            [item.skill.pk for item in response.context["skills_listed"]],
+            [
+                listed_low.pk,
+                selected_skill.pk,
+                listed_high.pk,
+            ],
+        )
+        self.assertContains(response, "Skills Not Listed")
+        self.assertContains(response, "Skills Listed")
+        self.assertContains(response, f'name="platform_skill_name_', html=False)
+        self.assertContains(response, f'value="{high_rating_not_listed.name}"', html=False)
+        self.assertContains(response, f'value="{same_rating_not_listed_a.name}"', html=False)
+        self.assertContains(response, f'value="{same_rating_not_listed_b.name}"', html=False)
+        self.assertContains(response, f'value="{listed_low.name}"', html=False)
+        self.assertContains(response, f'value="{selected_skill.name}"', html=False)
+        self.assertContains(response, f'value="{listed_high.name}"', html=False)
+        self.assertContains(response, "<th>Swap</th>", html=False)
+        self.assertContains(
+            response,
+            f'name="platform_skill_not_listed_{high_rating_not_listed.platformskill_set.get(platform=platform).pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'name="platform_skill_listed_{selected_skill.platformskill_set.get(platform=platform).pk}"',
+            html=False,
+        )
+        self.assertNotContains(
+            response,
+            f'name="platform_skill_rating_{high_rating_not_listed.platformskill_set.get(platform=platform).pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<tr style="background: #d9ead3;">',
+            html=False,
+        )
+
+    def test_platforms_section_save_updates_selected_skill_date_and_swaps_listing(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
+        platform = Platform.objects.create(name="Target Platform")
+        editable_skill = Skill.objects.create(name="Python", type="Language", rating=5)
+        listed_skill = Skill.objects.create(name="Bash", type="Language", rating=3)
+        editable_platform_skill = PlatformSkill.objects.create(
+            platform=platform,
+            skill=editable_skill,
+            available=True,
+            listed=False,
+            updated=None,
+        )
+        listed_platform_skill = PlatformSkill.objects.create(
+            platform=platform,
+            skill=listed_skill,
+            available=True,
+            listed=True,
+            updated=None,
+        )
+        untouched_platform_skill = PlatformSkill.objects.create(
+            platform=platform,
+            skill=selected_skill,
+            available=True,
+            listed=True,
+            updated=None,
+        )
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(selected_skill.pk),
+                "form-0-name": selected_skill.name,
+                "form-0-type": selected_skill.type,
+                "form-0-rating": str(selected_skill.rating),
+                "skill_id": str(selected_skill.pk),
+                "platform_id": str(platform.pk),
+                "save_platform_skills": "1",
+                f"platform_skill_name_{editable_platform_skill.pk}": "Python Updated",
+                f"platform_skill_available_{editable_platform_skill.pk}": "false",
+                f"platform_skill_not_listed_{editable_platform_skill.pk}": "on",
+                f"platform_skill_name_{listed_platform_skill.pk}": "Bash Updated",
+                f"platform_skill_available_{listed_platform_skill.pk}": "",
+                f"platform_skill_listed_{listed_platform_skill.pk}": "on",
+                f"platform_skill_name_{untouched_platform_skill.pk}": selected_skill.name,
+                f"platform_skill_available_{untouched_platform_skill.pk}": "true",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('skills')}?skill_id={selected_skill.pk}&platform_id={platform.pk}",
+        )
+        editable_platform_skill.refresh_from_db()
+        listed_platform_skill.refresh_from_db()
+        untouched_platform_skill.refresh_from_db()
+        self.assertEqual(editable_platform_skill.skill.name, "Python Updated")
+        self.assertEqual(editable_platform_skill.skill.rating, 5)
+        self.assertFalse(editable_platform_skill.available)
+        self.assertTrue(editable_platform_skill.listed)
+        self.assertEqual(str(editable_platform_skill.updated), "2026-09-03")
+        self.assertEqual(listed_platform_skill.skill.name, "Bash Updated")
+        self.assertEqual(listed_platform_skill.skill.rating, 3)
+        self.assertIsNone(listed_platform_skill.available)
+        self.assertFalse(listed_platform_skill.listed)
+        self.assertEqual(str(listed_platform_skill.updated), "2026-09-03")
+        self.assertTrue(untouched_platform_skill.listed)
+        self.assertEqual(str(untouched_platform_skill.updated), "2026-09-03")
+
+    def test_selected_skill_shows_platform_skill_formset_table_scoped_to_skill(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        other_skill = Skill.objects.create(name="Python", type="Language")
+        alpha_platform = Platform.objects.create(name="Alpha Platform", url="https://alpha.example.com")
+        beta_platform = Platform.objects.create(name="Beta Platform", url="https://beta.example.com")
+        gamma_platform = Platform.objects.create(name="Gamma Platform")
+
+        alpha_platform_skill = PlatformSkill.objects.create(
+            platform=alpha_platform,
+            skill=selected_skill,
+            available=True,
+            listed=False,
+            updated=None,
+        )
+        beta_platform_skill = PlatformSkill.objects.create(
+            platform=beta_platform,
+            skill=selected_skill,
+            available=False,
+            listed=True,
+            updated="2026-08-15",
+        )
+        PlatformSkill.objects.create(
+            platform=gamma_platform,
+            skill=other_skill,
+            available=True,
+            listed=True,
+            updated="2026-08-16",
+        )
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(
+                response.context["selected_skill_platform_skill_formset"].queryset.values_list(
+                    "pk",
+                    flat=True,
+                )
+            ),
+            [alpha_platform_skill.pk, beta_platform_skill.pk],
+        )
+        self.assertContains(response, "Platform Skills")
+        self.assertContains(response, "Alpha Platform")
+        self.assertContains(response, "Beta Platform")
+        self.assertNotContains(response, "Gamma Platform")
+        self.assertNotContains(response, "<th>Skill</th>", html=False)
+        self.assertContains(
+            response,
+            'href="https://alpha.example.com"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'target="_blank"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'rel="noopener noreferrer"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'href="https://beta.example.com"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<tr style="background: #f4cccc;">',
+            html=False,
+        )
+
+    def test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        today_platform = Platform.objects.create(name="Today Platform", url="https://today.example.com")
+        stale_platform = Platform.objects.create(name="Stale Platform", url="https://stale.example.com")
+        null_platform = Platform.objects.create(name="Null Platform", url="https://null.example.com")
+
+        PlatformSkill.objects.create(
+            platform=today_platform,
+            skill=selected_skill,
+            available=True,
+            listed=True,
+            updated="2026-09-03",
+        )
+        PlatformSkill.objects.create(
+            platform=stale_platform,
+            skill=selected_skill,
+            available=True,
+            listed=False,
+            updated="2026-09-02",
+        )
+        PlatformSkill.objects.create(
+            platform=null_platform,
+            skill=selected_skill,
+            available=False,
+            listed=False,
+            updated=None,
+        )
+
+        response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<tr style="background: #d9ead3;">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<tr style="background: #f4cccc;">',
+            html=False,
+            count=2,
+        )
+        self.assertContains(
+            response,
+            'name="selected-skill-platform-skills-0-available"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'name="selected-skill-platform-skills-0-listed"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'name="selected-skill-platform-skills-0-updated"',
+            html=False,
+        )
+
+    def test_selected_skill_platform_skill_formset_save_updates_only_chosen_skill_rows(self):
+        selected_skill = Skill.objects.create(name="SQL", type="Technology")
+        other_skill = Skill.objects.create(name="Python", type="Language")
+        alpha_platform = Platform.objects.create(name="Alpha Platform")
+        beta_platform = Platform.objects.create(name="Beta Platform")
+        gamma_platform = Platform.objects.create(name="Gamma Platform")
+
+        alpha_platform_skill = PlatformSkill.objects.create(
+            platform=alpha_platform,
+            skill=selected_skill,
+            available=True,
+            listed=False,
+            updated=None,
+        )
+        beta_platform_skill = PlatformSkill.objects.create(
+            platform=beta_platform,
+            skill=selected_skill,
+            available=False,
+            listed=True,
+            updated="2026-08-15",
+        )
+        other_platform_skill = PlatformSkill.objects.create(
+            platform=gamma_platform,
+            skill=other_skill,
+            available=True,
+            listed=True,
+            updated="2026-08-16",
+        )
+
+        response = self.client.post(
+            reverse("skills"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(selected_skill.pk),
+                "form-0-name": selected_skill.name,
+                "form-0-type": selected_skill.type,
+                "form-0-rating": str(selected_skill.rating),
+                "skill_id": str(selected_skill.pk),
+                "page": "1",
+                "selected-skill-platform-skills-TOTAL_FORMS": "2",
+                "selected-skill-platform-skills-INITIAL_FORMS": "2",
+                "selected-skill-platform-skills-MIN_NUM_FORMS": "0",
+                "selected-skill-platform-skills-MAX_NUM_FORMS": "1000",
+                "selected-skill-platform-skills-0-id": str(alpha_platform_skill.pk),
+                "selected-skill-platform-skills-0-available": "false",
+                "selected-skill-platform-skills-0-listed": "true",
+                "selected-skill-platform-skills-0-updated": "2026-09-03",
+                "selected-skill-platform-skills-1-id": str(beta_platform_skill.pk),
+                "selected-skill-platform-skills-1-available": "",
+                "selected-skill-platform-skills-1-listed": "",
+                "selected-skill-platform-skills-1-updated": "",
+                "save_selected_skill_platform_skills": "1",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('skills')}?skill_id={selected_skill.pk}")
+        alpha_platform_skill.refresh_from_db()
+        beta_platform_skill.refresh_from_db()
+        other_platform_skill.refresh_from_db()
+        self.assertFalse(alpha_platform_skill.available)
+        self.assertTrue(alpha_platform_skill.listed)
+        self.assertEqual(str(alpha_platform_skill.updated), "2026-09-03")
+        self.assertIsNone(beta_platform_skill.available)
+        self.assertIsNone(beta_platform_skill.listed)
+        self.assertIsNone(beta_platform_skill.updated)
+        self.assertTrue(other_platform_skill.available)
+        self.assertTrue(other_platform_skill.listed)
+        self.assertEqual(str(other_platform_skill.updated), "2026-08-16")
+
     def test_selected_skill_shows_courses_grouped_by_education(self):
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         school_one = School.objects.create(name="School One")
