@@ -22,6 +22,7 @@ from .forms import (
     FeatureLinkForm,
     FeatureLinkFormSet,
     PlatformForm,
+    PlatformFeatureFormSet,
     PlatformFormSet,
     PlatformSkillFormSet,
     SkillForm,
@@ -740,6 +741,8 @@ def skill_formset_view(request):
         )
         invalid_name_message = ""
 
+    current_date = timezone.now().astimezone(USER_TIMEZONE).date()
+
     return render(
         request,
         "app/skill_formset.html",
@@ -765,7 +768,8 @@ def skill_formset_view(request):
             "skills_not_listed": skills_not_listed,
             "skills_listed": skills_listed,
             "selected_skill_platform_skill_formset": selected_skill_platform_skill_formset,
-            "current_date": timezone.now().astimezone(USER_TIMEZONE).date(),
+            "current_date": current_date,
+            "one_year_ago_date": _one_year_ago(current_date),
         },
     )
 
@@ -834,6 +838,10 @@ def _add_calendar_months(date_value, months):
     return date_value.replace(year=year, month=month, day=day)
 
 
+def _one_year_ago(date_value):
+    return _add_calendar_months(date_value, -12)
+
+
 def _feature_due_date(feature):
     if not feature.updated or not feature.wait:
         return None
@@ -896,12 +904,27 @@ def features_view(request):
         if displayed_feature is not None
         else FeatureLink.objects.none()
     )
+    selected_feature_platform_features = (
+        PlatformFeature.objects
+        .select_related("platform", "feature")
+        .filter(feature=displayed_feature)
+        .order_by(
+            F("updated").asc(nulls_first=True),
+            "platform__name",
+            "feature__name",
+        )
+        if displayed_feature is not None
+        else PlatformFeature.objects.none()
+    )
 
     if request.method == "POST":
         new_form = FeatureForm(request.POST, prefix="new")
         new_link_form = FeatureLinkForm(request.POST, prefix="new-link")
         feature_formset_submitted = "form-TOTAL_FORMS" in request.POST
         feature_link_formset_submitted = "feature-links-TOTAL_FORMS" in request.POST
+        platform_feature_formset_submitted = (
+            "selected-feature-platform-features-TOTAL_FORMS" in request.POST
+        )
         formset = (
             FeatureFormSet(request.POST, queryset=queryset)
             if feature_formset_submitted
@@ -919,9 +942,24 @@ def features_view(request):
                 prefix="feature-links",
             )
         )
+        selected_feature_platform_feature_formset = (
+            PlatformFeatureFormSet(
+                request.POST,
+                queryset=selected_feature_platform_features,
+                prefix="selected-feature-platform-features",
+            )
+            if platform_feature_formset_submitted
+            else PlatformFeatureFormSet(
+                queryset=selected_feature_platform_features,
+                prefix="selected-feature-platform-features",
+            )
+        )
 
         add_feature_requested = bool(request.POST.get("add_feature"))
         add_feature_link_requested = bool(request.POST.get("add_feature_link"))
+        save_selected_feature_platform_features_requested = (
+            "save_selected_feature_platform_features" in request.POST
+        )
         delete_feature_id = request.POST.get("delete_feature", "").strip()
         delete_feature_link_id = request.POST.get("delete_feature_link", "").strip()
         redirect_params = {}
@@ -946,6 +984,11 @@ def features_view(request):
                 feature_link = new_link_form.save(commit=False)
                 feature_link.feature = displayed_feature
                 feature_link.save()
+                query_string = urlencode(redirect_params)
+                return redirect(f"{request.path}?{query_string}" if query_string else request.path)
+        elif save_selected_feature_platform_features_requested:
+            if displayed_feature is not None and selected_feature_platform_feature_formset.is_valid():
+                selected_feature_platform_feature_formset.save()
                 query_string = urlencode(redirect_params)
                 return redirect(f"{request.path}?{query_string}" if query_string else request.path)
         elif delete_feature_id:
@@ -977,6 +1020,10 @@ def features_view(request):
             queryset=selected_feature_links,
             prefix="feature-links",
         )
+        selected_feature_platform_feature_formset = PlatformFeatureFormSet(
+            queryset=selected_feature_platform_features,
+            prefix="selected-feature-platform-features",
+        )
 
     for form in formset.forms:
         form.instance.due_date = _feature_due_date(form.instance)
@@ -984,17 +1031,21 @@ def features_view(request):
     for form in feature_link_formset.forms:
         form.instance.resolved_url = _resolve_feature_link_url(request, form.instance.url)
 
+    current_date = timezone.now().astimezone(USER_TIMEZONE).date()
+
     return render(
         request,
         "app/features.html",
         {
             "all_features": all_features,
-            "current_date": timezone.now().astimezone(USER_TIMEZONE).date(),
+            "current_date": current_date,
             "feature_page_obj": page_obj,
             "displayed_feature": displayed_feature,
             "is_filtered": is_filtered,
             "new_form": new_form,
             "new_link_form": new_link_form,
+            "one_year_ago_date": _one_year_ago(current_date),
+            "selected_feature_platform_feature_formset": selected_feature_platform_feature_formset,
             "selected_feature": selected_feature,
             "selected_feature_id": selected_feature_id,
             "feature_link_formset": feature_link_formset,

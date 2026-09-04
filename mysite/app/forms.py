@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.forms import modelformset_factory
 from django.utils.dateparse import parse_duration
 
-from .models import Feature, FeatureLink, Platform, PlatformSkill, Skill
+from .models import Feature, FeatureLink, Platform, PlatformFeature, PlatformSkill, Skill
 
 
 class SkillForm(forms.ModelForm):
@@ -134,6 +134,52 @@ class PlatformSkillForm(forms.ModelForm):
 PlatformSkillFormSet = modelformset_factory(
     PlatformSkill,
     form=PlatformSkillForm,
+    extra=0,
+    can_delete=False,
+)
+
+
+class PlatformFeatureForm(forms.ModelForm):
+    available = forms.TypedChoiceField(
+        choices=NULL_BOOLEAN_CHOICES,
+        coerce=lambda value: {
+            "true": True,
+            "false": False,
+            "": None,
+            None: None,
+        }.get(value, None),
+        empty_value=None,
+        required=False,
+    )
+
+    class Meta:
+        model = PlatformFeature
+        fields = ["available", "updated"]
+        widgets = {
+            "updated": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={
+                    "type": "date",
+                    "autocomplete": "off",
+                    "data-form-type": "other",
+                },
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+        value = getattr(self.instance, "available", None)
+        self.initial["available"] = (
+            "true" if value is True else "false" if value is False else ""
+        )
+
+
+PlatformFeatureFormSet = modelformset_factory(
+    PlatformFeature,
+    form=PlatformFeatureForm,
     extra=0,
     can_delete=False,
 )

@@ -645,6 +645,87 @@ class PlatformFeature(models.Model):
         return f"{self.platform} - {self.feature}"
 
 
+class Peer(models.Model):
+    name = models.CharField(max_length=200)
+
+    linkedin_url = models.URLField(blank=True)
+
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    email = models.EmailField(blank=True)
+
+    wait = models.DurationField(
+        null=True,
+        blank=True,
+    )
+
+    companies = models.ManyToManyField(
+        "Company",
+        related_name="peers",
+        blank=True,
+    )
+
+    referrals = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="referred_by",
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class PeerConnect(models.Model):
+    peer = models.ForeignKey(
+        "Peer",
+        related_name="connects",
+        on_delete=models.CASCADE,
+    )
+
+    invite_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    meeting_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    rating = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(5),
+        ],
+    )
+
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.peer} - {self.invite_date or self.meeting_at or self.pk}"
+
+
+class Direction(models.Model):
+    peer_connect = models.ForeignKey(
+        "PeerConnect",
+        related_name="directions",
+        on_delete=models.CASCADE,
+    )
+
+    description = models.TextField()
+
+    resolved = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.description
+
+
 
 
 

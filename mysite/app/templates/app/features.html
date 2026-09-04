@@ -40,7 +40,7 @@
                 </td>
             </tr>
             {% for form in formset %}
-                <tr id="{{ form.instance.pk }}"{% if form.instance.due_date and form.instance.due_date < current_date %} style="background: #f4cccc;"{% endif %}>
+                <tr id="{{ form.instance.pk }}"{% if form.instance.due_date and form.instance.due_date <= current_date %} style="background: #f4cccc;"{% endif %}>
                     {% for hidden in form.hidden_fields %}
                         {{ hidden }}
                     {% endfor %}
@@ -99,13 +99,18 @@
     <button type="button" onclick="window.location.href='{% url 'features' %}'">Clear</button>
 </form>
 {% if displayed_feature %}
-    <form method="post" style="margin-top: 1.5rem;">
-        {% csrf_token %}
-        {{ feature_link_formset.management_form }}
-        <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
-        <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
-        <div>
-            <h2 style="margin: 0 0 1rem 0;">Links</h2>
+    <div style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">Links</h2>
+            <button type="button" class="feature-toggle-button" data-target="feature-links-section-body">Show</button>
+        </div>
+        <div id="feature-links-section-body" class="hidden">
+            <form method="post">
+                {% csrf_token %}
+                {{ feature_link_formset.management_form }}
+                <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
+                <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+                <div>
             <table border="1" cellpadding="8" cellspacing="0">
                 <thead>
                     <tr>
@@ -139,8 +144,67 @@
                     {% endfor %}
                 </tbody>
             </table>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+    <div style="margin-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">Platforms</h2>
+            <button type="button" class="feature-toggle-button" data-target="feature-platforms-section-body">Show</button>
+        </div>
+        <div id="feature-platforms-section-body" class="hidden">
+            <form method="post">
+                {% csrf_token %}
+                {{ selected_feature_platform_feature_formset.management_form }}
+                <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
+                <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+                <div style="margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Platform Features</h3>
+                        <button type="submit" name="save_selected_feature_platform_features" value="1">Save</button>
+                    </div>
+                    <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Platform</th>
+                                <th>Available</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for platform_feature_form in selected_feature_platform_feature_formset %}
+                                <tr{% if platform_feature_form.instance.updated == current_date %} style="background: #d9ead3;"{% elif platform_feature_form.instance.available == False %}{% if not platform_feature_form.instance.updated or platform_feature_form.instance.updated <= one_year_ago_date %} style="background: #f4cccc;"{% endif %}{% elif not platform_feature_form.instance.updated or platform_feature_form.instance.updated < current_date %} style="background: #f4cccc;"{% endif %}>
+                                    {% for hidden in platform_feature_form.hidden_fields %}
+                                        {{ hidden }}
+                                    {% endfor %}
+                                    <td>
+                                        {% if platform_feature_form.instance.platform.url %}
+                                            <a href="{{ platform_feature_form.instance.platform.url }}" target="_blank" rel="noopener noreferrer">{{ platform_feature_form.instance.platform }}</a>
+                                        {% else %}
+                                            {{ platform_feature_form.instance.platform }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ platform_feature_form.available.errors }}
+                                        {{ platform_feature_form.available }}
+                                    </td>
+                                    <td>
+                                        {{ platform_feature_form.updated.errors }}
+                                        {{ platform_feature_form.updated }}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3">No platform features.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
 {% endif %}
 </section>
 <script>
@@ -173,5 +237,18 @@
             }
         });
     })();
+
+    document.querySelectorAll(".feature-toggle-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const target = document.getElementById(button.dataset.target);
+            if (!target) {
+                return;
+            }
+
+            const isHidden = target.classList.contains("hidden");
+            target.classList.toggle("hidden");
+            button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
 </script>
 {% endblock %}

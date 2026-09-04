@@ -475,7 +475,7 @@
                     </thead>
                     <tbody>
                         {% for platform_skill_form in selected_skill_platform_skill_formset %}
-                            <tr{% if platform_skill_form.instance.updated == current_date %} style="background: #d9ead3;"{% elif not platform_skill_form.instance.updated or platform_skill_form.instance.updated < current_date %} style="background: #f4cccc;"{% endif %}>
+                            <tr{% if platform_skill_form.instance.updated == current_date %} style="background: #d9ead3;"{% elif platform_skill_form.instance.available == False %}{% if not platform_skill_form.instance.updated or platform_skill_form.instance.updated <= one_year_ago_date %} style="background: #f4cccc;"{% endif %}{% elif not platform_skill_form.instance.updated or platform_skill_form.instance.updated < current_date %} style="background: #f4cccc;"{% endif %}>
                                 {% for hidden in platform_skill_form.hidden_fields %}
                                     {{ hidden }}
                                 {% endfor %}

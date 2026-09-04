@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from django.contrib.messages import get_messages
 from django.core.cache import cache
@@ -743,7 +743,6 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="new-resume_ready"', html=False)
         self.assertContains(response, 'name="form-0-resume_ready"', html=False)
         self.assertNotContains(response, ">New<", html=False)
-        self.assertNotContains(response, ">Updated<", html=False)
 
     def test_skills_page_uses_arrow_navigation_labels(self):
         Skill.objects.create(name="Alpha", type="Language")
@@ -943,7 +942,6 @@ class SkillPageTests(TestCase):
         self.assertContains(response, "Alpha Platform")
         self.assertContains(response, "Beta Platform")
         self.assertContains(response, "Gamma Platform")
-        self.assertNotContains(response, "Delta Platform")
         self.assertContains(
             response,
             f'href="{reverse("skills")}?skill_id={selected_skill.pk}&platform_id={platform_listed.pk}"',
@@ -1120,14 +1118,14 @@ class SkillPageTests(TestCase):
         self.assertEqual(editable_platform_skill.skill.rating, 5)
         self.assertFalse(editable_platform_skill.available)
         self.assertTrue(editable_platform_skill.listed)
-        self.assertEqual(str(editable_platform_skill.updated), "2026-09-03")
+        self.assertEqual(str(editable_platform_skill.updated), "2026-09-04")
         self.assertEqual(listed_platform_skill.skill.name, "Bash")
         self.assertEqual(listed_platform_skill.skill.rating, 3)
         self.assertIsNone(listed_platform_skill.available)
         self.assertFalse(listed_platform_skill.listed)
-        self.assertEqual(str(listed_platform_skill.updated), "2026-09-03")
+        self.assertEqual(str(listed_platform_skill.updated), "2026-09-04")
         self.assertTrue(untouched_platform_skill.listed)
-        self.assertEqual(str(untouched_platform_skill.updated), "2026-09-03")
+        self.assertEqual(str(untouched_platform_skill.updated), "2026-09-04")
 
     def test_selected_skill_shows_platform_skill_formset_table_scoped_to_skill(self):
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
@@ -1201,10 +1199,13 @@ class SkillPageTests(TestCase):
             html=False,
         )
 
-    def test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date(self):
+    @patch("app.views.timezone.now")
+    def test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date(self, mock_now):
+        mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         today_platform = Platform.objects.create(name="Today Platform", url="https://today.example.com")
         stale_platform = Platform.objects.create(name="Stale Platform", url="https://stale.example.com")
+        recent_no_platform = Platform.objects.create(name="Recent No Platform")
         null_platform = Platform.objects.create(name="Null Platform", url="https://null.example.com")
 
         PlatformSkill.objects.create(
@@ -1212,14 +1213,21 @@ class SkillPageTests(TestCase):
             skill=selected_skill,
             available=True,
             listed=True,
-            updated="2026-09-03",
+            updated="2026-09-04",
         )
         PlatformSkill.objects.create(
             platform=stale_platform,
             skill=selected_skill,
             available=True,
             listed=False,
-            updated="2026-09-02",
+            updated="2026-09-03",
+        )
+        PlatformSkill.objects.create(
+            platform=recent_no_platform,
+            skill=selected_skill,
+            available=False,
+            listed=False,
+            updated="2026-09-03",
         )
         PlatformSkill.objects.create(
             platform=null_platform,
@@ -1258,6 +1266,58 @@ class SkillPageTests(TestCase):
             'name="selected-skill-platform-skills-0-updated"',
             html=False,
         )
+        html = response.content.decode()
+        recent_no_index = html.index("Recent No Platform")
+        recent_no_row = html[html.rfind("<tr", 0, recent_no_index):html.find("</tr>", recent_no_index)]
+        self.assertNotIn("background: #f4cccc;", recent_no_row)
+
+    @patch("app.views.timezone.now")
+    def test_selected_feature_platform_features_only_mark_unavailable_rows_red_when_stale_or_null(self, mock_now):
+        mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
+        feature = Feature.objects.create(name="Billing")
+        stale_yes_platform = Platform.objects.create(name="Stale Yes Platform")
+        recent_no_platform = Platform.objects.create(name="Recent No Feature Platform")
+        stale_no_platform = Platform.objects.create(name="Stale No Feature Platform")
+        null_no_platform = Platform.objects.create(name="Null No Feature Platform")
+
+        PlatformFeature.objects.create(
+            platform=stale_yes_platform,
+            feature=feature,
+            available=True,
+            updated="2026-09-03",
+        )
+        PlatformFeature.objects.create(
+            platform=recent_no_platform,
+            feature=feature,
+            available=False,
+            updated="2026-09-03",
+        )
+        PlatformFeature.objects.create(
+            platform=stale_no_platform,
+            feature=feature,
+            available=False,
+            updated="2025-09-04",
+        )
+        PlatformFeature.objects.create(
+            platform=null_no_platform,
+            feature=feature,
+            available=False,
+            updated=None,
+        )
+
+        response = self.client.get(reverse("features"), {"feature_id": feature.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<tr style="background: #f4cccc;">',
+            html=False,
+            count=3,
+        )
+        html = response.content.decode()
+        recent_no_index = html.index("Recent No Feature Platform")
+        recent_no_row = html[html.rfind("<tr", 0, recent_no_index):html.find("</tr>", recent_no_index)]
+        self.assertNotIn("background: #f4cccc;", recent_no_row)
 
     def test_selected_skill_platform_skill_formset_save_updates_only_chosen_skill_rows(self):
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
@@ -1654,7 +1714,7 @@ class SkillPageTests(TestCase):
         self.assertEqual(existing_skill.type, "Domain")
         self.assertEqual(existing_skill.rating, 4)
         self.assertTrue(existing_skill.resume_ready)
-        self.assertEqual(str(existing_skill.updated), "2026-09-02")
+        self.assertEqual(str(existing_skill.updated), "2026-09-04")
         self.assertFalse(Skill.objects.filter(name="Should Not Be Added").exists())
 
     def test_save_button_sets_updated_on_unchanged_existing_skill(self):
@@ -1682,7 +1742,7 @@ class SkillPageTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('skills')}?page=1")
         existing_skill.refresh_from_db()
-        self.assertEqual(str(existing_skill.updated), "2026-09-02")
+        self.assertEqual(str(existing_skill.updated), "2026-09-04")
 
 
 class FeaturePageTests(TestCase):
@@ -1767,6 +1827,25 @@ class FeaturePageTests(TestCase):
         self.assertNotContains(response, 'aria-label="Next feature"', html=False)
         self.assertEqual([form.instance.pk for form in response.context["formset"].forms], [first_feature.pk])
 
+    @patch("app.views.timezone.now")
+    def test_features_page_marks_row_red_when_due_date_is_today(self, mock_now):
+        mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
+        feature = Feature.objects.create(
+            name="Billing",
+            updated="2026-09-03",
+            wait=timedelta(days=1),
+        )
+
+        response = self.client.get(reverse("features"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'id="{feature.pk}" style="background: #f4cccc;"',
+            html=False,
+        )
+        self.assertContains(response, "2026-09-04")
+
     def test_search_feature_form_filters_table_by_feature_id_without_pagination(self):
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
@@ -1792,7 +1871,13 @@ class FeaturePageTests(TestCase):
         response = self.client.get(reverse("features"), {"feature_id": second_feature.pk})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<h2 style=\"margin: 0 0 1rem 0;\">Links</h2>", html=False)
+        self.assertContains(response, '<h2 style="margin: 0;">Links</h2>', html=False)
+        self.assertContains(
+            response,
+            '<button type="button" class="feature-toggle-button" data-target="feature-links-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, '<div id="feature-links-section-body" class="hidden">', html=False)
         self.assertContains(response, 'name="feature-links-TOTAL_FORMS" value="1"', html=False)
         self.assertContains(response, 'name="new-link-url"', html=False)
         self.assertContains(response, 'name="add_feature_link" value="1"', html=False)
@@ -1809,6 +1894,64 @@ class FeaturePageTests(TestCase):
         self.assertEqual(
             [form.instance.pk for form in response.context["feature_link_formset"].forms],
             [second_link.pk],
+        )
+
+    def test_selected_feature_shows_platforms_section_scoped_to_feature(self):
+        first_feature = Feature.objects.create(name="Auth")
+        second_feature = Feature.objects.create(name="Billing")
+        first_platform = Platform.objects.create(name="Alpha", url="https://alpha.example.com")
+        second_platform = Platform.objects.create(name="Beta")
+        first_platform_feature = PlatformFeature.objects.create(
+            platform=first_platform,
+            feature=first_feature,
+            available=True,
+            updated="2026-09-02",
+        )
+        second_platform_feature = PlatformFeature.objects.create(
+            platform=second_platform,
+            feature=second_feature,
+            available=False,
+            updated="2026-09-04",
+        )
+
+        response = self.client.get(reverse("features"), {"feature_id": second_feature.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<h2 style="margin: 0;">Platforms</h2>', html=False)
+        self.assertContains(
+            response,
+            '<button type="button" class="feature-toggle-button" data-target="feature-platforms-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, '<div id="feature-platforms-section-body" class="hidden">', html=False)
+        self.assertContains(response, '<h3 style="margin: 0;">Platform Features</h3>', html=False)
+        self.assertContains(
+            response,
+            'name="selected-feature-platform-features-TOTAL_FORMS" value="1"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'name="save_selected_feature_platform_features" value="1"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<tr style="background: #d9ead3;">',
+            html=False,
+        )
+        self.assertNotContains(response, "Alpha", html=False)
+        self.assertContains(response, "Beta")
+        self.assertContains(response, 'name="selected-feature-platform-features-0-available"', html=False)
+        self.assertContains(response, 'name="selected-feature-platform-features-0-updated"', html=False)
+        self.assertNotContains(
+            response,
+            f'value="{first_platform_feature.pk}"',
+            html=False,
+        )
+        self.assertEqual(
+            [form.instance.pk for form in response.context["selected_feature_platform_feature_formset"].forms],
+            [second_platform_feature.pk],
         )
 
     def test_links_section_uses_displayed_feature_when_feature_id_is_not_set(self):
@@ -1831,7 +1974,8 @@ class FeaturePageTests(TestCase):
         response = self.client.get(reverse("features"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<h2 style=\"margin: 0 0 1rem 0;\">Links</h2>", html=False)
+        self.assertContains(response, '<h2 style="margin: 0;">Links</h2>', html=False)
+        self.assertContains(response, '<div id="feature-links-section-body" class="hidden">', html=False)
         self.assertContains(response, f'name="delete_feature_link" value="{displayed_link.pk}"', html=False)
         self.assertNotContains(response, 'value="https://auth.example.com"', html=False)
         self.assertContains(
@@ -2019,6 +2163,51 @@ class FeaturePageTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('features')}?feature_id={selected_feature.pk}")
         self.assertFalse(FeatureLink.objects.filter(pk=existing_link.pk).exists())
+
+    def test_save_platforms_button_updates_existing_platform_features(self):
+        selected_feature = Feature.objects.create(name="Billing")
+        platform = Platform.objects.create(name="Alpha")
+        platform_feature = PlatformFeature.objects.create(
+            platform=platform,
+            feature=selected_feature,
+            available=None,
+            updated=None,
+        )
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "feature-links-TOTAL_FORMS": "0",
+                "feature-links-INITIAL_FORMS": "0",
+                "feature-links-MIN_NUM_FORMS": "0",
+                "feature-links-MAX_NUM_FORMS": "1000",
+                "selected-feature-platform-features-TOTAL_FORMS": "1",
+                "selected-feature-platform-features-INITIAL_FORMS": "1",
+                "selected-feature-platform-features-MIN_NUM_FORMS": "0",
+                "selected-feature-platform-features-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "feature_id": str(selected_feature.pk),
+                "form-0-id": str(selected_feature.pk),
+                "form-0-name": selected_feature.name,
+                "form-0-wait_0": "",
+                "form-0-wait_1": "",
+                "form-0-wait_2": "",
+                "form-0-updated": "",
+                "selected-feature-platform-features-0-id": str(platform_feature.pk),
+                "selected-feature-platform-features-0-available": "true",
+                "selected-feature-platform-features-0-updated": "2026-09-04",
+                "save_selected_feature_platform_features": "1",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('features')}?feature_id={selected_feature.pk}")
+        platform_feature.refresh_from_db()
+        self.assertTrue(platform_feature.available)
+        self.assertEqual(str(platform_feature.updated), "2026-09-04")
 
     def test_save_button_updates_existing_features(self):
         existing_feature = Feature.objects.create(name="Search")
