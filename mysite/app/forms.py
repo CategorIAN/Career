@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.forms import modelformset_factory
 from django.utils.dateparse import parse_duration
 
-from .models import Feature, Platform, PlatformSkill, Skill
+from .models import Feature, FeatureLink, Platform, PlatformSkill, Skill
 
 
 class SkillForm(forms.ModelForm):
@@ -220,6 +220,40 @@ class FeatureForm(forms.ModelForm):
 FeatureFormSet = modelformset_factory(
     Feature,
     form=FeatureForm,
+    extra=0,
+    can_delete=False,
+)
+
+
+class FeatureLinkForm(forms.ModelForm):
+    url = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "style": "width: 28rem;",
+            },
+        ),
+    )
+
+    class Meta:
+        model = FeatureLink
+        fields = ["url"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+    def clean_url(self):
+        url = (self.cleaned_data.get("url") or "").strip()
+        if not url:
+            raise ValidationError("This field is required.")
+        return url
+
+
+FeatureLinkFormSet = modelformset_factory(
+    FeatureLink,
+    form=FeatureLinkForm,
     extra=0,
     can_delete=False,
 )

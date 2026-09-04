@@ -13,12 +13,14 @@ import hashlib
 import logging
 import re
 from django.views.decorators.http import require_POST
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
 from .forms import (
     FeatureForm,
     FeatureFormSet,
+    FeatureLinkForm,
+    FeatureLinkFormSet,
     PlatformForm,
     PlatformFormSet,
     PlatformSkillFormSet,
@@ -28,6 +30,7 @@ from .forms import (
 from .models import (
     Course,
     Feature,
+    FeatureLink,
     Platform,
     PlatformFeature,
     PlatformSkill,
@@ -851,6 +854,12 @@ def _feature_due_date(feature):
     return due_date + timedelta(weeks=weeks, days=days)
 
 
+def _resolve_feature_link_url(request, link_text):
+    if link_text.startswith("https://"):
+        return link_text
+    return urljoin(request.build_absolute_uri("/"), link_text)
+
+
 def _ordered_feature_queryset():
     features = list(Feature.objects.all())
     ordered_ids = [
@@ -892,12 +901,40 @@ def features_view(request):
         page_obj = paginator.get_page(page_number)
         queryset = page_obj.object_list
 
+    displayed_feature = selected_feature if selected_feature is not None else queryset.first()
+    selected_feature_links = (
+        FeatureLink.objects.filter(feature=displayed_feature).order_by("url", "pk")
+        if displayed_feature is not None
+        else FeatureLink.objects.none()
+    )
+
     if request.method == "POST":
         new_form = FeatureForm(request.POST, prefix="new")
-        formset = FeatureFormSet(request.POST, queryset=queryset)
+        new_link_form = FeatureLinkForm(request.POST, prefix="new-link")
+        feature_formset_submitted = "form-TOTAL_FORMS" in request.POST
+        feature_link_formset_submitted = "feature-links-TOTAL_FORMS" in request.POST
+        formset = (
+            FeatureFormSet(request.POST, queryset=queryset)
+            if feature_formset_submitted
+            else FeatureFormSet(queryset=queryset)
+        )
+        feature_link_formset = (
+            FeatureLinkFormSet(
+                request.POST,
+                queryset=selected_feature_links,
+                prefix="feature-links",
+            )
+            if feature_link_formset_submitted
+            else FeatureLinkFormSet(
+                queryset=selected_feature_links,
+                prefix="feature-links",
+            )
+        )
 
         add_feature_requested = bool(request.POST.get("add_feature"))
+        add_feature_link_requested = bool(request.POST.get("add_feature_link"))
         delete_feature_id = request.POST.get("delete_feature", "").strip()
+        delete_feature_link_id = request.POST.get("delete_feature_link", "").strip()
         redirect_params = {}
         if not is_filtered and page_obj is not None:
             redirect_params["page"] = page_obj.number
@@ -915,22 +952,48 @@ def features_view(request):
                         ]
                     )
                 return redirect(f"{request.path}?feature_id={feature.pk}")
+        elif add_feature_link_requested:
+            if displayed_feature is not None and new_link_form.is_valid():
+                feature_link = new_link_form.save(commit=False)
+                feature_link.feature = displayed_feature
+                feature_link.save()
+                query_string = urlencode(redirect_params)
+                return redirect(f"{request.path}?{query_string}" if query_string else request.path)
         elif delete_feature_id:
             Feature.objects.filter(pk=delete_feature_id).delete()
             if str(selected_feature_id) == delete_feature_id:
                 redirect_params.pop("feature_id", None)
             query_string = urlencode(redirect_params)
             return redirect(f"{request.path}?{query_string}" if query_string else request.path)
-        elif formset.is_valid():
-            formset.save()
+        elif delete_feature_link_id:
+            if displayed_feature is not None:
+                FeatureLink.objects.filter(
+                    pk=delete_feature_link_id,
+                    feature=displayed_feature,
+                ).delete()
             query_string = urlencode(redirect_params)
             return redirect(f"{request.path}?{query_string}" if query_string else request.path)
+        else:
+            is_formset_valid = formset.is_valid() if feature_formset_submitted else True
+            if is_formset_valid:
+                if feature_formset_submitted:
+                    formset.save()
+                query_string = urlencode(redirect_params)
+                return redirect(f"{request.path}?{query_string}" if query_string else request.path)
     else:
         new_form = FeatureForm(prefix="new")
         formset = FeatureFormSet(queryset=queryset)
+        new_link_form = FeatureLinkForm(prefix="new-link")
+        feature_link_formset = FeatureLinkFormSet(
+            queryset=selected_feature_links,
+            prefix="feature-links",
+        )
 
     for form in formset.forms:
         form.instance.due_date = _feature_due_date(form.instance)
+
+    for form in feature_link_formset.forms:
+        form.instance.resolved_url = _resolve_feature_link_url(request, form.instance.url)
 
     return render(
         request,
@@ -939,10 +1002,13 @@ def features_view(request):
             "all_features": all_features,
             "current_date": timezone.now().astimezone(USER_TIMEZONE).date(),
             "feature_page_obj": page_obj,
+            "displayed_feature": displayed_feature,
             "is_filtered": is_filtered,
             "new_form": new_form,
+            "new_link_form": new_link_form,
             "selected_feature": selected_feature,
             "selected_feature_id": selected_feature_id,
+            "feature_link_formset": feature_link_formset,
             "formset": formset,
         },
     )

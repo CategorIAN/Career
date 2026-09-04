@@ -98,6 +98,50 @@
     <button type="submit">Search</button>
     <button type="button" onclick="window.location.href='{% url 'features' %}'">Clear</button>
 </form>
+{% if displayed_feature %}
+    <form method="post" style="margin-top: 1.5rem;">
+        {% csrf_token %}
+        {{ feature_link_formset.management_form }}
+        <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
+        <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+        <div>
+            <h2 style="margin: 0 0 1rem 0;">Links</h2>
+            <table border="1" cellpadding="8" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th style="width: 28rem;">URL</th>
+                        <th>Add/Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            {{ new_link_form.url.errors }}
+                            {{ new_link_form.url }}
+                        </td>
+                        <td>
+                            <button type="submit" name="add_feature_link" value="1">Add</button>
+                        </td>
+                    </tr>
+                    {% for form in feature_link_formset %}
+                        <tr>
+                            {% for hidden in form.hidden_fields %}
+                                {{ hidden }}
+                            {% endfor %}
+                            <td>
+                                {{ form.url.as_hidden }}
+                                <a href="{{ form.instance.resolved_url }}" target="_blank" rel="noopener noreferrer">{{ form.instance.url }}</a>
+                            </td>
+                            <td>
+                                <button type="submit" name="delete_feature_link" value="{{ form.instance.pk }}">Delete</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+{% endif %}
 </section>
 <script>
     (() => {

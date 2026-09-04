@@ -17,6 +17,7 @@ from .models import (
     Course,
     Education,
     Feature,
+    FeatureLink,
     FreelancerProject,
     FreelancerSkill,
     Platform,
@@ -1739,6 +1740,86 @@ class FeaturePageTests(TestCase):
         self.assertNotContains(response, "Feature 1 of", html=False)
         self.assertNotContains(response, 'aria-label="Next feature"', html=False)
 
+    def test_selected_feature_shows_links_section_scoped_to_feature(self):
+        first_feature = Feature.objects.create(name="Auth")
+        second_feature = Feature.objects.create(name="Billing")
+        first_link = FeatureLink.objects.create(feature=first_feature, url="https://auth.example.com")
+        second_link = FeatureLink.objects.create(feature=second_feature, url="https://billing.example.com")
+
+        response = self.client.get(reverse("features"), {"feature_id": second_feature.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<h2 style=\"margin: 0 0 1rem 0;\">Links</h2>", html=False)
+        self.assertContains(response, 'name="feature-links-TOTAL_FORMS" value="1"', html=False)
+        self.assertContains(response, 'name="new-link-url"', html=False)
+        self.assertContains(response, 'name="add_feature_link" value="1"', html=False)
+        self.assertContains(response, f'name="delete_feature_link" value="{second_link.pk}"', html=False)
+        self.assertNotContains(response, f'name="delete_feature_link" value="{first_link.pk}"', html=False)
+        self.assertContains(response, 'name="feature-links-0-url"', html=False)
+        self.assertContains(
+            response,
+            '<a href="https://billing.example.com" target="_blank" rel="noopener noreferrer">https://billing.example.com</a>',
+            html=False,
+        )
+        self.assertContains(response, 'value="https://billing.example.com"', html=False)
+        self.assertNotContains(response, 'value="https://auth.example.com"', html=False)
+        self.assertEqual(
+            [form.instance.pk for form in response.context["feature_link_formset"].forms],
+            [second_link.pk],
+        )
+
+    def test_links_section_uses_displayed_feature_when_feature_id_is_not_set(self):
+        first_feature = Feature.objects.create(
+            name="Auth",
+            updated="2026-09-01",
+            wait=timedelta(days=10),
+        )
+        displayed_feature = Feature.objects.create(
+            name="Billing",
+            updated="2026-09-01",
+            wait=timedelta(days=1),
+        )
+        FeatureLink.objects.create(feature=first_feature, url="https://auth.example.com")
+        displayed_link = FeatureLink.objects.create(
+            feature=displayed_feature,
+            url="https://billing.example.com",
+        )
+
+        response = self.client.get(reverse("features"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<h2 style=\"margin: 0 0 1rem 0;\">Links</h2>", html=False)
+        self.assertContains(response, f'name="delete_feature_link" value="{displayed_link.pk}"', html=False)
+        self.assertNotContains(response, 'value="https://auth.example.com"', html=False)
+        self.assertContains(
+            response,
+            '<a href="https://billing.example.com" target="_blank" rel="noopener noreferrer">https://billing.example.com</a>',
+            html=False,
+        )
+        self.assertEqual(response.context["displayed_feature"].pk, displayed_feature.pk)
+        self.assertEqual(
+            [form.instance.pk for form in response.context["feature_link_formset"].forms],
+            [displayed_link.pk],
+        )
+
+    def test_links_section_resolves_relative_link_text_from_base_url(self):
+        feature = Feature.objects.create(name="Billing")
+        relative_link = FeatureLink.objects.create(feature=feature, url="docs/guide")
+
+        response = self.client.get(reverse("features"), {"feature_id": feature.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<a href="http://testserver/docs/guide" target="_blank" rel="noopener noreferrer">docs/guide</a>',
+            html=False,
+        )
+        self.assertEqual(
+            response.context["feature_link_formset"].forms[0].instance.resolved_url,
+            "http://testserver/docs/guide",
+        )
+        self.assertEqual(response.context["feature_link_formset"].forms[0].instance.pk, relative_link.pk)
+
     def test_due_date_uses_calendar_month_addition(self):
         feature = Feature.objects.create(
             name="Addresses",
@@ -1794,6 +1875,48 @@ class FeaturePageTests(TestCase):
             {first_platform.pk, second_platform.pk},
         )
 
+    def test_add_feature_link_button_creates_link_for_selected_feature(self):
+        selected_feature = Feature.objects.create(name="Billing")
+        other_feature = Feature.objects.create(name="Auth")
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "feature-links-TOTAL_FORMS": "0",
+                "feature-links-INITIAL_FORMS": "0",
+                "feature-links-MIN_NUM_FORMS": "0",
+                "feature-links-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "feature_id": str(selected_feature.pk),
+                "form-0-id": str(selected_feature.pk),
+                "form-0-name": selected_feature.name,
+                "form-0-wait_0": "",
+                "form-0-wait_1": "",
+                "form-0-wait_2": "",
+                "form-0-updated": "",
+                "new-link-url": "https://billing.example.com",
+                "add_feature_link": "1",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('features')}?feature_id={selected_feature.pk}")
+        self.assertTrue(
+            FeatureLink.objects.filter(
+                feature=selected_feature,
+                url="https://billing.example.com",
+            ).exists()
+        )
+        self.assertFalse(
+            FeatureLink.objects.filter(
+                feature=other_feature,
+                url="https://billing.example.com",
+            ).exists()
+        )
+
     def test_delete_feature_button_removes_existing_feature(self):
         existing_feature = Feature.objects.create(name="Search")
 
@@ -1818,6 +1941,41 @@ class FeaturePageTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('features')}?page=1")
         self.assertFalse(Feature.objects.filter(pk=existing_feature.pk).exists())
+
+    def test_delete_feature_link_button_removes_existing_link(self):
+        selected_feature = Feature.objects.create(name="Billing")
+        existing_link = FeatureLink.objects.create(
+            feature=selected_feature,
+            url="https://billing.example.com",
+        )
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "feature-links-TOTAL_FORMS": "1",
+                "feature-links-INITIAL_FORMS": "1",
+                "feature-links-MIN_NUM_FORMS": "0",
+                "feature-links-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "feature_id": str(selected_feature.pk),
+                "form-0-id": str(selected_feature.pk),
+                "form-0-name": selected_feature.name,
+                "form-0-wait_0": "",
+                "form-0-wait_1": "",
+                "form-0-wait_2": "",
+                "form-0-updated": "",
+                "feature-links-0-id": str(existing_link.pk),
+                "feature-links-0-url": existing_link.url,
+                "delete_feature_link": str(existing_link.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('features')}?feature_id={selected_feature.pk}")
+        self.assertFalse(FeatureLink.objects.filter(pk=existing_link.pk).exists())
 
     def test_save_button_updates_existing_features(self):
         existing_feature = Feature.objects.create(name="Search")
