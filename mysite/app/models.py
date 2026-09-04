@@ -530,6 +530,13 @@ class Platform(models.Model):
         blank=True,
     )
 
+    features = models.ManyToManyField(
+        "Feature",
+        through="PlatformFeature",
+        related_name="platforms",
+        blank=True,
+    )
+
     def __str__(self):
         return self.name
 
@@ -570,6 +577,72 @@ class PlatformSkill(models.Model):
 
     def __str__(self):
         return f"{self.platform} - {self.skill}"
+
+
+class Feature(models.Model):
+    name = models.CharField(
+        max_length=200,
+        unique=True,
+    )
+
+    updated = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    wait = models.DurationField(
+        null=True,
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class FeatureLink(models.Model):
+    feature = models.ForeignKey(
+        "Feature",
+        related_name="links",
+        on_delete=models.CASCADE,
+    )
+
+    url = models.URLField()
+
+    def __str__(self):
+        return self.url
+
+
+class PlatformFeature(models.Model):
+    platform = models.ForeignKey(
+        "Platform",
+        on_delete=models.CASCADE,
+    )
+
+    feature = models.ForeignKey(
+        "Feature",
+        on_delete=models.CASCADE,
+    )
+
+    available = models.BooleanField(
+        null=True,
+        blank=True,
+    )
+
+    updated = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform", "feature"],
+                name="unique_platform_feature",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.platform} - {self.feature}"
 
 
 

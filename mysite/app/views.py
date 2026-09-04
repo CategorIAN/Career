@@ -3,11 +3,12 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import F, Prefetch, Q
+from django.db.models import Case, F, IntegerField, Prefetch, Q, Value, When
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
-from datetime import datetime, UTC
+from datetime import date, datetime, timedelta, UTC
+from calendar import monthrange
 import hashlib
 import logging
 import re
@@ -16,6 +17,8 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from .forms import (
+    FeatureForm,
+    FeatureFormSet,
     PlatformForm,
     PlatformFormSet,
     PlatformSkillFormSet,
@@ -24,7 +27,9 @@ from .forms import (
 )
 from .models import (
     Course,
+    Feature,
     Platform,
+    PlatformFeature,
     PlatformSkill,
     Skill,
     Education,
@@ -669,25 +674,9 @@ def skill_formset_view(request):
                 with transaction.atomic():
                     current_date = timezone.now().astimezone(USER_TIMEZONE).date()
                     for platform_skill in editable_platform_skills:
-                        name_key = f"platform_skill_name_{platform_skill.pk}"
-                        rating_key = f"platform_skill_rating_{platform_skill.pk}"
                         available_key = f"platform_skill_available_{platform_skill.pk}"
                         not_listed_swap_key = f"platform_skill_not_listed_{platform_skill.pk}"
                         listed_swap_key = f"platform_skill_listed_{platform_skill.pk}"
-
-                        platform_skill.skill.name = request.POST.get(
-                            name_key,
-                            platform_skill.skill.name,
-                        ).strip()
-
-                        rating_value = request.POST.get(
-                            rating_key,
-                            platform_skill.skill.rating,
-                        )
-                        try:
-                            platform_skill.skill.rating = int(rating_value)
-                        except (TypeError, ValueError):
-                            platform_skill.skill.rating = platform_skill.skill.rating
 
                         available_value = request.POST.get(available_key, "")
                         platform_skill.available = {
@@ -709,7 +698,6 @@ def skill_formset_view(request):
 
                         if displayed_skill is not None and platform_skill.skill_id == displayed_skill.pk:
                             platform_skill.updated = current_date
-                        platform_skill.skill.save()
                         platform_skill.save()
             return redirect(_build_redirect_url(redirect_params))
         elif save_selected_skill_platform_skills_requested:
@@ -827,6 +815,135 @@ def platform_skill_formset_view(request):
         {
             "formset": formset,
             "page_obj": page_obj,
+        },
+    )
+
+
+def _feature_wait_parts(wait_value):
+    if not wait_value:
+        return 0, 0, 0
+
+    total_days = wait_value.days
+    months = total_days // 30
+    remaining_days = total_days % 30
+    weeks = remaining_days // 7
+    days = remaining_days % 7
+    return months, weeks, days
+
+
+def _add_calendar_months(date_value, months):
+    if not months:
+        return date_value
+
+    total_month_index = (date_value.month - 1) + months
+    year = date_value.year + (total_month_index // 12)
+    month = (total_month_index % 12) + 1
+    day = min(date_value.day, monthrange(year, month)[1])
+    return date_value.replace(year=year, month=month, day=day)
+
+
+def _feature_due_date(feature):
+    if not feature.updated or not feature.wait:
+        return None
+
+    months, weeks, days = _feature_wait_parts(feature.wait)
+    due_date = _add_calendar_months(feature.updated, months)
+    return due_date + timedelta(weeks=weeks, days=days)
+
+
+def _ordered_feature_queryset():
+    features = list(Feature.objects.all())
+    ordered_ids = [
+        feature.pk
+        for feature in sorted(
+            features,
+            key=lambda feature: (
+                _feature_due_date(feature) is None,
+                _feature_due_date(feature) or date.max,
+                feature.name,
+                feature.pk,
+            ),
+        )
+    ]
+
+    if not ordered_ids:
+        return Feature.objects.none()
+
+    preserved_order = Case(
+        *[When(pk=pk, then=Value(index)) for index, pk in enumerate(ordered_ids)],
+        output_field=IntegerField(),
+    )
+    return Feature.objects.filter(pk__in=ordered_ids).order_by(preserved_order)
+
+
+def features_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    selected_feature_id = request.POST.get("feature_id") or request.GET.get("feature_id", "")
+    selected_feature_id = selected_feature_id.strip()
+
+    all_features = _ordered_feature_queryset()
+    selected_feature = all_features.filter(pk=selected_feature_id).first() if selected_feature_id else None
+    is_filtered = selected_feature is not None
+    queryset = all_features.filter(pk=selected_feature.pk) if selected_feature is not None else all_features
+    page_obj = None
+
+    if not is_filtered:
+        paginator = Paginator(queryset, 1)
+        page_obj = paginator.get_page(page_number)
+        queryset = page_obj.object_list
+
+    if request.method == "POST":
+        new_form = FeatureForm(request.POST, prefix="new")
+        formset = FeatureFormSet(request.POST, queryset=queryset)
+
+        add_feature_requested = bool(request.POST.get("add_feature"))
+        delete_feature_id = request.POST.get("delete_feature", "").strip()
+        redirect_params = {}
+        if not is_filtered and page_obj is not None:
+            redirect_params["page"] = page_obj.number
+        elif selected_feature is not None:
+            redirect_params["feature_id"] = selected_feature.pk
+
+        if add_feature_requested:
+            if new_form.is_valid():
+                with transaction.atomic():
+                    feature = new_form.save()
+                    PlatformFeature.objects.bulk_create(
+                        [
+                            PlatformFeature(platform=platform, feature=feature)
+                            for platform in Platform.objects.all()
+                        ]
+                    )
+                return redirect(f"{request.path}?feature_id={feature.pk}")
+        elif delete_feature_id:
+            Feature.objects.filter(pk=delete_feature_id).delete()
+            if str(selected_feature_id) == delete_feature_id:
+                redirect_params.pop("feature_id", None)
+            query_string = urlencode(redirect_params)
+            return redirect(f"{request.path}?{query_string}" if query_string else request.path)
+        elif formset.is_valid():
+            formset.save()
+            query_string = urlencode(redirect_params)
+            return redirect(f"{request.path}?{query_string}" if query_string else request.path)
+    else:
+        new_form = FeatureForm(prefix="new")
+        formset = FeatureFormSet(queryset=queryset)
+
+    for form in formset.forms:
+        form.instance.due_date = _feature_due_date(form.instance)
+
+    return render(
+        request,
+        "app/features.html",
+        {
+            "all_features": all_features,
+            "current_date": timezone.now().astimezone(USER_TIMEZONE).date(),
+            "feature_page_obj": page_obj,
+            "is_filtered": is_filtered,
+            "new_form": new_form,
+            "selected_feature": selected_feature,
+            "selected_feature_id": selected_feature_id,
+            "formset": formset,
         },
     )
 

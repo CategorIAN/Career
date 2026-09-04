@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+from datetime import timedelta
+
 from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.test import TestCase
@@ -14,6 +16,7 @@ from .models import (
     Country,
     Course,
     Education,
+    Feature,
     FreelancerProject,
     FreelancerSkill,
     Platform,
@@ -27,6 +30,7 @@ from .models import (
     Skill,
     State,
     Supervisor,
+    PlatformFeature,
 )
 from .views import (
     FREELANCER_RATE_LIMIT_MESSAGE,
@@ -687,13 +691,15 @@ class SkillPageTests(TestCase):
         response = self.client.get(reverse("skills"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Resume")
         self.assertContains(response, "Add/Delete")
         self.assertContains(response, "Skill 1 of 1")
         self.assertContains(response, 'name="add_skill" value="1"', html=False)
         self.assertContains(response, 'name="delete_skill"', html=False)
+        self.assertContains(response, 'name="new-resume_ready"', html=False)
+        self.assertContains(response, 'name="form-0-resume_ready"', html=False)
         self.assertNotContains(response, ">New<", html=False)
         self.assertNotContains(response, ">Updated<", html=False)
-        self.assertNotContains(response, 'type="checkbox"', html=False)
 
     def test_skills_page_uses_arrow_navigation_labels(self):
         Skill.objects.create(name="Alpha", type="Language")
@@ -975,13 +981,19 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(response, "Skills Not Listed")
         self.assertContains(response, "Skills Listed")
-        self.assertContains(response, f'name="platform_skill_name_', html=False)
-        self.assertContains(response, f'value="{high_rating_not_listed.name}"', html=False)
-        self.assertContains(response, f'value="{same_rating_not_listed_a.name}"', html=False)
-        self.assertContains(response, f'value="{same_rating_not_listed_b.name}"', html=False)
-        self.assertContains(response, f'value="{listed_low.name}"', html=False)
-        self.assertContains(response, f'value="{selected_skill.name}"', html=False)
-        self.assertContains(response, f'value="{listed_high.name}"', html=False)
+        self.assertNotContains(response, f'name="platform_skill_name_', html=False)
+        self.assertContains(response, f"{high_rating_not_listed.name} ({high_rating_not_listed.rating})")
+        self.assertContains(response, f"{same_rating_not_listed_a.name} ({same_rating_not_listed_a.rating})")
+        self.assertContains(response, f"{same_rating_not_listed_b.name} ({same_rating_not_listed_b.rating})")
+        self.assertContains(response, f"{listed_low.name} ({listed_low.rating})")
+        self.assertContains(response, f"{selected_skill.name} ({selected_skill.rating})")
+        self.assertContains(response, f"{listed_high.name} ({listed_high.rating})")
+        self.assertContains(
+            response,
+            f'href="{reverse("skills")}?skill_id={high_rating_not_listed.pk}&platform_id={platform.pk}"',
+            html=False,
+        )
+        self.assertContains(response, 'target="_blank"', html=False)
         self.assertContains(response, "<th>Swap</th>", html=False)
         self.assertContains(
             response,
@@ -1045,13 +1057,10 @@ class SkillPageTests(TestCase):
                 "skill_id": str(selected_skill.pk),
                 "platform_id": str(platform.pk),
                 "save_platform_skills": "1",
-                f"platform_skill_name_{editable_platform_skill.pk}": "Python Updated",
                 f"platform_skill_available_{editable_platform_skill.pk}": "false",
                 f"platform_skill_not_listed_{editable_platform_skill.pk}": "on",
-                f"platform_skill_name_{listed_platform_skill.pk}": "Bash Updated",
                 f"platform_skill_available_{listed_platform_skill.pk}": "",
                 f"platform_skill_listed_{listed_platform_skill.pk}": "on",
-                f"platform_skill_name_{untouched_platform_skill.pk}": selected_skill.name,
                 f"platform_skill_available_{untouched_platform_skill.pk}": "true",
             },
         )
@@ -1063,12 +1072,12 @@ class SkillPageTests(TestCase):
         editable_platform_skill.refresh_from_db()
         listed_platform_skill.refresh_from_db()
         untouched_platform_skill.refresh_from_db()
-        self.assertEqual(editable_platform_skill.skill.name, "Python Updated")
+        self.assertEqual(editable_platform_skill.skill.name, "Python")
         self.assertEqual(editable_platform_skill.skill.rating, 5)
         self.assertFalse(editable_platform_skill.available)
         self.assertTrue(editable_platform_skill.listed)
         self.assertEqual(str(editable_platform_skill.updated), "2026-09-03")
-        self.assertEqual(listed_platform_skill.skill.name, "Bash Updated")
+        self.assertEqual(listed_platform_skill.skill.name, "Bash")
         self.assertEqual(listed_platform_skill.skill.rating, 3)
         self.assertIsNone(listed_platform_skill.available)
         self.assertFalse(listed_platform_skill.listed)
@@ -1508,6 +1517,7 @@ class SkillPageTests(TestCase):
                 "new-name": "Python",
                 "new-type": "Language",
                 "new-rating": "5",
+                "new-resume_ready": "on",
                 "add_skill": "1",
             },
         )
@@ -1516,6 +1526,7 @@ class SkillPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('skills')}?skill_id={created_skill.pk}")
         self.assertEqual(created_skill.type, "Language")
         self.assertEqual(created_skill.rating, 5)
+        self.assertTrue(created_skill.resume_ready)
         self.assertIsNone(created_skill.updated)
 
     def test_add_skill_with_invalid_name_returns_error_on_page(self):
@@ -1586,6 +1597,7 @@ class SkillPageTests(TestCase):
                 "form-0-name": "Edited Skill",
                 "form-0-type": "Domain",
                 "form-0-rating": "4",
+                "form-0-resume_ready": "on",
                 "page": "1",
                 "new-name": "Should Not Be Added",
                 "new-type": "Language",
@@ -1597,6 +1609,7 @@ class SkillPageTests(TestCase):
         self.assertEqual(existing_skill.name, "Edited Skill")
         self.assertEqual(existing_skill.type, "Domain")
         self.assertEqual(existing_skill.rating, 4)
+        self.assertTrue(existing_skill.resume_ready)
         self.assertEqual(str(existing_skill.updated), "2026-09-02")
         self.assertFalse(Skill.objects.filter(name="Should Not Be Added").exists())
 
@@ -1618,6 +1631,7 @@ class SkillPageTests(TestCase):
                 "form-0-name": existing_skill.name,
                 "form-0-type": existing_skill.type,
                 "form-0-rating": str(existing_skill.rating),
+                "form-0-resume_ready": "on",
                 "page": "1",
             },
         )
@@ -1625,3 +1639,209 @@ class SkillPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('skills')}?page=1")
         existing_skill.refresh_from_db()
         self.assertEqual(str(existing_skill.updated), "2026-09-02")
+
+
+class FeaturePageTests(TestCase):
+    def test_features_page_shows_single_existing_feature_row_with_pagination_and_search(self):
+        first_feature = Feature.objects.create(
+            name="Auth",
+            updated="2026-09-01",
+            wait=timedelta(days=10),
+        )
+        second_feature = Feature.objects.create(
+            name="Billing",
+            updated="2026-09-01",
+            wait=timedelta(days=1),
+        )
+        third_feature = Feature.objects.create(name="Catalog")
+
+        response = self.client.get(reverse("features"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<title>Features</title>", html=False)
+        self.assertContains(response, f'href="{reverse("features")}"', html=False)
+        self.assertContains(response, "<h1>Features</h1>", html=False)
+        self.assertContains(response, "Due Date")
+        self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "Search Feature")
+        self.assertContains(response, 'name="add_feature" value="1"', html=False)
+        self.assertContains(response, f'name="delete_feature" value="{second_feature.pk}"', html=False)
+        self.assertNotContains(response, f'name="delete_feature" value="{first_feature.pk}"', html=False)
+        self.assertNotContains(response, f'name="delete_feature" value="{third_feature.pk}"', html=False)
+        self.assertContains(response, 'name="form-0-name"', html=False)
+        self.assertContains(response, 'name="form-0-wait_0"', html=False)
+        self.assertContains(response, 'name="form-0-wait_1"', html=False)
+        self.assertContains(response, 'name="form-0-wait_2"', html=False)
+        self.assertContains(response, 'name="form-0-updated"', html=False)
+        self.assertContains(response, 'name="new-name"', html=False)
+        self.assertContains(response, 'name="new-wait_0"', html=False)
+        self.assertContains(response, 'name="new-wait_1"', html=False)
+        self.assertContains(response, 'name="new-wait_2"', html=False)
+        self.assertContains(response, 'name="new-updated"', html=False)
+        self.assertContains(response, 'name="feature_id" value=""', html=False)
+        self.assertContains(response, 'list="feature-search-options"', html=False)
+        self.assertContains(response, f'<option value="Billing" data-feature-id="{second_feature.pk}"></option>', html=False)
+        self.assertContains(response, "placeholder=\"Months\"", html=False)
+        self.assertContains(response, "placeholder=\"Weeks\"", html=False)
+        self.assertContains(response, "placeholder=\"Days\"", html=False)
+        self.assertContains(response, "Months")
+        self.assertContains(response, "Weeks")
+        self.assertContains(response, "Days")
+        self.assertContains(response, 'id="%s" style="background: #f4cccc;"' % second_feature.pk, html=False)
+        self.assertContains(response, "2026-09-02")
+        self.assertNotContains(response, "2026-09-11")
+        self.assertContains(response, ">Save</button>", html=False)
+        self.assertContains(response, "Feature 1 of 3")
+        self.assertContains(response, 'aria-label="Next feature"', html=False)
+        self.assertContains(response, "&rarr;", html=False)
+        self.assertNotContains(response, 'aria-label="Previous feature"', html=False)
+        self.assertEqual(
+            [form.instance.pk for form in response.context["formset"].forms],
+            [second_feature.pk],
+        )
+        self.assertEqual(response.context["feature_page_obj"].number, 1)
+
+    def test_features_page_paginates_to_next_feature(self):
+        first_feature = Feature.objects.create(
+            name="Auth",
+            updated="2026-09-01",
+            wait=timedelta(days=10),
+        )
+        second_feature = Feature.objects.create(
+            name="Billing",
+            updated="2026-09-01",
+            wait=timedelta(days=1),
+        )
+
+        response = self.client.get(reverse("features"), {"page": 2})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'name="delete_feature" value="{first_feature.pk}"', html=False)
+        self.assertNotContains(response, f'name="delete_feature" value="{second_feature.pk}"', html=False)
+        self.assertContains(response, "Feature 2 of 2")
+        self.assertContains(response, 'aria-label="Previous feature"', html=False)
+        self.assertNotContains(response, 'aria-label="Next feature"', html=False)
+        self.assertEqual([form.instance.pk for form in response.context["formset"].forms], [first_feature.pk])
+
+    def test_search_feature_form_filters_table_by_feature_id_without_pagination(self):
+        first_feature = Feature.objects.create(name="Auth")
+        second_feature = Feature.objects.create(name="Billing")
+
+        response = self.client.get(reverse("features"), {"feature_id": second_feature.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Search Feature")
+        self.assertContains(response, f'name="feature_id" value="{second_feature.pk}"', html=False)
+        self.assertContains(response, f'<option value="Auth" data-feature-id="{first_feature.pk}"></option>', html=False)
+        self.assertContains(response, f'<option value="Billing" data-feature-id="{second_feature.pk}"></option>', html=False)
+        self.assertContains(response, f'name="delete_feature" value="{second_feature.pk}"', html=False)
+        self.assertNotContains(response, f'name="delete_feature" value="{first_feature.pk}"', html=False)
+        self.assertNotContains(response, "Feature 1 of", html=False)
+        self.assertNotContains(response, 'aria-label="Next feature"', html=False)
+
+    def test_due_date_uses_calendar_month_addition(self):
+        feature = Feature.objects.create(
+            name="Addresses",
+            updated="2026-03-04",
+            wait=timedelta(days=180),
+        )
+
+        response = self.client.get(reverse("features"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026-09-04")
+        self.assertNotContains(response, "2026-08-31")
+        feature_form = next(
+            form for form in response.context["formset"].forms if form.instance.pk == feature.pk
+        )
+        self.assertEqual(str(feature_form.instance.due_date), "2026-09-04")
+
+    def test_add_feature_button_creates_feature_and_redirects(self):
+        first_platform = Platform.objects.create(name="Alpha Platform")
+        second_platform = Platform.objects.create(name="Beta Platform")
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "new-name": "Search",
+                "new-wait_0": "0",
+                "new-wait_1": "2",
+                "new-wait_2": "1",
+                "new-updated": "2026-09-03",
+                "add_feature": "1",
+            },
+        )
+
+        created_feature = Feature.objects.get(name="Search")
+        self.assertRedirects(
+            response,
+            f"{reverse('features')}?feature_id={created_feature.pk}",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(str(created_feature.wait), "15 days, 0:00:00")
+        self.assertEqual(str(created_feature.updated), "2026-09-03")
+        self.assertEqual(
+            set(
+                PlatformFeature.objects.filter(feature=created_feature).values_list(
+                    "platform_id",
+                    flat=True,
+                )
+            ),
+            {first_platform.pk, second_platform.pk},
+        )
+
+    def test_delete_feature_button_removes_existing_feature(self):
+        existing_feature = Feature.objects.create(name="Search")
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "feature_id": "",
+                "form-0-id": str(existing_feature.pk),
+                "form-0-name": existing_feature.name,
+                "form-0-wait_0": "",
+                "form-0-wait_1": "",
+                "form-0-wait_2": "",
+                "form-0-updated": "",
+                "delete_feature": str(existing_feature.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('features')}?page=1")
+        self.assertFalse(Feature.objects.filter(pk=existing_feature.pk).exists())
+
+    def test_save_button_updates_existing_features(self):
+        existing_feature = Feature.objects.create(name="Search")
+
+        response = self.client.post(
+            reverse("features"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "feature_id": "",
+                "form-0-id": str(existing_feature.pk),
+                "form-0-name": "Search Updated",
+                "form-0-wait_0": "1",
+                "form-0-wait_1": "0",
+                "form-0-wait_2": "2",
+                "form-0-updated": "2026-09-03",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('features')}?page=1")
+        existing_feature.refresh_from_db()
+        self.assertEqual(existing_feature.name, "Search Updated")
+        self.assertEqual(str(existing_feature.wait), "32 days, 0:00:00")
+        self.assertEqual(str(existing_feature.updated), "2026-09-03")

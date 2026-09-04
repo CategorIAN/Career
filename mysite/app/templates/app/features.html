@@ -1,0 +1,133 @@
+{% extends "app/base.html" %}
+
+{% block title %}Features{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Features</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
+    <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+    <table border="1" cellpadding="8" cellspacing="0">
+        <thead>
+            <tr>
+                <th style="width: 10rem;">Name</th>
+                <th>Wait</th>
+                <th>Updated</th>
+                <th>Due Date</th>
+                <th>Add/Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    {{ new_form.name.errors }}
+                    {{ new_form.name }}
+                </td>
+                <td>
+                    {{ new_form.wait.errors }}
+                    {{ new_form.wait }}
+                </td>
+                <td>
+                    {{ new_form.updated.errors }}
+                    {{ new_form.updated }}
+                </td>
+                <td></td>
+                <td>
+                    <button type="submit" name="add_feature" value="1">Add</button>
+                </td>
+            </tr>
+            {% for form in formset %}
+                <tr id="{{ form.instance.pk }}"{% if form.instance.due_date and form.instance.due_date < current_date %} style="background: #f4cccc;"{% endif %}>
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+                    <td>
+                        {{ form.name.errors }}
+                        {{ form.name }}
+                    </td>
+                    <td>
+                        {{ form.wait.errors }}
+                        {{ form.wait }}
+                    </td>
+                    <td>
+                        {{ form.updated.errors }}
+                        {{ form.updated }}
+                    </td>
+                    <td>
+                        {% if form.instance.due_date %}{{ form.instance.due_date|date:"Y-m-d" }}{% endif %}
+                    </td>
+                    <td>
+                        <button type="submit" name="delete_feature" value="{{ form.instance.pk }}">Delete</button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not is_filtered %}
+        <div style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
+            {% if feature_page_obj.has_previous %}
+                <a href="?page={{ feature_page_obj.previous_page_number }}" aria-label="Previous feature">&larr;</a>
+            {% endif %}
+            <span>Feature {{ feature_page_obj.number }} of {{ feature_page_obj.paginator.num_pages }}</span>
+            {% if feature_page_obj.has_next %}
+                <a href="?page={{ feature_page_obj.next_page_number }}" aria-label="Next feature">&rarr;</a>
+            {% endif %}
+        </div>
+    {% endif %}
+    <button type="submit" style="margin-top: 1rem;">Save</button>
+</form>
+<form method="get" style="margin-top: 1rem;">
+    <label for="feature-search">Search Feature</label>
+    <input
+        id="feature-search"
+        type="text"
+        list="feature-search-options"
+        value="{% if selected_feature %}{{ selected_feature.name }}{% endif %}"
+        autocomplete="off"
+        style="width: 20rem;"
+    >
+    <datalist id="feature-search-options">
+        {% for feature in all_features %}
+            <option value="{{ feature.name }}" data-feature-id="{{ feature.pk }}"></option>
+        {% endfor %}
+    </datalist>
+    <input id="feature-id-input" type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+    <button type="submit">Search</button>
+    <button type="button" onclick="window.location.href='{% url 'features' %}'">Clear</button>
+</form>
+</section>
+<script>
+    (() => {
+        const searchInput = document.getElementById("feature-search");
+        const featureIdInput = document.getElementById("feature-id-input");
+        const featureOptions = document.querySelectorAll("#feature-search-options option");
+
+        if (!searchInput || !featureIdInput || !featureOptions.length) {
+            return;
+        }
+
+        const featureIdByName = new Map();
+        featureOptions.forEach(option => {
+            if (!featureIdByName.has(option.value)) {
+                featureIdByName.set(option.value, option.dataset.featureId || "");
+            }
+        });
+
+        const syncFeatureId = () => {
+            featureIdInput.value = featureIdByName.get(searchInput.value) || "";
+        };
+
+        searchInput.addEventListener("input", syncFeatureId);
+        searchInput.addEventListener("change", syncFeatureId);
+        searchInput.form?.addEventListener("submit", () => {
+            syncFeatureId();
+            if (!featureIdInput.value) {
+                featureIdInput.disabled = true;
+            }
+        });
+    })();
+</script>
+{% endblock %}

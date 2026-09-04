@@ -19,6 +19,7 @@
                         <th>Name</th>
                         <th>Type</th>
                         <th>Rating</th>
+                        <th>Resume</th>
                         <th>Add/Delete</th>
                     </tr>
                 </thead>
@@ -32,6 +33,9 @@
                         </td>
                         <td>
                             {{ new_form.rating }}
+                        </td>
+                        <td>
+                            {{ new_form.resume_ready }}
                         </td>
                         <td>
                             <button type="submit" name="add_skill" value="1">Add</button>
@@ -53,6 +57,10 @@
                             <td>
                                 {{ form.rating.errors }}
                                 {{ form.rating }}
+                            </td>
+                            <td>
+                                {{ form.resume_ready.errors }}
+                                {{ form.resume_ready }}
                             </td>
                             <td>
                                 <button type="submit" name="delete_skill" value="{{ form.instance.pk }}">Delete</button>
@@ -360,12 +368,15 @@
                     {% for platform_skill in skills_not_listed %}
                         <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
                             <td>
-                                <input
-                                    type="text"
-                                    name="platform_skill_name_{{ platform_skill.pk }}"
-                                    value="{{ platform_skill.skill.name }}"
-                                    style="width: 100%;"
-                                >
+                                {% if selected_platform %}
+                                    <a
+                                        href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ selected_platform.pk }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a>
+                                {% else %}
+                                    {{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})
+                                {% endif %}
                             </td>
                             <td>
                                 <select name="platform_skill_available_{{ platform_skill.pk }}">
@@ -406,12 +417,15 @@
                     {% for platform_skill in skills_listed %}
                         <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
                             <td>
-                                <input
-                                    type="text"
-                                    name="platform_skill_name_{{ platform_skill.pk }}"
-                                    value="{{ platform_skill.skill.name }}"
-                                    style="width: 100%;"
-                                >
+                                {% if selected_platform %}
+                                    <a
+                                        href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ selected_platform.pk }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a>
+                                {% else %}
+                                    {{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})
+                                {% endif %}
                             </td>
                             <td>
                                 <select name="platform_skill_available_{{ platform_skill.pk }}">
