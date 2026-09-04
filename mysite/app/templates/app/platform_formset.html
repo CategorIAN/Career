@@ -15,7 +15,7 @@
                 <th>Name</th>
                 <th>URL</th>
                 <th>Max Skills</th>
-                <th>Delete</th>
+                <th>Add/Delete</th>
             </tr>
         </thead>
         <tbody>
@@ -32,7 +32,9 @@
                     {{ new_form.max_skills.errors }}
                     {{ new_form.max_skills }}
                 </td>
-                <td>New</td>
+                <td>
+                    <button type="submit" name="add_platform" value="1">Add</button>
+                </td>
             </tr>
             {% for form in formset %}
                 <tr>
@@ -51,7 +53,9 @@
                         {{ form.max_skills.errors }}
                         {{ form.max_skills }}
                     </td>
-                    <td>{{ form.DELETE }}</td>
+                    <td>
+                        <button type="submit" name="delete_platform" value="{{ form.instance.pk }}">Delete</button>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>

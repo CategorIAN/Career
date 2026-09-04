@@ -416,6 +416,19 @@ def _create_platform_skills_for_platform(platform):
     )
 
 
+def _create_platform_features_for_platform(platform):
+    features = Feature.objects.all()
+    PlatformFeature.objects.bulk_create(
+        [
+            PlatformFeature(
+                platform=platform,
+                feature=feature,
+            )
+            for feature in features
+        ]
+    )
+
+
 def _create_platform_skills_for_skill(skill):
     platforms = Platform.objects.all()
     PlatformSkill.objects.bulk_create(
@@ -767,15 +780,20 @@ def platform_formset_view(request):
     if request.method == "POST":
         new_form = PlatformForm(request.POST, prefix="new")
         formset = PlatformFormSet(request.POST, queryset=page_queryset)
-        new_form_has_data = new_form.has_changed()
-        is_new_form_valid = new_form.is_valid() if new_form_has_data else True
-        is_formset_valid = formset.is_valid()
+        add_platform_requested = "add_platform" in request.POST
+        delete_platform_id = request.POST.get("delete_platform", "").strip()
 
-        if is_formset_valid and is_new_form_valid:
-            if new_form_has_data:
+        if add_platform_requested:
+            if new_form.is_valid():
                 with transaction.atomic():
                     platform = new_form.save()
                     _create_platform_skills_for_platform(platform)
+                    _create_platform_features_for_platform(platform)
+            return redirect(f"{request.path}?page={page_obj.number}")
+        if delete_platform_id:
+            Platform.objects.filter(pk=delete_platform_id).delete()
+            return redirect(f"{request.path}?page={page_obj.number}")
+        if formset.is_valid():
             formset.save()
             return redirect(f"{request.path}?page={page_obj.number}")
     else:
@@ -787,35 +805,6 @@ def platform_formset_view(request):
         "app/platform_formset.html",
         {
             "new_form": new_form,
-            "formset": formset,
-            "page_obj": page_obj,
-        },
-    )
-
-
-def platform_skill_formset_view(request):
-    page_number = request.POST.get("page") or request.GET.get("page") or 1
-    queryset = PlatformSkill.objects.select_related("platform", "skill").order_by(
-        F("updated").asc(nulls_first=True),
-        "platform__name",
-        "skill__name",
-    )
-    paginator = Paginator(queryset, 8)
-    page_obj = paginator.get_page(page_number)
-    page_queryset = page_obj.object_list
-
-    if request.method == "POST":
-        formset = PlatformSkillFormSet(request.POST, queryset=page_queryset)
-        if formset.is_valid():
-            formset.save()
-            return redirect(f"{request.path}?page={page_obj.number}")
-    else:
-        formset = PlatformSkillFormSet(queryset=page_queryset)
-
-    return render(
-        request,
-        "app/platform_skill_formset.html",
-        {
             "formset": formset,
             "page_obj": page_obj,
         },

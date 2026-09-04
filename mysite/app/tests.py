@@ -612,77 +612,120 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, 'id="course-skill-')
         self.assertContains(response, "Program:\nMaster of Science, Data Science", html=False)
 
-    def test_platform_skills_page_uses_paginated_formset_and_updates_existing_rows(self):
-        platform_alpha = Platform.objects.create(name="Alpha Platform")
-        platform_beta = Platform.objects.create(name="Beta Platform")
 
-        platform_skill_null = PlatformSkill.objects.create(
-            platform=platform_alpha,
-            skill=self.python_skill,
-            available=None,
-            listed=None,
-            updated=None,
-        )
-        platform_skill_dated = PlatformSkill.objects.create(
-            platform=platform_beta,
-            skill=self.sql_skill,
-            available=True,
-            listed=False,
-            updated="2026-08-15",
+class PlatformPageTests(TestCase):
+    def test_platforms_page_shows_add_delete_column_and_buttons(self):
+        platform = Platform.objects.create(
+            name="Alpha Platform",
+            url="https://alpha.example.com",
+            max_skills=10,
         )
 
-        response = self.client.get(reverse("platform_skills"))
+        response = self.client.get(reverse("platforms"))
 
         self.assertEqual(response.status_code, 200)
-        page_items = list(response.context["page_obj"].object_list)
-        self.assertEqual(
-            [item.pk for item in page_items],
-            [platform_skill_null.pk, platform_skill_dated.pk],
-        )
-        self.assertContains(response, "Platform Skills")
-        self.assertContains(response, "Alpha Platform")
-        self.assertContains(response, "Python")
-        self.assertContains(response, "Beta Platform")
-        self.assertContains(response, "SQL")
-        self.assertContains(response, 'name="form-0-available"')
-        self.assertContains(response, 'name="form-0-listed"')
-        self.assertContains(response, 'name="form-0-updated"')
-        self.assertContains(response, ">Unknown<", html=False)
-        self.assertNotContains(response, "Delete")
+        self.assertContains(response, "<title>Platforms</title>", html=False)
+        self.assertContains(response, "<h1>Platforms</h1>", html=False)
+        self.assertContains(response, "Add/Delete")
+        self.assertContains(response, 'name="add_platform" value="1"', html=False)
+        self.assertContains(response, f'name="delete_platform" value="{platform.pk}"', html=False)
+        self.assertNotContains(response, 'name="form-0-DELETE"', html=False)
         self.assertNotContains(response, ">New<", html=False)
 
-        post_data = {
-            "form-TOTAL_FORMS": "2",
-            "form-INITIAL_FORMS": "2",
-            "form-MIN_NUM_FORMS": "0",
-            "form-MAX_NUM_FORMS": "1000",
-            "page": "1",
-            "form-0-id": str(platform_skill_null.pk),
-            "form-0-available": "false",
-            "form-0-listed": "true",
-            "form-0-updated": "2026-08-20",
-            "form-1-id": str(platform_skill_dated.pk),
-            "form-1-available": "true",
-            "form-1-listed": "false",
-            "form-1-updated": "2026-08-15",
-        }
+    def test_platforms_save_updates_existing_rows_without_creating_top_row(self):
+        existing_platform = Platform.objects.create(
+            name="Alpha Platform",
+            url="https://alpha.example.com",
+            max_skills=10,
+        )
 
-        post_response = self.client.post(reverse("platform_skills"), data=post_data)
+        response = self.client.post(
+            reverse("platforms"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "form-0-id": str(existing_platform.pk),
+                "form-0-name": "Alpha Platform Updated",
+                "form-0-url": "https://updated.example.com",
+                "form-0-max_skills": "12",
+                "new-name": "Should Not Save",
+                "new-url": "https://ignored.example.com",
+                "new-max_skills": "3",
+            },
+        )
 
-        self.assertRedirects(post_response, f"{reverse('platform_skills')}?page=1")
+        self.assertRedirects(response, f"{reverse('platforms')}?page=1")
+        existing_platform.refresh_from_db()
+        self.assertEqual(existing_platform.name, "Alpha Platform Updated")
+        self.assertEqual(existing_platform.url, "https://updated.example.com")
+        self.assertEqual(existing_platform.max_skills, 12)
+        self.assertFalse(Platform.objects.filter(name="Should Not Save").exists())
 
-        platform_skill_null.refresh_from_db()
-        platform_skill_dated.refresh_from_db()
+    def test_platforms_add_button_creates_platform(self):
+        skill = Skill.objects.create(name="Python", type="Language")
+        first_feature = Feature.objects.create(name="Auth")
+        second_feature = Feature.objects.create(name="Billing")
 
-        self.assertFalse(platform_skill_null.available)
-        self.assertTrue(platform_skill_null.listed)
-        self.assertEqual(str(platform_skill_null.updated), "2026-08-20")
-        self.assertEqual(platform_skill_null.platform, platform_alpha)
-        self.assertEqual(platform_skill_null.skill, self.python_skill)
-        self.assertTrue(platform_skill_dated.available)
-        self.assertFalse(platform_skill_dated.listed)
-        self.assertEqual(str(platform_skill_dated.updated), "2026-08-15")
-        self.assertEqual(PlatformSkill.objects.count(), 2)
+        response = self.client.post(
+            reverse("platforms"),
+            data={
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "new-name": "Beta Platform",
+                "new-url": "https://beta.example.com",
+                "new-max_skills": "5",
+                "add_platform": "1",
+            },
+        )
+
+        created_platform = Platform.objects.get(name="Beta Platform")
+        self.assertRedirects(response, f"{reverse('platforms')}?page=1")
+        self.assertEqual(created_platform.url, "https://beta.example.com")
+        self.assertEqual(created_platform.max_skills, 5)
+        self.assertTrue(
+            PlatformSkill.objects.filter(platform=created_platform, skill=skill).exists()
+        )
+        self.assertEqual(
+            set(
+                PlatformFeature.objects.filter(platform=created_platform).values_list(
+                    "feature_id",
+                    flat=True,
+                )
+            ),
+            {first_feature.pk, second_feature.pk},
+        )
+
+    def test_platforms_delete_button_removes_existing_platform(self):
+        platform = Platform.objects.create(
+            name="Alpha Platform",
+            url="https://alpha.example.com",
+            max_skills=10,
+        )
+
+        response = self.client.post(
+            reverse("platforms"),
+            data={
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "form-0-id": str(platform.pk),
+                "form-0-name": platform.name,
+                "form-0-url": platform.url,
+                "form-0-max_skills": str(platform.max_skills),
+                "delete_platform": str(platform.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('platforms')}?page=1")
+        self.assertFalse(Platform.objects.filter(pk=platform.pk).exists())
 
 
 class SkillPageTests(TestCase):
