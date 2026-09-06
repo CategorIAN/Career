@@ -199,6 +199,8 @@ class Company(models.Model):
 
     website = models.URLField(blank=True)
 
+    linkedin_url = models.URLField(blank=True)
+
     phone = models.CharField(
         max_length=30,
         blank=True,

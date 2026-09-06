@@ -3,7 +3,7 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, F, IntegerField, Prefetch, Q, Value, When
+from django.db.models import Case, F, IntegerField, Max, Prefetch, Q, Value, When
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
@@ -17,6 +17,7 @@ from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
 from .forms import (
+    CompanyForm,
     FeatureForm,
     FeatureFormSet,
     FeatureLinkForm,
@@ -30,6 +31,7 @@ from .forms import (
     SkillFormSet,
 )
 from .models import (
+    Company,
     Course,
     Feature,
     FeatureLink,
@@ -824,11 +826,110 @@ def platform_formset_view(request):
 
 def professional_formset_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    queryset = Professional.objects.all().order_by("name", "id")
-    paginator = Paginator(queryset, 8)
-    page_obj = paginator.get_page(page_number)
-    professionals = page_obj.object_list
+    selected_professional_id = (
+        request.POST.get("professional_id") or request.GET.get("professional_id", "")
+    ).strip()
+    queryset = (
+        Professional.objects
+        .annotate(
+            last_invited=Max("connects__invite_date"),
+            last_connected=Max("connects__meeting_at"),
+        )
+    )
+    current_date = timezone.localdate()
+    current_datetime = timezone.now()
+    all_professionals = list(queryset)
+    searchable_professionals = sorted(
+        all_professionals,
+        key=lambda professional: (professional.name.casefold(), professional.pk),
+    )
+
+    for professional in all_professionals:
+        professional.wait_display = (
+            f"{professional.wait.days} days" if professional.wait else ""
+        )
+        professional.invite_due = (
+            _add_calendar_months(professional.last_invited, 1)
+            if professional.last_invited
+            else None
+        )
+        professional.connect_due = (
+            professional.last_connected + professional.wait
+            if professional.last_connected and professional.wait
+            else None
+        )
+        professional.last_attended = (
+            timezone.localtime(professional.last_connected).date()
+            if professional.last_connected
+            else None
+        )
+        if professional.invite_due is None:
+            professional.invite = True
+        elif professional.connect_due is None:
+            professional.invite = professional.invite_due <= current_date
+        else:
+            professional.invite = (
+                professional.connect_due <= current_datetime
+                and (
+                    professional.last_invited <= professional.last_attended
+                    or professional.invite_due <= current_date
+                )
+            )
+
+    all_professionals.sort(
+        key=lambda professional: (
+            not professional.invite,
+            professional.connect_due is None,
+            professional.connect_due or current_datetime,
+            professional.invite_due is None,
+            professional.invite_due or current_date,
+            professional.last_connected is None,
+            professional.last_connected or current_datetime,
+            professional.last_invited is None,
+            professional.last_invited or current_date,
+            professional.name.casefold(),
+            professional.pk,
+        )
+    )
+    selected_professional = next(
+        (
+            professional
+            for professional in all_professionals
+            if str(professional.pk) == selected_professional_id
+        ),
+        None,
+    )
+    is_filtered = selected_professional is not None
+    if is_filtered:
+        professionals = [selected_professional]
+        page_obj = None
+    else:
+        paginator = Paginator(all_professionals, 1)
+        page_obj = paginator.get_page(page_number)
+        professionals = page_obj.object_list
+
+    displayed_professional = professionals[0] if professionals else None
+    companies = (
+        displayed_professional.companies.order_by("name", "pk")
+        if displayed_professional is not None
+        else Company.objects.none()
+    )
+    available_companies = (
+        Company.objects.exclude(peers=displayed_professional).order_by("name", "pk")
+        if displayed_professional is not None
+        else Company.objects.none()
+    )
+    referrals = (
+        displayed_professional.referrals.order_by("name", "pk")
+        if displayed_professional is not None
+        else Professional.objects.none()
+    )
+    current_page = page_obj.number if page_obj is not None else 1
+    redirect_params = f"?page={current_page}"
+    if selected_professional_id:
+        redirect_params += f"&professional_id={selected_professional_id}"
     show_add_modal = False
+    show_add_company_modal = False
     show_edit_modal_id = None
     invited_professional_id = request.GET.get("invited_professional", "").strip()
     invited_professional_name = (
@@ -843,16 +944,35 @@ def professional_formset_view(request):
 
     if request.method == "POST":
         new_form = ProfessionalForm(request.POST, prefix="new")
+        new_company_form = CompanyForm(request.POST, prefix="new-company")
         add_professional_requested = "add_professional" in request.POST
         invite_professional_id = request.POST.get("invite_professional", "").strip()
         save_professional_id = request.POST.get("save_professional", "").strip()
         delete_professional_id = request.POST.get("delete_professional", "").strip()
+        add_company_professional_id = request.POST.get("add_company", "").strip()
+        add_new_company_professional_id = request.POST.get("add_new_company", "").strip()
+        company_id = request.POST.get("company_id", "").strip()
 
         if add_professional_requested:
             if new_form.is_valid():
                 new_form.save()
-                return redirect(f"{request.path}?page={page_obj.number}")
+                return redirect(f"{request.path}{redirect_params}")
             show_add_modal = True
+        elif add_company_professional_id:
+            professional = Professional.objects.filter(pk=add_company_professional_id).first()
+            company = Company.objects.filter(pk=company_id).first()
+            if professional is not None and company is not None:
+                professional.companies.add(company)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_company_professional_id:
+            professional = Professional.objects.filter(
+                pk=add_new_company_professional_id
+            ).first()
+            if professional is not None and new_company_form.is_valid():
+                company = new_company_form.save()
+                professional.companies.add(company)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_company_modal = True
         elif invite_professional_id:
             professional = Professional.objects.filter(pk=invite_professional_id).first()
             if professional is not None:
@@ -861,13 +981,13 @@ def professional_formset_view(request):
                     invite_date=timezone.localdate(),
                 )
                 return redirect(
-                    f"{request.path}?page={page_obj.number}"
+                    f"{request.path}{redirect_params}"
                     f"&invited_professional={professional.pk}"
                 )
-            return redirect(f"{request.path}?page={page_obj.number}")
+            return redirect(f"{request.path}{redirect_params}")
         elif delete_professional_id:
             Professional.objects.filter(pk=delete_professional_id).delete()
-            return redirect(f"{request.path}?page={page_obj.number}")
+            return redirect(f"{request.path}{redirect_params}")
         elif save_professional_id:
             professional = Professional.objects.filter(pk=save_professional_id).first()
             if professional is not None:
@@ -879,15 +999,13 @@ def professional_formset_view(request):
                 )
                 if submitted_edit_form.is_valid():
                     submitted_edit_form.save()
-                    return redirect(f"{request.path}?page={page_obj.number}")
+                    return redirect(f"{request.path}{redirect_params}")
                 show_edit_modal_id = professional.pk
     else:
         new_form = ProfessionalForm(prefix="new")
+        new_company_form = CompanyForm(prefix="new-company")
 
     for professional in professionals:
-        professional.wait_display = (
-            f"{professional.wait.days} days" if professional.wait else ""
-        )
         professional.edit_form = (
             submitted_edit_form
             if professional.pk == submitted_edit_professional_id
@@ -899,9 +1017,20 @@ def professional_formset_view(request):
         "app/professional_formset.html",
         {
             "new_form": new_form,
+            "new_company_form": new_company_form,
             "page_obj": page_obj,
             "professionals": professionals,
+            "displayed_professional": displayed_professional,
+            "companies": companies,
+            "available_companies": available_companies,
+            "referrals": referrals,
+            "all_professionals": searchable_professionals,
+            "selected_professional": selected_professional,
+            "selected_professional_id": selected_professional_id,
+            "is_filtered": is_filtered,
+            "current_page": current_page,
             "show_add_modal": show_add_modal,
+            "show_add_company_modal": show_add_company_modal,
             "show_edit_modal_id": show_edit_modal_id,
             "invited_professional_name": invited_professional_name,
         },

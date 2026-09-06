@@ -6,6 +6,7 @@ from django.forms import modelformset_factory
 from django.utils.dateparse import parse_duration
 
 from .models import (
+    Company,
     Feature,
     FeatureLink,
     Platform,
@@ -14,6 +15,46 @@ from .models import (
     Professional,
     Skill,
 )
+
+
+class CompanyForm(forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = [
+            "name",
+            "website",
+            "linkedin_url",
+            "email",
+            "phone",
+            "description",
+        ]
+        widgets = {
+            "email": forms.EmailInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                }
+            ),
+            "phone": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "style": "width: 20rem;",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class SkillForm(forms.ModelForm):

@@ -21,7 +21,8 @@
             <h2 id="professional-add-modal-title">Add Professional</h2>
             <form method="post" autocomplete="off">
                 {% csrf_token %}
-                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <input type="hidden" name="page" value="{{ current_page }}">
+                <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
                 <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
                     <label for="{{ new_form.name.id_for_label }}">Name</label>
                     <div>
@@ -65,19 +66,54 @@
         </div>
     </div>
 
+    {% if displayed_professional %}
+        <div
+            id="professional-add-company-modal"
+            class="modal professional-modal{% if not show_add_company_modal %} hidden{% endif %}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="professional-add-company-modal-title"
+        >
+            <div class="modal-content">
+                <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
+                <h2 id="professional-add-company-modal-title">Add New Company</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ current_page }}">
+                    <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                    <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                        {% for field in new_company_form %}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div>
+                                {{ field.errors }}
+                                {{ field }}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" name="add_new_company" value="{{ displayed_professional.pk }}" style="grid-column: 2; justify-self: start;">Add Company</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
     {% if professionals %}
         <table class="project-results">
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Wait</th>
+                    <th>Last Invited</th>
+                    <th>Invite Due</th>
+                    <th>Last Connected</th>
+                    <th>Connect Due</th>
                     <th>Invite</th>
+                    <th>Send Invite</th>
                     <th>Edit</th>
                 </tr>
             </thead>
             <tbody>
                 {% for professional in professionals %}
-                    <tr>
+                    <tr{% if professional.invite %} style="background: #f4cccc;"{% endif %}>
                         <td>
                             {% if professional.linkedin_url %}
                                 <a href="{{ professional.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ professional.name }}</a>
@@ -86,10 +122,16 @@
                             {% endif %}
                         </td>
                         <td>{{ professional.wait_display }}</td>
+                        <td>{{ professional.last_invited|date:"Y-m-d" }}</td>
+                        <td>{{ professional.invite_due|date:"Y-m-d" }}</td>
+                        <td>{{ professional.last_connected|date:"Y-m-d H:i" }}</td>
+                        <td>{{ professional.connect_due|date:"Y-m-d H:i" }}</td>
+                        <td>{{ professional.invite }}</td>
                         <td>
                             <form method="post">
                                 {% csrf_token %}
-                                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                                <input type="hidden" name="page" value="{{ current_page }}">
+                                <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
                                 <button type="submit" class="copy-button" name="invite_professional" value="{{ professional.pk }}">Invite</button>
                             </form>
                         </td>
@@ -120,7 +162,8 @@
                     <h2 id="professional-edit-modal-title-{{ professional.pk }}">Edit Professional</h2>
                     <form method="post" autocomplete="off">
                         {% csrf_token %}
-                        <input type="hidden" name="page" value="{{ page_obj.number }}">
+                        <input type="hidden" name="page" value="{{ current_page }}">
+                        <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
                         <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
                             <label for="{{ professional.edit_form.name.id_for_label }}">Name</label>
                             <div>
@@ -155,15 +198,133 @@
         <p>No professionals found.</p>
     {% endif %}
 
-    <div style="margin-top: 1rem;">
-        {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
-        {% endif %}
-        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}">Next</a>
-        {% endif %}
-    </div>
+    {% if not is_filtered %}
+        <div style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous professional">&larr;</a>
+            {% endif %}
+            <span>Professional {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next professional">&rarr;</a>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <form method="get" style="margin-top: 1rem;">
+        <label for="professional-search">Search Professional</label>
+        <input
+            id="professional-search"
+            type="text"
+            list="professional-search-options"
+            value="{% if selected_professional %}{{ selected_professional.name }}{% endif %}"
+            autocomplete="off"
+            style="width: 20rem;"
+        >
+        <datalist id="professional-search-options">
+            {% for professional in all_professionals %}
+                <option value="{{ professional.name }}" data-professional-id="{{ professional.pk }}"></option>
+            {% endfor %}
+        </datalist>
+        <input id="professional-id-input" type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'professionals' %}'">Clear</button>
+    </form>
+
+    {% if displayed_professional %}
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Companies</h2>
+                <div style="position: relative;">
+                    <button type="button" class="copy-button" id="add-company-toggle">Add Company</button>
+                    <div id="add-company-menu" class="hidden" style="position: absolute; right: 0; z-index: 1; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #8c8c8c; background: #fff;">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ current_page }}">
+                            <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                            <select name="company_id" aria-label="Company">
+                                {% for company in available_companies %}
+                                    <option value="{{ company.pk }}">{{ company.name }}</option>
+                                {% empty %}
+                                    <option value="" disabled selected>No companies available</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" name="add_company" value="{{ displayed_professional.pk }}"{% if not available_companies %} disabled{% endif %}>Add Existing</button>
+                        </form>
+                        <button type="button" class="copy-button open-professional-modal" data-target="professional-add-company-modal" style="margin-top: 0.5rem;">Add New</button>
+                    </div>
+                </div>
+            </div>
+            <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>LinkedIn</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in companies %}
+                        <tr>
+                            <td>
+                                {% if company.website %}
+                                    <a href="{{ company.website }}" target="_blank" rel="noopener noreferrer">{{ company.name }}</a>
+                                {% else %}
+                                    {{ company.name }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if company.linkedin_url %}
+                                    <button type="button" class="copy-button" onclick="window.open('{{ company.linkedin_url }}', '_blank', 'noopener,noreferrer')">LinkedIn</button>
+                                {% endif %}
+                            </td>
+                            <td>{{ company.email }}</td>
+                            <td>{{ company.phone }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No companies found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+
+    {% if displayed_professional %}
+        <section style="margin-top: 1.5rem;">
+            <h2>Referrals</h2>
+            <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for referral in referrals %}
+                        <tr>
+                            <td>
+                                {% if referral.linkedin_url %}
+                                    <a href="{{ referral.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ referral.name }}</a>
+                                {% else %}
+                                    {{ referral.name }}
+                                {% endif %}
+                            </td>
+                            <td>{{ referral.email }}</td>
+                            <td>{{ referral.phone }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3">No referrals found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+
 </section>
 <script>
     (() => {
@@ -188,6 +349,43 @@
                 input.removeAttribute("readonly");
             }, { once: true });
         });
+        const searchInput = document.getElementById("professional-search");
+        const professionalIdInput = document.getElementById("professional-id-input");
+        const professionalOptions = document.querySelectorAll("#professional-search-options option");
+
+        if (searchInput && professionalIdInput && professionalOptions.length) {
+            const professionalIdByName = new Map(
+                Array.from(professionalOptions).map(option => [
+                    option.value,
+                    option.dataset.professionalId,
+                ])
+            );
+            const syncProfessionalId = () => {
+                professionalIdInput.value = professionalIdByName.get(searchInput.value) || "";
+            };
+
+            searchInput.addEventListener("input", syncProfessionalId);
+            searchInput.addEventListener("change", syncProfessionalId);
+            searchInput.form?.addEventListener("submit", () => {
+                syncProfessionalId();
+            });
+        }
+        const addCompanyToggle = document.getElementById("add-company-toggle");
+        const addCompanyMenu = document.getElementById("add-company-menu");
+
+        if (addCompanyToggle && addCompanyMenu) {
+            addCompanyToggle.addEventListener("click", () => {
+                addCompanyMenu.classList.toggle("hidden");
+            });
+            document.addEventListener("click", event => {
+                if (
+                    !addCompanyMenu.contains(event.target)
+                    && !addCompanyToggle.contains(event.target)
+                ) {
+                    addCompanyMenu.classList.add("hidden");
+                }
+            });
+        }
         modals.forEach(modal => {
             modal.addEventListener("click", event => {
                 if (event.target === modal) {

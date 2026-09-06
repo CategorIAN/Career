@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from django.contrib.messages import get_messages
 from django.core.cache import cache
@@ -765,21 +765,27 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "<title>Professionals</title>", html=False)
         self.assertContains(response, "Add Professional")
+        self.assertContains(response, "Professional 1 of 1")
         self.assertContains(response, 'id="professional-add-modal"', html=False)
         self.assertContains(response, 'data-target="professional-add-modal"', html=False)
         self.assertContains(response, 'class="close-professional-modal"', html=False)
         self.assertContains(response, '<table class="project-results">', html=False)
         self.assertContains(response, "<th>Name</th>", html=False)
         self.assertContains(response, "<th>Wait</th>", html=False)
+        self.assertContains(response, "<th>Last Invited</th>", html=False)
+        self.assertContains(response, "<th>Invite Due</th>", html=False)
+        self.assertContains(response, "<th>Last Connected</th>", html=False)
+        self.assertContains(response, "<th>Connect Due</th>", html=False)
         self.assertContains(response, "<th>Invite</th>", html=False)
+        self.assertContains(response, "<th>Send Invite</th>", html=False)
         self.assertContains(response, "<th>Edit</th>", html=False)
         self.assertContains(response, 'name="new-name"', html=False)
         self.assertContains(response, 'name="new-linkedin_url"', html=False)
         self.assertContains(response, 'name="new-email"', html=False)
-        self.assertContains(response, 'autocomplete="new-password"', count=4, html=False)
-        self.assertContains(response, 'class="autofill-blocked"', count=4, html=False)
-        self.assertContains(response, 'readonly="readonly"', count=4, html=False)
-        self.assertContains(response, 'data-form-type="other"', count=4, html=False)
+        self.assertContains(response, 'autocomplete="new-password"', count=6, html=False)
+        self.assertContains(response, 'class="autofill-blocked"', count=6, html=False)
+        self.assertContains(response, 'readonly="readonly"', count=6, html=False)
+        self.assertContains(response, 'data-form-type="other"', count=6, html=False)
         self.assertContains(response, 'name="new-linkedin_url" autocomplete="off"', html=False)
         self.assertContains(response, 'name="new-wait_0"', html=False)
         self.assertContains(response, 'name="add_professional" value="1"', html=False)
@@ -805,6 +811,7 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertContains(response, "15 days")
         self.assertNotContains(response, "15 days, 0:00:00")
+        self.assertContains(response, '<tr style="background: #f4cccc;">', html=False)
 
     def test_professionals_add_button_creates_professional(self):
         response = self.client.post(
@@ -829,6 +836,156 @@ class ProfessionalPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(professional.email, "grace@example.com")
         self.assertEqual(str(professional.wait), "15 days, 0:00:00")
+
+    def test_professionals_search_displays_selected_professional(self):
+        first_professional = Professional.objects.create(name="Ada Lovelace")
+        selected_professional = Professional.objects.create(name="Grace Hopper")
+
+        response = self.client.get(
+            reverse("professionals"),
+            {"professional_id": selected_professional.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["is_filtered"])
+        self.assertEqual(
+            [professional.pk for professional in response.context["professionals"]],
+            [selected_professional.pk],
+        )
+        self.assertContains(response, "Search Professional")
+        self.assertContains(response, 'id="professional-search"', html=False)
+        self.assertContains(response, 'list="professional-search-options"', html=False)
+        self.assertContains(
+            response,
+            f'data-professional-id="{first_professional.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'data-professional-id="{selected_professional.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'name="professional_id" value="{selected_professional.pk}"',
+            html=False,
+        )
+        self.assertNotContains(response, "Professional 1 of 2")
+
+    def test_professionals_page_displays_current_professionals_companies(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        company = Company.objects.create(
+            name="Analytical Engines",
+            website="https://analytical-engines.example.com",
+            linkedin_url="https://www.linkedin.com/company/analytical-engines",
+            email="hello@analytical-engines.example.com",
+            phone="555-0100",
+        )
+        professional.companies.add(company)
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, '<h2 style="margin: 0;">Companies</h2>', html=False)
+        self.assertContains(response, '<th>LinkedIn</th>', html=False)
+        self.assertContains(
+            response,
+            f'href="{company.website}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f"window.open('{company.linkedin_url}', '_blank', 'noopener,noreferrer')",
+            html=False,
+        )
+        self.assertContains(response, company.email)
+        self.assertContains(response, company.phone)
+
+    def test_professionals_page_adds_company_to_current_professional(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        company = Company.objects.create(name="Analytical Engines")
+
+        page_response = self.client.get(reverse("professionals"))
+        self.assertContains(page_response, 'id="add-company-toggle"', html=False)
+        self.assertContains(page_response, 'id="add-company-menu"', html=False)
+        self.assertContains(page_response, ">Add Existing<", html=False)
+        self.assertContains(
+            page_response,
+            'data-target="professional-add-company-modal"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            f'<option value="{company.pk}">{company.name}</option>',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "company_id": str(company.pk),
+                "add_company": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.companies.all()), [company])
+
+    def test_professionals_page_creates_and_links_new_company(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        page_response = self.client.get(reverse("professionals"))
+        self.assertNotContains(page_response, 'name="new-company-address"', html=False)
+        self.assertContains(
+            page_response,
+            'name="new-company-email" autocomplete="new-password"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'name="new-company-phone" autocomplete="new-password"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'name="new-company-description" cols="40" rows="3" style="width: 20rem;"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-company-name": "Analytical Engines",
+                "new-company-website": "https://analytical-engines.example.com",
+                "new-company-linkedin_url": "https://www.linkedin.com/company/analytical-engines",
+                "new-company-email": "hello@analytical-engines.example.com",
+                "new-company-phone": "555-0100",
+                "new-company-description": "Computing machinery.",
+                "add_new_company": str(professional.pk),
+            },
+        )
+
+        company = Company.objects.get(name="Analytical Engines")
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.companies.all()), [company])
+
+    def test_professionals_page_displays_current_professionals_referrals(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        referral = Professional.objects.create(
+            name="Grace Hopper",
+            linkedin_url="https://www.linkedin.com/in/grace-hopper",
+            email="grace@example.com",
+            phone="555-0101",
+        )
+        professional.referrals.add(referral)
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, "<h2>Referrals</h2>", html=False)
+        self.assertContains(response, f'href="{referral.linkedin_url}"', html=False)
+        self.assertContains(response, referral.email)
+        self.assertContains(response, referral.phone)
 
     def test_professionals_edit_existing_cards(self):
         professional = Professional.objects.create(
@@ -856,6 +1013,158 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(professional.name, "Ada Lovelace Updated")
         self.assertEqual(professional.email, "updated@example.com")
         self.assertEqual(str(professional.wait), "32 days, 0:00:00")
+
+    def test_professionals_page_uses_latest_connection_dates(self):
+        professional = Professional.objects.create(
+            name="Ada Lovelace",
+            wait=timedelta(days=15),
+        )
+        first_connected_at = timezone.make_aware(datetime(2026, 8, 1, 9, 30))
+        last_connected_at = timezone.make_aware(datetime(2026, 8, 2, 10, 45))
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 7, 1),
+            meeting_at=first_connected_at,
+        )
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 7, 15),
+            meeting_at=last_connected_at,
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        displayed_professional = list(response.context["professionals"])[0]
+        self.assertEqual(displayed_professional.last_invited, date(2026, 7, 15))
+        self.assertEqual(displayed_professional.last_connected, last_connected_at)
+        self.assertEqual(displayed_professional.invite_due, date(2026, 8, 15))
+        self.assertEqual(
+            displayed_professional.connect_due,
+            timezone.make_aware(datetime(2026, 8, 17, 10, 45)),
+        )
+
+    def test_professionals_page_calculates_invite_without_database_field(self):
+        never_invited = Professional.objects.create(name="Never Invited")
+        overdue_invite = Professional.objects.create(name="Overdue Invite")
+        current_connect = Professional.objects.create(
+            name="Current Connect",
+            wait=timedelta(days=1),
+        )
+        future_connect = Professional.objects.create(
+            name="Future Connect",
+            wait=timedelta(days=30),
+        )
+        current_date = timezone.localdate()
+        current_datetime = timezone.now()
+        attended_at = current_datetime - timedelta(days=2)
+
+        ProfessionalConnect.objects.create(
+            person=overdue_invite,
+            invite_date=current_date - timedelta(days=35),
+        )
+        ProfessionalConnect.objects.create(
+            person=current_connect,
+            invite_date=current_date - timedelta(days=3),
+            meeting_at=attended_at,
+        )
+        ProfessionalConnect.objects.create(
+            person=future_connect,
+            invite_date=current_date - timedelta(days=3),
+            meeting_at=current_datetime,
+        )
+
+        displayed_professionals = {}
+        for page_number in range(1, 5):
+            response = self.client.get(reverse("professionals"), {"page": page_number})
+            displayed_professionals.update(
+                {
+                    professional.name: professional
+                    for professional in response.context["professionals"]
+                }
+            )
+        self.assertTrue(displayed_professionals[never_invited.name].invite)
+        self.assertTrue(displayed_professionals[overdue_invite.name].invite)
+        self.assertTrue(displayed_professionals[current_connect.name].invite)
+        self.assertFalse(displayed_professionals[future_connect.name].invite)
+        self.assertFalse(hasattr(never_invited, "invite"))
+
+    def test_professionals_page_sorts_by_invite_and_due_dates(self):
+        current_date = timezone.localdate()
+        current_datetime = timezone.now()
+        first = Professional.objects.create(
+            name="Alpha",
+            wait=timedelta(days=10),
+        )
+        second = Professional.objects.create(
+            name="Beta",
+            wait=timedelta(days=10),
+        )
+        third = Professional.objects.create(
+            name="Charlie",
+            wait=timedelta(days=11),
+        )
+        fourth = Professional.objects.create(
+            name="Delta",
+            wait=timedelta(days=11),
+        )
+        last = Professional.objects.create(
+            name="Future Connect",
+            wait=timedelta(days=30),
+        )
+
+        ProfessionalConnect.objects.create(
+            person=first,
+            invite_date=current_date - timedelta(days=40),
+            meeting_at=current_datetime - timedelta(days=11),
+        )
+        ProfessionalConnect.objects.create(
+            person=second,
+            invite_date=current_date - timedelta(days=35),
+            meeting_at=current_datetime - timedelta(days=11),
+        )
+        for professional in (third, fourth):
+            ProfessionalConnect.objects.create(
+                person=professional,
+                invite_date=current_date - timedelta(days=35),
+                meeting_at=current_datetime - timedelta(days=12),
+            )
+        ProfessionalConnect.objects.create(
+            person=last,
+            invite_date=current_date - timedelta(days=3),
+            meeting_at=current_datetime,
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertEqual(
+            [professional.name for professional in response.context["professionals"]],
+            ["Alpha"],
+        )
+
+        second_page_response = self.client.get(reverse("professionals"), {"page": 2})
+
+        self.assertEqual(
+            [professional.name for professional in second_page_response.context["professionals"]],
+            ["Charlie"],
+        )
+        self.assertContains(second_page_response, "Professional 2 of 5")
+        self.assertContains(
+            second_page_response,
+            'display: flex; justify-content: center; align-items: center; gap: 1rem;',
+            html=False,
+        )
+        self.assertContains(
+            second_page_response,
+            'aria-label="Previous professional"',
+            html=False,
+        )
+        self.assertContains(
+            second_page_response,
+            'aria-label="Next professional"',
+            html=False,
+        )
+        self.assertContains(second_page_response, "&larr;", html=False)
+        self.assertContains(second_page_response, "&rarr;", html=False)
 
     def test_professionals_invite_creates_connect_and_shows_message(self):
         professional = Professional.objects.create(name="Ada Lovelace")
