@@ -41,6 +41,28 @@
                     <div class="utility-field-body">{{ role.company.name }}</div>
                 </div>
 
+                {% if role.copy_payload.website %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Website</strong>
+                            <button type="button" class="copy-button" data-copy-source="role-website-{{ role.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">
+                            <a href="{{ role.copy_payload.website }}" target="_blank" rel="noopener noreferrer">{{ role.copy_payload.website }}</a>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if role.copy_payload.phone %}
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>Phone</strong>
+                            <button type="button" class="copy-button" data-copy-source="role-phone-{{ role.id }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ role.copy_payload.phone }}</div>
+                    </div>
+                {% endif %}
+
                 {% if role.copy_payload.address %}
                     <div class="utility-field">
                         <div class="utility-field-header">
@@ -372,6 +394,8 @@
 
             <textarea id="role-title-{{ role.id }}" class="copy-source">{{ role.copy_payload.title }}</textarea>
             <textarea id="role-company-{{ role.id }}" class="copy-source">{{ role.copy_payload.company }}</textarea>
+            <textarea id="role-website-{{ role.id }}" class="copy-source">{{ role.copy_payload.website }}</textarea>
+            <textarea id="role-phone-{{ role.id }}" class="copy-source">{{ role.copy_payload.phone }}</textarea>
             <textarea id="role-address-{{ role.id }}" class="copy-source">{{ role.copy_payload.address }}</textarea>
             <textarea id="role-street-1-{{ role.id }}" class="copy-source">{{ role.copy_payload.street_1 }}</textarea>
             <textarea id="role-street-2-{{ role.id }}" class="copy-source">{{ role.copy_payload.street_2 }}</textarea>

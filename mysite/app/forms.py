@@ -5,7 +5,15 @@ from django.core.exceptions import ValidationError
 from django.forms import modelformset_factory
 from django.utils.dateparse import parse_duration
 
-from .models import Feature, FeatureLink, Platform, PlatformFeature, PlatformSkill, Skill
+from .models import (
+    Feature,
+    FeatureLink,
+    Platform,
+    PlatformFeature,
+    PlatformSkill,
+    Professional,
+    Skill,
+)
 
 
 class SkillForm(forms.ModelForm):
@@ -191,7 +199,7 @@ class DurationWidget(forms.MultiWidget):
     def __init__(self, attrs=None):
         widget_attrs = {
             "min": 0,
-            "style": "width: 3.25rem;",
+            "style": "width: 4rem;",
         }
         widgets = [
             forms.NumberInput(attrs={**widget_attrs, "placeholder": "Months"}),
@@ -266,6 +274,56 @@ class FeatureForm(forms.ModelForm):
 FeatureFormSet = modelformset_factory(
     Feature,
     form=FeatureForm,
+    extra=0,
+    can_delete=False,
+)
+
+
+class ProfessionalForm(forms.ModelForm):
+    wait = DurationFormField(required=False)
+
+    class Meta:
+        model = Professional
+        fields = ["name", "linkedin_url", "email", "wait"]
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                    "style": "width: 14rem;",
+                }
+            ),
+            "linkedin_url": forms.URLInput(
+                attrs={"autocomplete": "off", "style": "width: 22rem;"}
+            ),
+            "email": forms.EmailInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                    "style": "width: 18rem;",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("linkedin_url", "email", "wait"):
+            self.fields[field_name].required = False
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Invalid Name")
+        return name
+
+
+ProfessionalFormSet = modelformset_factory(
+    Professional,
+    form=ProfessionalForm,
     extra=0,
     can_delete=False,
 )

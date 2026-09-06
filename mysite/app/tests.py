@@ -6,6 +6,7 @@ from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from freelancersdk.resources.projects.exceptions import ProjectsNotFoundException
 
@@ -22,6 +23,8 @@ from .models import (
     FreelancerSkill,
     Platform,
     PlatformSkill,
+    Professional,
+    ProfessionalConnect,
     Project,
     ProjectTask,
     Residency,
@@ -326,7 +329,12 @@ class ApplicationReferencePageTests(TestCase):
             city=self.city,
             postal_code="59601",
         )
-        self.company = Company.objects.create(name="Carroll College", address=self.address)
+        self.company = Company.objects.create(
+            name="Carroll College",
+            address=self.address,
+            website="https://www.carroll.edu",
+            phone="406-447-4300",
+        )
         self.school = School.objects.create(name="State University", city=self.city)
         self.education = Education.objects.create(
             school=self.school,
@@ -377,6 +385,11 @@ class ApplicationReferencePageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         roles = list(response.context["roles"])
         self.assertEqual([item.pk for item in roles], [role.pk, earlier_role.pk])
+        self.assertContains(response, "https://www.carroll.edu")
+        self.assertContains(response, 'href="https://www.carroll.edu"')
+        self.assertContains(response, "406-447-4300")
+        self.assertContains(response, 'id="role-website-')
+        self.assertContains(response, 'id="role-phone-')
         self.assertContains(response, "1 Main St")
         self.assertContains(response, "Suite 200")
         self.assertContains(response, ">City<", html=False)
@@ -424,6 +437,11 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, "Description:\nLed reporting and analytics projects.", html=False)
         self.assertContains(response, "Responsibilities:\n- First task\n- Second task", html=False)
         self.assertContains(response, "Skills:\nPython, SQL", html=False)
+        self.assertContains(
+            response,
+            "Website: https://www.carroll.edu\nPhone: 406-447-4300",
+            html=False,
+        )
         self.assertContains(
             response,
             "Pay:\nEnding pay: $72,000.00\nPay frequency: Monthly",
@@ -578,6 +596,11 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, 'id="course-list-')
         self.assertContains(response, ">Courses<", html=False)
         self.assertContains(response, 'id="course-details-')
+        self.assertContains(response, 'id="program-school-')
+        self.assertContains(response, "Helena")
+        self.assertContains(response, "Montana")
+        self.assertContains(response, 'id="program-city-')
+        self.assertContains(response, 'id="program-state-')
         self.assertContains(response, ">Show<", html=False)
         self.assertContains(response, "DS 610")
         self.assertContains(response, "State University")
@@ -726,6 +749,163 @@ class PlatformPageTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('platforms')}?page=1")
         self.assertFalse(Platform.objects.filter(pk=platform.pk).exists())
+
+
+class ProfessionalPageTests(TestCase):
+    def test_professionals_page_shows_modal_add_form_and_existing_cards(self):
+        professional = Professional.objects.create(
+            name="Ada Lovelace",
+            linkedin_url="https://www.linkedin.com/in/ada-lovelace",
+            email="ada@example.com",
+            wait=timedelta(days=15),
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<title>Professionals</title>", html=False)
+        self.assertContains(response, "Add Professional")
+        self.assertContains(response, 'id="professional-add-modal"', html=False)
+        self.assertContains(response, 'data-target="professional-add-modal"', html=False)
+        self.assertContains(response, 'class="close-professional-modal"', html=False)
+        self.assertContains(response, '<table class="project-results">', html=False)
+        self.assertContains(response, "<th>Name</th>", html=False)
+        self.assertContains(response, "<th>Wait</th>", html=False)
+        self.assertContains(response, "<th>Invite</th>", html=False)
+        self.assertContains(response, "<th>Edit</th>", html=False)
+        self.assertContains(response, 'name="new-name"', html=False)
+        self.assertContains(response, 'name="new-linkedin_url"', html=False)
+        self.assertContains(response, 'name="new-email"', html=False)
+        self.assertContains(response, 'autocomplete="new-password"', count=4, html=False)
+        self.assertContains(response, 'class="autofill-blocked"', count=4, html=False)
+        self.assertContains(response, 'readonly="readonly"', count=4, html=False)
+        self.assertContains(response, 'data-form-type="other"', count=4, html=False)
+        self.assertContains(response, 'name="new-linkedin_url" autocomplete="off"', html=False)
+        self.assertContains(response, 'name="new-wait_0"', html=False)
+        self.assertContains(response, 'name="add_professional" value="1"', html=False)
+        self.assertContains(response, ">Submit<", html=False)
+        self.assertContains(
+            response,
+            f'data-target="professional-edit-modal-{professional.pk}"',
+            html=False,
+        )
+        self.assertContains(response, f'id="professional-edit-modal-{professional.pk}"')
+        self.assertContains(response, f'name="save_professional" value="{professional.pk}"')
+        self.assertContains(response, ">Save<", html=False)
+        self.assertContains(
+            response,
+            f'name="delete_professional" value="{professional.pk}"',
+            html=False,
+        )
+        self.assertContains(response, f'href="{professional.linkedin_url}"')
+        self.assertContains(
+            response,
+            f'name="invite_professional" value="{professional.pk}"',
+            html=False,
+        )
+        self.assertContains(response, "15 days")
+        self.assertNotContains(response, "15 days, 0:00:00")
+
+    def test_professionals_add_button_creates_professional(self):
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "page": "1",
+                "new-name": "Grace Hopper",
+                "new-linkedin_url": "https://www.linkedin.com/in/grace-hopper",
+                "new-email": "grace@example.com",
+                "new-wait_0": "0",
+                "new-wait_1": "2",
+                "new-wait_2": "1",
+                "add_professional": "1",
+            },
+        )
+
+        professional = Professional.objects.get(name="Grace Hopper")
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(professional.email, "grace@example.com")
+        self.assertEqual(str(professional.wait), "15 days, 0:00:00")
+
+    def test_professionals_edit_existing_cards(self):
+        professional = Professional.objects.create(
+            name="Ada Lovelace",
+            linkedin_url="https://www.linkedin.com/in/ada-lovelace",
+            email="ada@example.com",
+        )
+
+        edit_response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                f"edit-{professional.pk}-name": "Ada Lovelace Updated",
+                f"edit-{professional.pk}-linkedin_url": "https://www.linkedin.com/in/ada-updated",
+                f"edit-{professional.pk}-email": "updated@example.com",
+                f"edit-{professional.pk}-wait_0": "1",
+                f"edit-{professional.pk}-wait_1": "0",
+                f"edit-{professional.pk}-wait_2": "2",
+                "save_professional": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(edit_response, f"{reverse('professionals')}?page=1")
+        professional.refresh_from_db()
+        self.assertEqual(professional.name, "Ada Lovelace Updated")
+        self.assertEqual(professional.email, "updated@example.com")
+        self.assertEqual(str(professional.wait), "32 days, 0:00:00")
+
+    def test_professionals_invite_creates_connect_and_shows_message(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        invite_response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "invite_professional": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(
+            invite_response,
+            f"{reverse('professionals')}?page=1&invited_professional={professional.pk}",
+        )
+        connect = ProfessionalConnect.objects.get(person=professional)
+        self.assertEqual(connect.invite_date, timezone.localdate())
+
+        response = self.client.get(
+            reverse("professionals"),
+            {"invited_professional": professional.pk},
+        )
+
+        self.assertContains(response, 'id="professional-invite-modal"', html=False)
+        self.assertContains(
+            response,
+            'data-copy-source="professional-invite-message"',
+            html=False,
+        )
+        self.assertContains(response, 'id="professional-invite-message"', html=False)
+        self.assertContains(response, "Hello Ada Lovelace.")
+        self.assertContains(
+            response,
+            "I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL.",
+        )
+
+    def test_professionals_delete_existing_cards_from_edit_modal(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        delete_response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "delete_professional": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(delete_response, f"{reverse('professionals')}?page=1")
+        self.assertFalse(Professional.objects.filter(pk=professional.pk).exists())
 
 
 class SkillPageTests(TestCase):

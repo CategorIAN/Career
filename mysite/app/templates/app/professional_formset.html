@@ -1,0 +1,205 @@
+{% extends "app/base.html" %}
+
+{% block title %}Professionals{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <div class="utility-card-header">
+        <h1>Professionals</h1>
+        <button type="button" class="copy-button open-professional-modal" data-target="professional-add-modal">Add Professional</button>
+    </div>
+
+    <div
+        id="professional-add-modal"
+        class="modal professional-modal{% if not show_add_modal %} hidden{% endif %}"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="professional-add-modal-title"
+    >
+        <div class="modal-content">
+            <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
+            <h2 id="professional-add-modal-title">Add Professional</h2>
+            <form method="post" autocomplete="off">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                    <label for="{{ new_form.name.id_for_label }}">Name</label>
+                    <div>
+                        {{ new_form.name.errors }}
+                        {{ new_form.name }}
+                    </div>
+                    <label for="{{ new_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                    <div>
+                        {{ new_form.linkedin_url.errors }}
+                        {{ new_form.linkedin_url }}
+                    </div>
+                    <label for="{{ new_form.email.id_for_label }}">Email</label>
+                    <div>
+                        {{ new_form.email.errors }}
+                        {{ new_form.email }}
+                    </div>
+                    <label>Wait</label>
+                    <div>
+                        {{ new_form.wait.errors }}
+                        {{ new_form.wait }}
+                    </div>
+                    <button type="submit" name="add_professional" value="1" style="grid-column: 2; justify-self: start;">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div
+        id="professional-invite-modal"
+        class="modal professional-modal{% if not invited_professional_name %} hidden{% endif %}"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="professional-invite-modal-title"
+    >
+        <div class="modal-content">
+            <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
+            <h2 id="professional-invite-modal-title">Invitation</h2>
+            <button type="button" class="copy-button" data-copy-source="professional-invite-message">Copy</button>
+            <p>Hello {{ invited_professional_name }}. I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL. I would like to video chat with you to learn about your background and possibly get insight for my job search and/or projects.</p>
+            <textarea id="professional-invite-message" class="copy-source">Hello {{ invited_professional_name }}. I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL. I would like to video chat with you to learn about your background and possibly get insight for my job search and/or projects.</textarea>
+        </div>
+    </div>
+
+    {% if professionals %}
+        <table class="project-results">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Wait</th>
+                    <th>Invite</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for professional in professionals %}
+                    <tr>
+                        <td>
+                            {% if professional.linkedin_url %}
+                                <a href="{{ professional.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ professional.name }}</a>
+                            {% else %}
+                                {{ professional.name }}
+                            {% endif %}
+                        </td>
+                        <td>{{ professional.wait_display }}</td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                                <button type="submit" class="copy-button" name="invite_professional" value="{{ professional.pk }}">Invite</button>
+                            </form>
+                        </td>
+                        <td>
+                            <button
+                                type="button"
+                                class="copy-button open-professional-modal"
+                                data-target="professional-edit-modal-{{ professional.pk }}"
+                            >
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% for professional in professionals %}
+            <div
+                id="professional-edit-modal-{{ professional.pk }}"
+                class="modal professional-modal{% if show_edit_modal_id != professional.pk %} hidden{% endif %}"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="professional-edit-modal-title-{{ professional.pk }}"
+            >
+                <div class="modal-content">
+                    <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
+                    <h2 id="professional-edit-modal-title-{{ professional.pk }}">Edit Professional</h2>
+                    <form method="post" autocomplete="off">
+                        {% csrf_token %}
+                        <input type="hidden" name="page" value="{{ page_obj.number }}">
+                        <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                            <label for="{{ professional.edit_form.name.id_for_label }}">Name</label>
+                            <div>
+                                {{ professional.edit_form.name.errors }}
+                                {{ professional.edit_form.name }}
+                            </div>
+                            <label for="{{ professional.edit_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                            <div>
+                                {{ professional.edit_form.linkedin_url.errors }}
+                                {{ professional.edit_form.linkedin_url }}
+                            </div>
+                            <label for="{{ professional.edit_form.email.id_for_label }}">Email</label>
+                            <div>
+                                {{ professional.edit_form.email.errors }}
+                                {{ professional.edit_form.email }}
+                            </div>
+                            <label>Wait</label>
+                            <div>
+                                {{ professional.edit_form.wait.errors }}
+                                {{ professional.edit_form.wait }}
+                            </div>
+                            <div style="grid-column: 2; display: flex; gap: 0.5rem;">
+                                <button type="submit" name="save_professional" value="{{ professional.pk }}">Save</button>
+                                <button type="submit" name="delete_professional" value="{{ professional.pk }}">Delete</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No professionals found.</p>
+    {% endif %}
+
+    <div style="margin-top: 1rem;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+    </div>
+</section>
+<script>
+    (() => {
+        const modals = document.querySelectorAll(".professional-modal");
+
+        const openModal = targetId => {
+            const modal = document.getElementById(targetId);
+            if (modal) {
+                modal.classList.remove("hidden");
+            }
+        };
+        const closeModal = modal => modal.classList.add("hidden");
+
+        document.querySelectorAll(".open-professional-modal").forEach(button => {
+            button.addEventListener("click", () => openModal(button.dataset.target));
+        });
+        document.querySelectorAll(".close-professional-modal").forEach(button => {
+            button.addEventListener("click", () => closeModal(button.closest(".professional-modal")));
+        });
+        document.querySelectorAll(".autofill-blocked").forEach(input => {
+            input.addEventListener("focus", () => {
+                input.removeAttribute("readonly");
+            }, { once: true });
+        });
+        modals.forEach(modal => {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                modals.forEach(closeModal);
+            }
+        });
+    })();
+</script>
+{% endblock %}

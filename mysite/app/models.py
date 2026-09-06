@@ -645,7 +645,7 @@ class PlatformFeature(models.Model):
         return f"{self.platform} - {self.feature}"
 
 
-class Peer(models.Model):
+class Professional(models.Model):
     name = models.CharField(max_length=200)
 
     linkedin_url = models.URLField(blank=True)
@@ -679,11 +679,13 @@ class Peer(models.Model):
         return self.name
 
 
-class PeerConnect(models.Model):
-    peer = models.ForeignKey(
-        "Peer",
+class ProfessionalConnect(models.Model):
+    person = models.ForeignKey(
+        "Professional",
         related_name="connects",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
     )
 
     invite_date = models.DateField(
@@ -712,8 +714,8 @@ class PeerConnect(models.Model):
 
 
 class Direction(models.Model):
-    peer_connect = models.ForeignKey(
-        "PeerConnect",
+    meeting = models.ForeignKey(
+        "ProfessionalConnect",
         related_name="directions",
         on_delete=models.CASCADE,
     )

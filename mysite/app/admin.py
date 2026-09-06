@@ -62,7 +62,7 @@ class RoleAdmin(admin.ModelAdmin):
     list_filter = ("current", "is_public", "company")
     search_fields = ("title", "company__name", "description")
     filter_horizontal = ("skills",)
-    inlines = [SupervisorInline]
+    inlines = [RoleTaskInline, SupervisorInline]
 
 
 @admin.register(Company)

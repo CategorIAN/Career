@@ -25,6 +25,7 @@ from .forms import (
     PlatformFeatureFormSet,
     PlatformFormSet,
     PlatformSkillFormSet,
+    ProfessionalForm,
     SkillForm,
     SkillFormSet,
 )
@@ -35,6 +36,8 @@ from .models import (
     Platform,
     PlatformFeature,
     PlatformSkill,
+    Professional,
+    ProfessionalConnect,
     Skill,
     Education,
     Residency,
@@ -210,6 +213,8 @@ def _build_role_copy_payload(role):
         [
             role.title,
             role.company.name,
+            f"Website: {role.company.website}" if role.company.website else "",
+            f"Phone: {role.company.phone}" if role.company.phone else "",
             location_text,
             date_range,
             "",
@@ -233,6 +238,8 @@ def _build_role_copy_payload(role):
     return {
         "title": role.title,
         "company": role.company.name,
+        "website": role.company.website,
+        "phone": role.company.phone,
         "street_1": address_payload["street_1"],
         "street_2": address_payload["street_2"],
         "city": address_payload["city"],
@@ -811,6 +818,92 @@ def platform_formset_view(request):
             "new_form": new_form,
             "formset": formset,
             "page_obj": page_obj,
+        },
+    )
+
+
+def professional_formset_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    queryset = Professional.objects.all().order_by("name", "id")
+    paginator = Paginator(queryset, 8)
+    page_obj = paginator.get_page(page_number)
+    professionals = page_obj.object_list
+    show_add_modal = False
+    show_edit_modal_id = None
+    invited_professional_id = request.GET.get("invited_professional", "").strip()
+    invited_professional_name = (
+        Professional.objects.filter(pk=invited_professional_id)
+        .values_list("name", flat=True)
+        .first()
+        if invited_professional_id
+        else None
+    )
+    submitted_edit_form = None
+    submitted_edit_professional_id = None
+
+    if request.method == "POST":
+        new_form = ProfessionalForm(request.POST, prefix="new")
+        add_professional_requested = "add_professional" in request.POST
+        invite_professional_id = request.POST.get("invite_professional", "").strip()
+        save_professional_id = request.POST.get("save_professional", "").strip()
+        delete_professional_id = request.POST.get("delete_professional", "").strip()
+
+        if add_professional_requested:
+            if new_form.is_valid():
+                new_form.save()
+                return redirect(f"{request.path}?page={page_obj.number}")
+            show_add_modal = True
+        elif invite_professional_id:
+            professional = Professional.objects.filter(pk=invite_professional_id).first()
+            if professional is not None:
+                ProfessionalConnect.objects.create(
+                    person=professional,
+                    invite_date=timezone.localdate(),
+                )
+                return redirect(
+                    f"{request.path}?page={page_obj.number}"
+                    f"&invited_professional={professional.pk}"
+                )
+            return redirect(f"{request.path}?page={page_obj.number}")
+        elif delete_professional_id:
+            Professional.objects.filter(pk=delete_professional_id).delete()
+            return redirect(f"{request.path}?page={page_obj.number}")
+        elif save_professional_id:
+            professional = Professional.objects.filter(pk=save_professional_id).first()
+            if professional is not None:
+                submitted_edit_professional_id = professional.pk
+                submitted_edit_form = ProfessionalForm(
+                    request.POST,
+                    instance=professional,
+                    prefix=f"edit-{professional.pk}",
+                )
+                if submitted_edit_form.is_valid():
+                    submitted_edit_form.save()
+                    return redirect(f"{request.path}?page={page_obj.number}")
+                show_edit_modal_id = professional.pk
+    else:
+        new_form = ProfessionalForm(prefix="new")
+
+    for professional in professionals:
+        professional.wait_display = (
+            f"{professional.wait.days} days" if professional.wait else ""
+        )
+        professional.edit_form = (
+            submitted_edit_form
+            if professional.pk == submitted_edit_professional_id
+            else ProfessionalForm(instance=professional, prefix=f"edit-{professional.pk}")
+        )
+
+    return render(
+        request,
+        "app/professional_formset.html",
+        {
+            "new_form": new_form,
+            "page_obj": page_obj,
+            "professionals": professionals,
+            "show_add_modal": show_add_modal,
+            "show_edit_modal_id": show_edit_modal_id,
+            "invited_professional_name": invited_professional_name,
         },
     )
 
@@ -1522,6 +1615,8 @@ def courses_view(request):
         .select_related(
             "education",
             "education__school",
+            "education__school__city",
+            "education__school__city__state",
         )
         .prefetch_related(
             Prefetch(

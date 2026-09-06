@@ -24,6 +24,32 @@
 
             <div id="course-group-{{ forloop.counter }}" class="hidden">
                 <div class="utility-meta">
+                    <div class="utility-field">
+                        <div class="utility-field-header">
+                            <strong>School</strong>
+                            <button type="button" class="copy-button" data-copy-source="program-school-{{ forloop.counter }}">Copy</button>
+                        </div>
+                        <div class="utility-field-body">{{ course_group.education.school.name }}</div>
+                    </div>
+
+                    {% if course_group.education.school.city %}
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>City</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-city-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.education.school.city.name }}</div>
+                        </div>
+
+                        <div class="utility-field">
+                            <div class="utility-field-header">
+                                <strong>State</strong>
+                                <button type="button" class="copy-button" data-copy-source="program-state-{{ forloop.counter }}">Copy</button>
+                            </div>
+                            <div class="utility-field-body">{{ course_group.education.school.city.state.name }}</div>
+                        </div>
+                    {% endif %}
+
                     {% if course_group.degree %}
                         <div class="utility-field">
                             <div class="utility-field-header">
@@ -174,6 +200,9 @@
                     </div>
                 {% endif %}
 
+                <textarea id="program-school-{{ forloop.counter }}" class="copy-source">{{ course_group.education.school.name }}</textarea>
+                <textarea id="program-city-{{ forloop.counter }}" class="copy-source">{% if course_group.education.school.city %}{{ course_group.education.school.city.name }}{% endif %}</textarea>
+                <textarea id="program-state-{{ forloop.counter }}" class="copy-source">{% if course_group.education.school.city %}{{ course_group.education.school.city.state.name }}{% endif %}</textarea>
                 <textarea id="program-degree-{{ forloop.counter }}" class="copy-source">{{ course_group.degree }}</textarea>
                 <textarea id="program-field-of-study-{{ forloop.counter }}" class="copy-source">{{ course_group.field_of_study }}</textarea>
                 <textarea id="program-gpa-{{ forloop.counter }}" class="copy-source">{{ course_group.gpa }}</textarea>
