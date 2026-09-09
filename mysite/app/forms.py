@@ -13,6 +13,7 @@ from .models import (
     PlatformFeature,
     PlatformSkill,
     Professional,
+    ProfessionalConnect,
     Skill,
 )
 
@@ -325,7 +326,7 @@ class ProfessionalForm(forms.ModelForm):
 
     class Meta:
         model = Professional
-        fields = ["name", "linkedin_url", "email", "wait"]
+        fields = ["name", "linkedin_url", "email", "phone", "wait"]
         widgets = {
             "name": forms.TextInput(
                 attrs={
@@ -348,11 +349,20 @@ class ProfessionalForm(forms.ModelForm):
                     "style": "width: 18rem;",
                 }
             ),
+            "phone": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                    "style": "width: 12rem;",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("linkedin_url", "email", "wait"):
+        for field_name in ("linkedin_url", "email", "phone", "wait"):
             self.fields[field_name].required = False
 
     def clean_name(self):
@@ -360,6 +370,35 @@ class ProfessionalForm(forms.ModelForm):
         if not name:
             raise ValidationError("Invalid Name")
         return name
+
+
+class ProfessionalConnectForm(forms.ModelForm):
+    class Meta:
+        model = ProfessionalConnect
+        fields = ["invite_date", "meeting_at", "rating", "notes"]
+        widgets = {
+            "invite_date": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={
+                    "type": "date",
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "readonly": "readonly",
+                },
+            ),
+            "meeting_at": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M",
+                attrs={"type": "datetime-local"},
+            ),
+            "notes": forms.Textarea(attrs={"rows": 3, "style": "width: 20rem;"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("invite_date", "meeting_at", "rating"):
+            self.fields[field_name].required = False
+        self.fields["meeting_at"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 
 ProfessionalFormSet = modelformset_factory(

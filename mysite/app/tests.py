@@ -782,10 +782,11 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, 'name="new-name"', html=False)
         self.assertContains(response, 'name="new-linkedin_url"', html=False)
         self.assertContains(response, 'name="new-email"', html=False)
-        self.assertContains(response, 'autocomplete="new-password"', count=6, html=False)
-        self.assertContains(response, 'class="autofill-blocked"', count=6, html=False)
-        self.assertContains(response, 'readonly="readonly"', count=6, html=False)
-        self.assertContains(response, 'data-form-type="other"', count=6, html=False)
+        self.assertContains(response, 'name="new-phone"', html=False)
+        self.assertContains(response, 'autocomplete="new-password"', count=14, html=False)
+        self.assertContains(response, 'class="autofill-blocked"', count=14, html=False)
+        self.assertContains(response, 'readonly="readonly"', count=14, html=False)
+        self.assertContains(response, 'data-form-type="other"', count=14, html=False)
         self.assertContains(response, 'name="new-linkedin_url" autocomplete="off"', html=False)
         self.assertContains(response, 'name="new-wait_0"', html=False)
         self.assertContains(response, 'name="add_professional" value="1"', html=False)
@@ -825,6 +826,7 @@ class ProfessionalPageTests(TestCase):
                 "new-name": "Grace Hopper",
                 "new-linkedin_url": "https://www.linkedin.com/in/grace-hopper",
                 "new-email": "grace@example.com",
+                "new-phone": "555-0100",
                 "new-wait_0": "0",
                 "new-wait_1": "2",
                 "new-wait_2": "1",
@@ -835,6 +837,7 @@ class ProfessionalPageTests(TestCase):
         professional = Professional.objects.get(name="Grace Hopper")
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(professional.email, "grace@example.com")
+        self.assertEqual(professional.phone, "555-0100")
         self.assertEqual(str(professional.wait), "15 days, 0:00:00")
 
     def test_professionals_search_displays_selected_professional(self):
@@ -886,6 +889,12 @@ class ProfessionalPageTests(TestCase):
         response = self.client.get(reverse("professionals"))
 
         self.assertContains(response, '<h2 style="margin: 0;">Companies</h2>', html=False)
+        self.assertContains(
+            response,
+            'data-target="companies-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, 'id="companies-section-body" class="hidden"', html=False)
         self.assertContains(response, '<th>LinkedIn</th>', html=False)
         self.assertContains(
             response,
@@ -982,10 +991,226 @@ class ProfessionalPageTests(TestCase):
 
         response = self.client.get(reverse("professionals"))
 
-        self.assertContains(response, "<h2>Referrals</h2>", html=False)
+        self.assertContains(response, '<h2 style="margin: 0;">Referrals</h2>', html=False)
+        self.assertContains(
+            response,
+            'data-target="referrals-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, 'id="referrals-section-body" class="hidden"', html=False)
+        self.assertContains(
+            response,
+            f'href="{reverse("professionals")}?professional_id={referral.pk}"',
+            html=False,
+        )
+        self.assertContains(response, "<th>LinkedIn URL</th>", html=False)
         self.assertContains(response, f'href="{referral.linkedin_url}"', html=False)
         self.assertContains(response, referral.email)
         self.assertContains(response, referral.phone)
+
+    def test_professionals_page_adds_existing_referral(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        referral = Professional.objects.create(name="Grace Hopper")
+
+        page_response = self.client.get(reverse("professionals"))
+        self.assertContains(page_response, 'id="add-referral-toggle"', html=False)
+        self.assertContains(page_response, 'id="add-referral-menu"', html=False)
+        self.assertContains(page_response, ">Add Existing<", html=False)
+        self.assertContains(
+            page_response,
+            'data-target="professional-add-referral-modal"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "referral_id": str(referral.pk),
+                "add_referral": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.referrals.all()), [referral])
+
+    def test_professionals_page_creates_and_links_new_referral(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-referral-name": "Grace Hopper",
+                "new-referral-linkedin_url": "https://www.linkedin.com/in/grace-hopper",
+                "new-referral-email": "grace@example.com",
+                "new-referral-phone": "555-0101",
+                "new-referral-wait_0": "0",
+                "new-referral-wait_1": "2",
+                "new-referral-wait_2": "1",
+                "add_new_referral": str(professional.pk),
+            },
+        )
+
+        referral = Professional.objects.get(name="Grace Hopper")
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.referrals.all()), [referral])
+        self.assertEqual(referral.phone, "555-0101")
+
+    def test_professionals_page_displays_current_professionals_referrers(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        referrer = Professional.objects.create(
+            name="Grace Hopper",
+            linkedin_url="https://www.linkedin.com/in/grace-hopper",
+            email="grace@example.com",
+            phone="555-0101",
+        )
+        referrer.referrals.add(professional)
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, '<h2 style="margin: 0;">Referred By</h2>', html=False)
+        self.assertContains(
+            response,
+            'data-target="referred-by-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, 'id="referred-by-section-body" class="hidden"', html=False)
+        self.assertContains(
+            response,
+            f'href="{reverse("professionals")}?professional_id={referrer.pk}"',
+            html=False,
+        )
+        self.assertContains(response, f'href="{referrer.linkedin_url}"', html=False)
+        self.assertContains(response, referrer.email)
+        self.assertContains(response, referrer.phone)
+
+    def test_professionals_page_adds_existing_referrer(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        referrer = Professional.objects.create(name="Grace Hopper")
+
+        page_response = self.client.get(reverse("professionals"))
+        self.assertContains(page_response, 'id="add-referrer-toggle"', html=False)
+        self.assertContains(page_response, 'id="add-referrer-menu"', html=False)
+        self.assertContains(
+            page_response,
+            'data-target="professional-add-referrer-modal"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "referrer_id": str(referrer.pk),
+                "add_referrer": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.referred_by.all()), [referrer])
+
+    def test_professionals_page_creates_and_links_new_referrer(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-referrer-name": "Grace Hopper",
+                "new-referrer-linkedin_url": "https://www.linkedin.com/in/grace-hopper",
+                "new-referrer-email": "grace@example.com",
+                "new-referrer-phone": "555-0101",
+                "new-referrer-wait_0": "0",
+                "new-referrer-wait_1": "2",
+                "new-referrer-wait_2": "1",
+                "add_new_referrer": str(professional.pk),
+            },
+        )
+
+        referrer = Professional.objects.get(name="Grace Hopper")
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(list(professional.referred_by.all()), [referrer])
+
+    def test_professionals_page_shows_current_professionals_invitations(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        other_professional = Professional.objects.create(name="Grace Hopper")
+        older_invitation = ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 8, 1),
+            notes="Older invitation",
+        )
+        newer_invitation = ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 8, 2),
+            notes="Newer invitation",
+        )
+        ProfessionalConnect.objects.create(
+            person=professional,
+            meeting_at=timezone.make_aware(datetime(2026, 8, 3, 9, 0)),
+            notes="No invitation",
+        )
+        ProfessionalConnect.objects.create(
+            person=other_professional,
+            invite_date=date(2026, 8, 4),
+            notes="Other professional invitation",
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, "<h2>Invitations</h2>", html=False)
+        self.assertContains(response, "<th>Status</th>", html=False)
+        self.assertContains(response, "<th>Edit</th>", html=False)
+        self.assertContains(
+            response,
+            f'data-target="invitation-edit-modal-{newer_invitation.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'name="invitation-{newer_invitation.pk}-invite_date" value="2026-08-02" autocomplete="new-password"',
+            html=False,
+        )
+        self.assertContains(response, "Waiting For Response")
+        self.assertContains(response, "Invited Again")
+        self.assertContains(response, "Newer invitation")
+        self.assertContains(response, "Older invitation")
+        self.assertNotContains(response, "No invitation")
+        self.assertNotContains(response, "Other professional invitation")
+        self.assertLess(
+            response.content.find(b"Newer invitation"),
+            response.content.find(b"Older invitation"),
+        )
+        self.assertEqual(
+            list(response.context["invitations"]),
+            [newer_invitation, older_invitation],
+        )
+
+    def test_professionals_page_edits_current_professionals_invitation(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        invitation = ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 8, 1),
+            notes="Initial notes",
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                f"invitation-{invitation.pk}-invite_date": "2026-08-02",
+                f"invitation-{invitation.pk}-meeting_at": "2026-08-03T09:30",
+                f"invitation-{invitation.pk}-rating": "5",
+                f"invitation-{invitation.pk}-notes": "Updated notes",
+                "save_invitation": str(invitation.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.invite_date, date(2026, 8, 2))
+        self.assertEqual(invitation.rating, 5)
+        self.assertEqual(invitation.notes, "Updated notes")
 
     def test_professionals_edit_existing_cards(self):
         professional = Professional.objects.create(
@@ -1001,6 +1226,7 @@ class ProfessionalPageTests(TestCase):
                 f"edit-{professional.pk}-name": "Ada Lovelace Updated",
                 f"edit-{professional.pk}-linkedin_url": "https://www.linkedin.com/in/ada-updated",
                 f"edit-{professional.pk}-email": "updated@example.com",
+                f"edit-{professional.pk}-phone": "555-0100",
                 f"edit-{professional.pk}-wait_0": "1",
                 f"edit-{professional.pk}-wait_1": "0",
                 f"edit-{professional.pk}-wait_2": "2",
@@ -1012,6 +1238,7 @@ class ProfessionalPageTests(TestCase):
         professional.refresh_from_db()
         self.assertEqual(professional.name, "Ada Lovelace Updated")
         self.assertEqual(professional.email, "updated@example.com")
+        self.assertEqual(professional.phone, "555-0100")
         self.assertEqual(str(professional.wait), "32 days, 0:00:00")
 
     def test_professionals_page_uses_latest_connection_dates(self):

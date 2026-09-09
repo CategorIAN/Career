@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 
 class Skill(models.Model):
@@ -713,6 +714,36 @@ class ProfessionalConnect(models.Model):
 
     def __str__(self):
         return f"{self.peer} - {self.invite_date or self.meeting_at or self.pk}"
+
+    @property
+    def status(self):
+        now = timezone.now()
+
+        # A future meeting has been scheduled.
+        if self.meeting_at is not None and self.meeting_at > now:
+            return "Meeting Planned"
+
+        # A meeting has occurred but still needs to be reviewed.
+        if self.meeting_at is not None:
+            if self.rating is None or not self.notes.strip():
+                return "Needs Review"
+
+        # Invitation statuses only matter if the Professional still exists.
+        if (
+                self.person_id is not None
+                and self.invite_date is not None
+                and self.meeting_at is None
+        ):
+            if ProfessionalConnect.objects.filter(
+                    person_id=self.person_id,
+                    invite_date__gt=self.invite_date,
+                    meeting_at__isnull=True,
+            ).exists():
+                return "Invited Again"
+
+            return "Waiting For Response"
+
+        return None
 
 
 class Direction(models.Model):

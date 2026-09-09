@@ -26,6 +26,7 @@ from .forms import (
     PlatformFeatureFormSet,
     PlatformFormSet,
     PlatformSkillFormSet,
+    ProfessionalConnectForm,
     ProfessionalForm,
     SkillForm,
     SkillFormSet,
@@ -924,13 +925,43 @@ def professional_formset_view(request):
         if displayed_professional is not None
         else Professional.objects.none()
     )
+    available_referrals = (
+        Professional.objects.exclude(pk=displayed_professional.pk)
+        .exclude(pk__in=referrals.values("pk"))
+        .order_by("name", "pk")
+        if displayed_professional is not None
+        else Professional.objects.none()
+    )
+    referred_by = (
+        displayed_professional.referred_by.order_by("name", "pk")
+        if displayed_professional is not None
+        else Professional.objects.none()
+    )
+    available_referrers = (
+        Professional.objects.exclude(pk=displayed_professional.pk)
+        .exclude(pk__in=referred_by.values("pk"))
+        .order_by("name", "pk")
+        if displayed_professional is not None
+        else Professional.objects.none()
+    )
+    invitations = (
+        ProfessionalConnect.objects.filter(
+            person=displayed_professional,
+            invite_date__isnull=False,
+        ).order_by("-invite_date", "-pk")
+        if displayed_professional is not None
+        else ProfessionalConnect.objects.none()
+    )
     current_page = page_obj.number if page_obj is not None else 1
     redirect_params = f"?page={current_page}"
     if selected_professional_id:
         redirect_params += f"&professional_id={selected_professional_id}"
     show_add_modal = False
     show_add_company_modal = False
+    show_add_referral_modal = False
+    show_add_referrer_modal = False
     show_edit_modal_id = None
+    show_edit_invitation_id = None
     invited_professional_id = request.GET.get("invited_professional", "").strip()
     invited_professional_name = (
         Professional.objects.filter(pk=invited_professional_id)
@@ -941,17 +972,32 @@ def professional_formset_view(request):
     )
     submitted_edit_form = None
     submitted_edit_professional_id = None
+    submitted_invitation_form = None
+    submitted_invitation_id = None
 
     if request.method == "POST":
         new_form = ProfessionalForm(request.POST, prefix="new")
         new_company_form = CompanyForm(request.POST, prefix="new-company")
+        new_referral_form = ProfessionalForm(request.POST, prefix="new-referral")
+        new_referrer_form = ProfessionalForm(request.POST, prefix="new-referrer")
         add_professional_requested = "add_professional" in request.POST
         invite_professional_id = request.POST.get("invite_professional", "").strip()
         save_professional_id = request.POST.get("save_professional", "").strip()
         delete_professional_id = request.POST.get("delete_professional", "").strip()
         add_company_professional_id = request.POST.get("add_company", "").strip()
         add_new_company_professional_id = request.POST.get("add_new_company", "").strip()
+        add_referral_professional_id = request.POST.get("add_referral", "").strip()
+        add_new_referral_professional_id = request.POST.get(
+            "add_new_referral", ""
+        ).strip()
+        referral_id = request.POST.get("referral_id", "").strip()
+        add_referrer_professional_id = request.POST.get("add_referrer", "").strip()
+        add_new_referrer_professional_id = request.POST.get(
+            "add_new_referrer", ""
+        ).strip()
+        referrer_id = request.POST.get("referrer_id", "").strip()
         company_id = request.POST.get("company_id", "").strip()
+        save_invitation_id = request.POST.get("save_invitation", "").strip()
 
         if add_professional_requested:
             if new_form.is_valid():
@@ -973,6 +1019,53 @@ def professional_formset_view(request):
                 professional.companies.add(company)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_company_modal = True
+        elif add_referral_professional_id:
+            professional = Professional.objects.filter(pk=add_referral_professional_id).first()
+            referral = Professional.objects.filter(pk=referral_id).first()
+            if professional is not None and referral is not None and professional != referral:
+                professional.referrals.add(referral)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_referral_professional_id:
+            professional = Professional.objects.filter(
+                pk=add_new_referral_professional_id
+            ).first()
+            if professional is not None and new_referral_form.is_valid():
+                referral = new_referral_form.save()
+                professional.referrals.add(referral)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_referral_modal = True
+        elif add_referrer_professional_id:
+            professional = Professional.objects.filter(pk=add_referrer_professional_id).first()
+            referrer = Professional.objects.filter(pk=referrer_id).first()
+            if professional is not None and referrer is not None and professional != referrer:
+                referrer.referrals.add(professional)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_referrer_professional_id:
+            professional = Professional.objects.filter(
+                pk=add_new_referrer_professional_id
+            ).first()
+            if professional is not None and new_referrer_form.is_valid():
+                referrer = new_referrer_form.save()
+                referrer.referrals.add(professional)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_referrer_modal = True
+        elif save_invitation_id:
+            invitation = ProfessionalConnect.objects.filter(
+                pk=save_invitation_id,
+                person=displayed_professional,
+                invite_date__isnull=False,
+            ).first()
+            if invitation is not None:
+                submitted_invitation_id = invitation.pk
+                submitted_invitation_form = ProfessionalConnectForm(
+                    request.POST,
+                    instance=invitation,
+                    prefix=f"invitation-{invitation.pk}",
+                )
+                if submitted_invitation_form.is_valid():
+                    submitted_invitation_form.save()
+                    return redirect(f"{request.path}{redirect_params}")
+                show_edit_invitation_id = invitation.pk
         elif invite_professional_id:
             professional = Professional.objects.filter(pk=invite_professional_id).first()
             if professional is not None:
@@ -1004,12 +1097,23 @@ def professional_formset_view(request):
     else:
         new_form = ProfessionalForm(prefix="new")
         new_company_form = CompanyForm(prefix="new-company")
+        new_referral_form = ProfessionalForm(prefix="new-referral")
+        new_referrer_form = ProfessionalForm(prefix="new-referrer")
 
     for professional in professionals:
         professional.edit_form = (
             submitted_edit_form
             if professional.pk == submitted_edit_professional_id
             else ProfessionalForm(instance=professional, prefix=f"edit-{professional.pk}")
+        )
+    for invitation in invitations:
+        invitation.edit_form = (
+            submitted_invitation_form
+            if invitation.pk == submitted_invitation_id
+            else ProfessionalConnectForm(
+                instance=invitation,
+                prefix=f"invitation-{invitation.pk}",
+            )
         )
 
     return render(
@@ -1018,12 +1122,18 @@ def professional_formset_view(request):
         {
             "new_form": new_form,
             "new_company_form": new_company_form,
+            "new_referral_form": new_referral_form,
+            "new_referrer_form": new_referrer_form,
             "page_obj": page_obj,
             "professionals": professionals,
             "displayed_professional": displayed_professional,
             "companies": companies,
             "available_companies": available_companies,
             "referrals": referrals,
+            "available_referrals": available_referrals,
+            "referred_by": referred_by,
+            "available_referrers": available_referrers,
+            "invitations": invitations,
             "all_professionals": searchable_professionals,
             "selected_professional": selected_professional,
             "selected_professional_id": selected_professional_id,
@@ -1031,7 +1141,10 @@ def professional_formset_view(request):
             "current_page": current_page,
             "show_add_modal": show_add_modal,
             "show_add_company_modal": show_add_company_modal,
+            "show_add_referral_modal": show_add_referral_modal,
+            "show_add_referrer_modal": show_add_referrer_modal,
             "show_edit_modal_id": show_edit_modal_id,
+            "show_edit_invitation_id": show_edit_invitation_id,
             "invited_professional_name": invited_professional_name,
         },
     )
