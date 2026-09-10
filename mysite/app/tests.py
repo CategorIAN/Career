@@ -1,10 +1,11 @@
 from unittest.mock import patch
+import json
 
 from datetime import UTC, date, datetime, timedelta
 
 from django.contrib.messages import get_messages
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -16,6 +17,7 @@ from .models import (
     Company,
     Country,
     Course,
+    Direction,
     Education,
     Feature,
     FeatureLink,
@@ -778,15 +780,18 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, "<th>Connect Due</th>", html=False)
         self.assertContains(response, "<th>Invite</th>", html=False)
         self.assertContains(response, "<th>Send Invite</th>", html=False)
+        self.assertContains(response, "<th>Pass</th>", html=False)
         self.assertContains(response, "<th>Edit</th>", html=False)
         self.assertContains(response, 'name="new-name"', html=False)
         self.assertContains(response, 'name="new-linkedin_url"', html=False)
         self.assertContains(response, 'name="new-email"', html=False)
         self.assertContains(response, 'name="new-phone"', html=False)
-        self.assertContains(response, 'autocomplete="new-password"', count=15, html=False)
+        self.assertContains(response, 'autocomplete="new-password"', count=14, html=False)
         self.assertContains(response, 'class="autofill-blocked"', count=15, html=False)
         self.assertContains(response, 'readonly="readonly"', count=15, html=False)
         self.assertContains(response, 'data-form-type="other"', count=15, html=False)
+        self.assertContains(response, 'name="new-connection-invite_date" autocomplete="off"', html=False)
+        self.assertContains(response, 'data-lpignore="true"', count=1, html=False)
         self.assertContains(response, 'name="new-linkedin_url" autocomplete="off"', html=False)
         self.assertContains(response, 'name="new-wait_0"', html=False)
         self.assertContains(response, 'name="add_professional" value="1"', html=False)
@@ -808,6 +813,11 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(
             response,
             f'name="invite_professional" value="{professional.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'name="pass_professional" value="{professional.pk}"',
             html=False,
         )
         self.assertContains(response, "15 days")
@@ -1168,14 +1178,20 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertContains(
             response,
-            f'name="invitation-{newer_invitation.pk}-invite_date" value="2026-08-02" autocomplete="new-password"',
+            f'name="invitation-{newer_invitation.pk}-invite_date" value="2026-08-02" autocomplete="off"',
             html=False,
         )
+        self.assertContains(response, 'data-lpignore="true"', count=3, html=False)
         self.assertContains(response, "Waiting For Response")
         self.assertContains(response, "Invited Again")
         self.assertContains(response, "Newer invi...")
         self.assertContains(response, "Older invi...")
-        self.assertNotContains(response, "No invitation")
+        self.assertContains(
+            response,
+            f'name="delete_invitation" value="{newer_invitation.pk}"',
+            html=False,
+        )
+        self.assertContains(response, "No invitation")
         self.assertNotContains(response, "Other professional invitation")
         self.assertLess(
             response.content.find(b"Newer invi..."),
@@ -1212,6 +1228,133 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(invitation.rating, 5)
         self.assertEqual(invitation.notes, "Updated notes")
 
+    def test_professionals_page_builds_notes_from_connections_newest_first(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 9, 1),
+            notes="Old invite note",
+        )
+        ProfessionalConnect.objects.create(
+            person=professional,
+            meeting_at=datetime(2026, 9, 3, 14, 30, tzinfo=UTC),
+            notes="Meeting note",
+        )
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 9, 5),
+            notes="Newest invite note",
+        )
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 9, 6),
+            notes="   ",
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, '<h2 style="margin: 0;">Notes</h2>', html=False)
+        self.assertContains(
+            response,
+            'data-target="notes-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, 'id="notes-section-body" class="hidden"', html=False)
+        self.assertContains(response, "2026-09-05")
+        self.assertContains(response, "2026-09-03 14:30")
+        self.assertContains(response, "2026-09-01")
+        self.assertEqual(
+            [note["notes"] for note in response.context["connection_notes"]],
+            ["Newest invite note", "Meeting note", "Old invite note"],
+        )
+
+    def test_professionals_page_groups_directions_by_resolution_and_meeting_date(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        other_professional = Professional.objects.create(name="Grace Hopper")
+        recent_connection = ProfessionalConnect.objects.create(
+            person=professional,
+            meeting_at=datetime(2026, 9, 5, 14, 30, tzinfo=UTC),
+        )
+        older_connection = ProfessionalConnect.objects.create(
+            person=professional,
+            meeting_at=datetime(2026, 9, 3, 9, 0, tzinfo=UTC),
+        )
+        undated_connection = ProfessionalConnect.objects.create(person=professional)
+        other_connection = ProfessionalConnect.objects.create(
+            person=other_professional,
+            meeting_at=datetime(2026, 9, 6, 9, 0, tzinfo=UTC),
+        )
+        recent_unresolved = Direction.objects.create(
+            connect=recent_connection,
+            description="Recent unresolved direction",
+        )
+        older_unresolved = Direction.objects.create(
+            connect=older_connection,
+            description="Older unresolved direction",
+        )
+        undated_unresolved = Direction.objects.create(
+            connect=undated_connection,
+            description="Undated unresolved direction",
+        )
+        resolved = Direction.objects.create(
+            connect=older_connection,
+            description="Resolved direction",
+            resolved=True,
+        )
+        Direction.objects.create(
+            connect=other_connection,
+            description="Other professional direction",
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, '<h2 style="margin: 0;">Directions</h2>', html=False)
+        self.assertContains(
+            response,
+            'data-target="directions-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(response, 'id="directions-section-body" class="hidden', html=False)
+        self.assertContains(response, "<h3>Unresolved</h3>", html=False)
+        self.assertContains(response, "<h3>Resolved</h3>", html=False)
+        self.assertContains(response, "No meeting date")
+        self.assertNotContains(response, "Other professional direction")
+        self.assertEqual(
+            response.context["unresolved_directions"],
+            [recent_unresolved, older_unresolved, undated_unresolved],
+        )
+        self.assertEqual(response.context["resolved_directions"], [resolved])
+
+        update_response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "direction_resolved": "on",
+                "update_direction": str(recent_unresolved.pk),
+            },
+        )
+        self.assertRedirects(update_response, f"{reverse('professionals')}?page=1")
+        recent_unresolved.refresh_from_db()
+        self.assertTrue(recent_unresolved.resolved)
+
+    def test_professionals_page_deletes_current_professionals_connection(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        invitation = ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 8, 1),
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "delete_invitation": str(invitation.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertFalse(ProfessionalConnect.objects.filter(pk=invitation.pk).exists())
+
     def test_professionals_page_adds_connection_for_current_professional(self):
         professional = Professional.objects.create(name="Ada Lovelace")
 
@@ -1236,6 +1379,7 @@ class ProfessionalPageTests(TestCase):
         )
 
         connection = ProfessionalConnect.objects.get(person=professional)
+        self.assertEqual(connection.description, "Ian x Ada Lovelace")
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(connection.invite_date, date(2026, 9, 1))
         self.assertEqual(connection.rating, 5)
@@ -1470,6 +1614,7 @@ class ProfessionalPageTests(TestCase):
             f"{reverse('professionals')}?page=1&invited_professional={professional.pk}",
         )
         connect = ProfessionalConnect.objects.get(person=professional)
+        self.assertEqual(connect.description, "Ian x Ada Lovelace")
         self.assertEqual(connect.invite_date, timezone.localdate())
 
         response = self.client.get(
@@ -1490,6 +1635,25 @@ class ProfessionalPageTests(TestCase):
             "I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL.",
         )
 
+    def test_professionals_pass_deletes_professional_and_logs_connection(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "pass_professional": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertFalse(Professional.objects.filter(pk=professional.pk).exists())
+        passed_connection = ProfessionalConnect.objects.get(
+            description="Passed on Ada Lovelace"
+        )
+        self.assertEqual(passed_connection.invite_date, timezone.localdate())
+        self.assertIsNone(passed_connection.person)
+
     def test_professionals_delete_existing_cards_from_edit_modal(self):
         professional = Professional.objects.create(name="Ada Lovelace")
 
@@ -1503,6 +1667,264 @@ class ProfessionalPageTests(TestCase):
 
         self.assertRedirects(delete_response, f"{reverse('professionals')}?page=1")
         self.assertFalse(Professional.objects.filter(pk=professional.pk).exists())
+
+
+class ConnectionsCalendarTests(TestCase):
+    def setUp(self):
+        self.professional = Professional.objects.create(name="Calendar Professional")
+
+    def test_connections_page_includes_editable_fullcalendar(self):
+        response = self.client.get(reverse("connections"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="connections-calendar"')
+        self.assertContains(response, 'data-date-mode="meeting"')
+        self.assertContains(response, 'data-date-mode="invite"')
+        self.assertContains(response, 'id="connections-weekly-total"')
+        self.assertContains(response, "invite-date-mode")
+        self.assertContains(response, "FullCalendar.Calendar")
+        self.assertContains(response, "firstDay: 1")
+        self.assertContains(response, "editable: true")
+        self.assertContains(response, "eventClick(info)")
+        self.assertContains(response, 'id="connection-edit-modal"')
+        self.assertContains(response, 'id="connection-meeting-at" type="datetime-local" autocomplete="off"', html=False)
+        self.assertContains(response, 'id="connection-invite-date-display"', html=False)
+        self.assertContains(response, 'id="connection-edit-form" class="connection-edit-dialog" autocomplete="off"', html=False)
+        self.assertContains(response, 'meetingAtInput.classList.toggle("hidden", inviteMode)')
+        self.assertContains(response, 'id="connection-description"')
+        self.assertContains(response, 'id="connection-rating"')
+        self.assertContains(response, 'id="connection-notes"')
+        self.assertContains(response, 'id="connection-edit-delete"')
+        self.assertContains(response, 'id="connection-directions-button"')
+        self.assertContains(response, 'id="directions-panel"')
+        self.assertContains(response, "direction-delete-button")
+        self.assertContains(response, ">Description<")
+        self.assertContains(response, "eventDrop(info)")
+        self.assertContains(response, "info.revert()")
+        self.assertContains(response, reverse("connection_events"))
+
+    def test_connection_events_returns_only_scheduled_connections(self):
+        scheduled_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
+        scheduled = ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=date(2026, 9, 1),
+            meeting_at=scheduled_at,
+            description="Career discussion",
+        )
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=date(2026, 9, 2),
+        )
+
+        response = self.client.get(reverse("connection_events"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [
+                {
+                    "id": str(scheduled.pk),
+                    "title": "Career discussion",
+                    "start": scheduled_at.isoformat(),
+                    "allDay": False,
+                    "extendedProps": {
+                        "status": scheduled.status,
+                        "description": "Career discussion",
+                        "rating": None,
+                        "notes": "",
+                    },
+                }
+            ],
+        )
+
+    def test_connection_event_update_requires_csrf_and_updates_meeting(self):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+        updated_at = datetime(2026, 9, 20, 18, 45, tzinfo=UTC)
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": updated_at.isoformat(),
+                    "description": "Follow-up call",
+                    "rating": 4,
+                    "notes": "Discussed next steps.",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(connection.meeting_at, updated_at)
+        self.assertEqual(connection.description, "Follow-up call")
+        self.assertEqual(connection.rating, 4)
+        self.assertEqual(connection.notes, "Discussed next steps.")
+        self.assertEqual(response.json()["status"], connection.status)
+
+    def test_connection_events_supports_all_day_invite_date_mode(self):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=date(2026, 9, 15),
+            description="Invite conversation",
+        )
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 16, 16, 30, tzinfo=UTC),
+            description="Meeting only",
+        )
+
+        response = self.client.get(
+            reverse("connection_events"),
+            {"date_mode": "invite"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        event = response.json()[0]
+        self.assertEqual(event["id"], str(connection.pk))
+        self.assertEqual(event["title"], "Invite conversation")
+        self.assertEqual(event["start"], "2026-09-15")
+        self.assertTrue(event["allDay"])
+
+    def test_connection_weekly_total_uses_the_active_date_mode(self):
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())
+        in_week_meeting = datetime.combine(week_start, datetime.min.time(), tzinfo=UTC)
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=in_week_meeting,
+        )
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=week_start + timedelta(days=1),
+        )
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=week_start - timedelta(days=1),
+        )
+
+        meeting_response = self.client.get(reverse("connection_weekly_total"))
+        invite_response = self.client.get(
+            reverse("connection_weekly_total"),
+            {"date_mode": "invite"},
+        )
+
+        self.assertEqual(meeting_response.json(), {"total": 1})
+        self.assertEqual(invite_response.json(), {"total": 1})
+
+    def test_connection_invite_date_update_requires_csrf_and_updates_invite_date(self):
+        meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            invite_date=date(2026, 9, 1),
+            meeting_at=meeting_at,
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": "2026-09-20",
+                    "date_mode": "invite",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(connection.invite_date, date(2026, 9, 20))
+        self.assertEqual(connection.meeting_at, meeting_at)
+
+    def test_connection_event_delete_requires_csrf_and_deletes_connection(self):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("delete_connection"),
+            data=json.dumps({"id": connection.pk}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ProfessionalConnect.objects.filter(pk=connection.pk).exists())
+
+    def test_connection_directions_can_be_loaded_added_and_resolved(self):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+        )
+        direction = Direction.objects.create(
+            connect=connection,
+            description="Review the portfolio.",
+        )
+
+        response = self.client.get(
+            reverse("connection_directions", args=[connection.pk])
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "directions": [
+                    {
+                        "id": direction.pk,
+                        "description": "Review the portfolio.",
+                        "resolved": False,
+                    }
+                ]
+            },
+        )
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+        add_response = csrf_client.post(
+            reverse("connection_directions", args=[connection.pk]),
+            data=json.dumps({"description": "Send follow-up questions."}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(add_response.status_code, 200)
+        new_direction = Direction.objects.get(description="Send follow-up questions.")
+        self.assertEqual(new_direction.connect, connection)
+
+        update_response = csrf_client.post(
+            reverse("update_direction", args=[direction.pk]),
+            data=json.dumps({"resolved": True}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(update_response.status_code, 200)
+        direction.refresh_from_db()
+        self.assertTrue(direction.resolved)
+
+        delete_response = csrf_client.post(
+            reverse("delete_direction", args=[direction.pk]),
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(Direction.objects.filter(pk=direction.pk).exists())
 
 
 class SkillPageTests(TestCase):

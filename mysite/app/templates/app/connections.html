@@ -1,0 +1,558 @@
+{% extends "app/base.html" %}
+
+{% block title %}Connections{% endblock %}
+
+{% block content %}
+<section class="connections-calendar-page">
+    <div class="connections-calendar-header">
+        <h1>Connections</h1>
+        <div class="date-mode-toggle" role="group" aria-label="Calendar date mode">
+            <button type="button" class="date-mode-button active" data-date-mode="meeting">Meeting Date</button>
+            <button type="button" class="date-mode-button" data-date-mode="invite">Invite Date</button>
+        </div>
+        <strong id="connections-weekly-total">Connections this week: 0</strong>
+    </div>
+    <div id="connections-calendar"></div>
+</section>
+
+<input id="csrf-token" type="hidden" value="{{ csrf_token }}">
+
+<div id="connection-edit-modal" class="connection-edit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connection-edit-title">
+    <div class="connection-panels">
+        <form id="connection-edit-form" class="connection-edit-dialog" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
+            <h2 id="connection-edit-title">Edit Connection</h2>
+            <label id="connection-date-label" for="connection-meeting-at">Meeting date and time</label>
+            <input id="connection-meeting-at" type="datetime-local" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required>
+            <div id="connection-invite-date-display" class="connection-invite-date-display hidden" aria-labelledby="connection-date-label"></div>
+            <label for="connection-rating">Rating</label>
+            <input id="connection-rating" type="number" min="0" max="5" step="1">
+            <label for="connection-description">Description</label>
+            <input id="connection-description" type="text" maxlength="200">
+            <label for="connection-notes">Notes</label>
+            <textarea id="connection-notes" rows="4"></textarea>
+            <div class="connection-edit-actions">
+                <button type="button" id="connection-edit-delete" class="connection-delete-button">Delete</button>
+                <button type="button" id="connection-edit-cancel">Cancel</button>
+                <button type="submit">Save</button>
+            </div>
+            <button type="button" id="connection-directions-button">Directions</button>
+        </form>
+        <aside id="directions-panel" class="directions-panel hidden" aria-labelledby="directions-title">
+            <h2 id="directions-title">Directions</h2>
+            <div id="directions-list" class="directions-list"></div>
+            <form id="new-direction-form" class="new-direction-form">
+                <label for="new-direction-description">New Direction</label>
+                <textarea id="new-direction-description" rows="3" required></textarea>
+                <button type="submit">Add Direction</button>
+            </form>
+        </aside>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const calendarElement = document.getElementById("connections-calendar");
+        const csrfToken = document.getElementById("csrf-token").value;
+        const editModal = document.getElementById("connection-edit-modal");
+        const editForm = document.getElementById("connection-edit-form");
+        const dateLabel = document.getElementById("connection-date-label");
+        const meetingAtInput = document.getElementById("connection-meeting-at");
+        const inviteDateDisplay = document.getElementById("connection-invite-date-display");
+        const descriptionInput = document.getElementById("connection-description");
+        const ratingInput = document.getElementById("connection-rating");
+        const notesInput = document.getElementById("connection-notes");
+        const cancelEditButton = document.getElementById("connection-edit-cancel");
+        const deleteEditButton = document.getElementById("connection-edit-delete");
+        const directionsButton = document.getElementById("connection-directions-button");
+        const directionsPanel = document.getElementById("directions-panel");
+        const directionsList = document.getElementById("directions-list");
+        const newDirectionForm = document.getElementById("new-direction-form");
+        const newDirectionDescription = document.getElementById("new-direction-description");
+        const dateModeButtons = document.querySelectorAll(".date-mode-button");
+        const weeklyTotal = document.getElementById("connections-weekly-total");
+        let selectedEvent = null;
+        let dateMode = "meeting";
+
+        const closeEditModal = () => {
+            editModal.classList.add("hidden");
+            directionsPanel.classList.add("hidden");
+            directionsList.replaceChildren();
+            newDirectionForm.reset();
+            selectedEvent = null;
+        };
+
+        const formatDatetimeLocal = date => {
+            const timezoneOffset = date.getTimezoneOffset() * 60_000;
+            return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+        };
+
+        const configureDateInput = event => {
+            const inviteMode = dateMode === "invite";
+            dateLabel.textContent = inviteMode ? "Invite date" : "Meeting date and time";
+            meetingAtInput.classList.toggle("hidden", inviteMode);
+            meetingAtInput.required = !inviteMode;
+            inviteDateDisplay.classList.toggle("hidden", !inviteMode);
+            if (inviteMode) {
+                inviteDateDisplay.textContent = event.startStr;
+            } else {
+                meetingAtInput.value = formatDatetimeLocal(event.start);
+            }
+        };
+
+        const loadWeeklyTotal = () => fetch(
+            `{% url 'connection_weekly_total' %}?date_mode=${dateMode}`,
+            {credentials: "same-origin"},
+        )
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Unable to load the weekly total.");
+                }
+                return response.json();
+            })
+            .then(data => {
+                weeklyTotal.textContent = `Connections this week: ${data.total}`;
+            });
+
+        const updateMeeting = (event, start, changes = {}) => fetch("{% url 'update_connection_meeting' %}", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+            },
+            body: JSON.stringify({id: event.id, start, date_mode: dateMode, ...changes}),
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Unable to update the meeting.");
+                }
+                return response.json();
+            })
+            .then(updatedEvent => {
+                event.setExtendedProp("status", updatedEvent.status);
+                event.setExtendedProp("description", updatedEvent.description);
+                event.setExtendedProp("rating", updatedEvent.rating);
+                event.setExtendedProp("notes", updatedEvent.notes);
+                return updatedEvent;
+            });
+
+        const deleteConnection = event => fetch("{% url 'delete_connection' %}", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+            },
+            body: JSON.stringify({id: event.id}),
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error("Unable to delete the connection.");
+            }
+        });
+
+        const directionsUrlTemplate = "{% url 'connection_directions' 0 %}";
+        const directionUpdateUrlTemplate = "{% url 'update_direction' 0 %}";
+        const directionDeleteUrlTemplate = "{% url 'delete_direction' 0 %}";
+        const directionsUrl = connectionId => directionsUrlTemplate.replace("/0/", `/${connectionId}/`);
+        const directionUpdateUrl = directionId => directionUpdateUrlTemplate.replace("/0/", `/${directionId}/`);
+        const directionDeleteUrl = directionId => directionDeleteUrlTemplate.replace("/0/", `/${directionId}/`);
+
+        const requestDirections = (url, options = {}) => fetch(url, {
+            credentials: "same-origin",
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+                ...options.headers,
+            },
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error("Unable to update directions.");
+            }
+            return response.json();
+        });
+
+        const renderDirections = directions => {
+            directionsList.replaceChildren();
+            if (!directions.length) {
+                directionsList.textContent = "No directions yet.";
+                return;
+            }
+
+            directions.forEach(direction => {
+                const directionRow = document.createElement("label");
+                directionRow.className = "direction-row";
+
+                const resolvedInput = document.createElement("input");
+                resolvedInput.type = "checkbox";
+                resolvedInput.checked = direction.resolved;
+                resolvedInput.addEventListener("change", () => {
+                    requestDirections(directionUpdateUrl(direction.id), {
+                        method: "POST",
+                        body: JSON.stringify({resolved: resolvedInput.checked}),
+                    }).catch(() => {
+                        resolvedInput.checked = !resolvedInput.checked;
+                    });
+                });
+
+                const directionDescription = document.createElement("span");
+                directionDescription.textContent = direction.description;
+
+                const deleteDirectionButton = document.createElement("button");
+                deleteDirectionButton.type = "button";
+                deleteDirectionButton.className = "direction-delete-button";
+                deleteDirectionButton.textContent = "×";
+                deleteDirectionButton.setAttribute("aria-label", "Delete direction");
+                deleteDirectionButton.addEventListener("click", () => {
+                    requestDirections(directionDeleteUrl(direction.id), {method: "POST"})
+                        .then(() => loadDirections());
+                });
+
+                directionRow.append(resolvedInput, directionDescription, deleteDirectionButton);
+                directionsList.append(directionRow);
+            });
+        };
+
+        const loadDirections = () => {
+            if (!selectedEvent) {
+                return Promise.resolve();
+            }
+
+            return requestDirections(directionsUrl(selectedEvent.id))
+                .then(data => renderDirections(data.directions));
+        };
+
+        const calendar = new FullCalendar.Calendar(calendarElement, {
+            initialView: "dayGridMonth",
+            firstDay: 1,
+            headerToolbar: {
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek,timeGridDay",
+            },
+            editable: true,
+            events: {
+                url: "{% url 'connection_events' %}",
+                extraParams: () => ({date_mode: dateMode}),
+            },
+            eventDidMount(info) {
+                const { status } = info.event.extendedProps;
+                if (status) {
+                    info.el.title = `${info.event.title}: ${status}`;
+                }
+            },
+            eventClick(info) {
+                selectedEvent = info.event;
+                configureDateInput(info.event);
+                descriptionInput.value = info.event.extendedProps.description ?? "";
+                ratingInput.value = info.event.extendedProps.rating ?? "";
+                notesInput.value = info.event.extendedProps.notes ?? "";
+                editModal.classList.remove("hidden");
+                if (dateMode !== "invite") {
+                    meetingAtInput.focus();
+                }
+            },
+            eventDrop(info) {
+                const start = dateMode === "invite"
+                    ? info.event.startStr
+                    : info.event.start.toISOString();
+                updateMeeting(info.event, start)
+                    .catch(() => info.revert());
+            },
+        });
+
+        editForm.addEventListener("submit", event => {
+            event.preventDefault();
+            const inviteDate = inviteDateDisplay.textContent.trim();
+            if (!selectedEvent || (dateMode === "invite" ? !inviteDate : !meetingAtInput.value)) {
+                return;
+            }
+
+            const updatedStart = dateMode === "invite"
+                ? inviteDate
+                : new Date(meetingAtInput.value);
+            const rating = ratingInput.value === "" ? null : Number(ratingInput.value);
+            const start = dateMode === "invite"
+                ? updatedStart
+                : updatedStart.toISOString();
+            updateMeeting(selectedEvent, start, {
+                description: descriptionInput.value,
+                rating,
+                notes: notesInput.value,
+            })
+                .then(() => {
+                    selectedEvent.setProp("title", descriptionInput.value);
+                    calendar.refetchEvents();
+                    closeEditModal();
+                });
+        });
+
+        deleteEditButton.addEventListener("click", () => {
+            if (!selectedEvent || !window.confirm("Delete this connection?")) {
+                return;
+            }
+
+            deleteConnection(selectedEvent)
+                .then(() => {
+                    selectedEvent.remove();
+                    closeEditModal();
+                });
+        });
+
+        directionsButton.addEventListener("click", () => {
+            if (!selectedEvent) {
+                return;
+            }
+
+            directionsPanel.classList.remove("hidden");
+            loadDirections();
+        });
+
+        dateModeButtons.forEach(button => {
+            button.addEventListener("click", () => {
+                dateMode = button.dataset.dateMode;
+                dateModeButtons.forEach(modeButton => {
+                    modeButton.classList.toggle("active", modeButton === button);
+                });
+                calendarElement.classList.toggle("invite-date-mode", dateMode === "invite");
+                closeEditModal();
+                calendar.refetchEvents();
+                loadWeeklyTotal();
+            });
+        });
+
+        newDirectionForm.addEventListener("submit", event => {
+            event.preventDefault();
+            if (!selectedEvent || !newDirectionDescription.value.trim()) {
+                return;
+            }
+
+            requestDirections(directionsUrl(selectedEvent.id), {
+                method: "POST",
+                body: JSON.stringify({description: newDirectionDescription.value}),
+            }).then(data => {
+                renderDirections(data.directions);
+                newDirectionForm.reset();
+            });
+        });
+
+        cancelEditButton.addEventListener("click", closeEditModal);
+        editModal.addEventListener("click", event => {
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        });
+
+        calendar.render();
+        loadWeeklyTotal();
+    });
+</script>
+
+<style>
+    .connections-calendar-page {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .connections-calendar-page h1 {
+        margin-top: 0;
+    }
+
+    .connections-calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .connections-calendar-header h1 {
+        margin-bottom: 0;
+    }
+
+    .date-mode-toggle {
+        display: inline-flex;
+        overflow: hidden;
+        border: 1px solid #d1d5db;
+        border-radius: 7px;
+    }
+
+    .date-mode-button {
+        border: none;
+        border-right: 1px solid #d1d5db;
+        padding: 0.45rem 0.75rem;
+        background: #ffffff;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .date-mode-button:last-child {
+        border-right: none;
+    }
+
+    .date-mode-button.active {
+        background: #e0e7ff;
+        color: #312e81;
+        font-weight: 700;
+    }
+
+    #connections-calendar {
+        padding: 1rem;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    #connections-calendar .fc-button {
+        background: #ffffff;
+        border-color: #d1d5db;
+        color: #374151;
+        box-shadow: none;
+    }
+
+    #connections-calendar .fc-button:hover,
+    #connections-calendar .fc-button.fc-button-active {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+        color: #111827;
+    }
+
+    #connections-calendar .fc-event {
+        border: none;
+        border-radius: 4px;
+        padding: 2px 4px;
+        background: #e0e7ff;
+        color: #312e81;
+    }
+
+    #connections-calendar.invite-date-mode .fc-event {
+        background: #d9ead3;
+        color: #111111;
+    }
+
+    #connections-calendar.invite-date-mode .fc-event-main {
+        color: #111111;
+    }
+
+    .connection-edit-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .connection-panels {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        width: min(780px, 100%);
+    }
+
+    .connection-edit-dialog {
+        display: grid;
+        gap: 0.75rem;
+        width: min(360px, 100%);
+        padding: 1.25rem;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .connection-edit-dialog h2 {
+        margin: 0;
+    }
+
+    .connection-invite-date-display {
+        min-height: 1.25rem;
+        padding: 0.35rem;
+        border: 1px solid #767676;
+        border-radius: 2px;
+        font: inherit;
+    }
+
+    .connection-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .connection-delete-button {
+        margin-right: auto;
+        border-color: #b91c1c;
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .directions-panel {
+        display: grid;
+        flex: 1 1 360px;
+        gap: 0.75rem;
+        max-height: min(70vh, 640px);
+        overflow-y: auto;
+        padding: 1.25rem;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .directions-panel h2 {
+        margin: 0;
+    }
+
+    .directions-list {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .direction-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+    }
+
+    .direction-row span {
+        flex: 1;
+    }
+
+    .direction-delete-button {
+        padding: 0 0.35rem;
+        border: none;
+        background: none;
+        color: #b91c1c;
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .new-direction-form {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    @media (max-width: 800px) {
+        .connection-panels {
+            flex-direction: column;
+            align-items: stretch;
+            width: min(420px, 100%);
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+
+        .directions-panel {
+            flex-basis: auto;
+            max-height: none;
+        }
+    }
+</style>
+{% endblock %}

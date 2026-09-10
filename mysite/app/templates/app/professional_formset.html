@@ -209,6 +209,7 @@
                     <th>Connect Due</th>
                     <th>Invite</th>
                     <th>Send Invite</th>
+                    <th>Pass</th>
                     <th>Edit</th>
                 </tr>
             </thead>
@@ -242,6 +243,14 @@
                                 <input type="hidden" name="page" value="{{ current_page }}">
                                 <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
                                 <button type="submit" class="copy-button" name="invite_professional" value="{{ professional.pk }}">Invite</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="page" value="{{ current_page }}">
+                                <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                                <button type="submit" class="copy-button" name="pass_professional" value="{{ professional.pk }}">Pass</button>
                             </form>
                         </td>
                         <td>
@@ -408,6 +417,7 @@
                 </table>
             </div>
         </section>
+
     {% endif %}
 
     {% if displayed_professional %}
@@ -470,6 +480,7 @@
                 </table>
             </div>
         </section>
+
     {% endif %}
 
     {% if displayed_professional %}
@@ -591,7 +602,7 @@
                     <div class="modal-content">
                         <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
                         <h2 id="invitation-edit-modal-title-{{ invitation.pk }}">Edit Invitation</h2>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="page" value="{{ current_page }}">
                             <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
@@ -616,7 +627,10 @@
                                     {{ invitation.edit_form.notes.errors }}
                                     {{ invitation.edit_form.notes }}
                                 </div>
-                                <button type="submit" name="save_invitation" value="{{ invitation.pk }}" style="grid-column: 2; justify-self: start;">Save</button>
+                                <div style="grid-column: 2; display: flex; gap: 0.5rem; justify-self: start;">
+                                    <button type="submit" name="delete_invitation" value="{{ invitation.pk }}" style="border-color: #b91c1c; background: #fee2e2; color: #991b1b;">Delete</button>
+                                    <button type="submit" name="save_invitation" value="{{ invitation.pk }}">Save</button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -633,7 +647,7 @@
                 <div class="modal-content">
                     <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
                     <h2 id="connection-add-modal-title">Add Connection</h2>
-                    <form method="post">
+                    <form method="post" autocomplete="off">
                         {% csrf_token %}
                         <input type="hidden" name="page" value="{{ current_page }}">
                         <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
@@ -661,6 +675,100 @@
                             <button type="submit" name="add_connection" value="{{ displayed_professional.pk }}" style="grid-column: 2; justify-self: start;">Add Connection</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Notes</h2>
+                <button type="button" class="copy-button professional-section-toggle" data-target="notes-section-body">Show</button>
+            </div>
+            <div id="notes-section-body" class="hidden">
+                <div class="professional-notes-document">
+                    {% for connection_note in connection_notes %}
+                        <article class="professional-note-entry">
+                            <h3>{{ connection_note.date_heading }}</h3>
+                            <div>{{ connection_note.notes }}</div>
+                        </article>
+                    {% empty %}
+                        <p>No connection notes found.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Directions</h2>
+                <button type="button" class="copy-button professional-section-toggle" data-target="directions-section-body">Show</button>
+            </div>
+            <div id="directions-section-body" class="hidden professional-directions-groups">
+                <div>
+                    <h3>Unresolved</h3>
+                    <table class="project-results">
+                        <thead>
+                            <tr>
+                                <th>Meeting Date</th>
+                                <th>Direction</th>
+                                <th>Resolved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for direction in unresolved_directions %}
+                                <tr>
+                                    <td>{% if direction.connect.meeting_at %}{{ direction.connect.meeting_at|date:"Y-m-d H:i" }}{% else %}No meeting date{% endif %}</td>
+                                    <td>{{ direction.description }}</td>
+                                    <td>
+                                        <form method="post" class="professional-direction-resolved-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="page" value="{{ current_page }}">
+                                            <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                                            <input type="hidden" name="update_direction" value="{{ direction.pk }}">
+                                            <label aria-label="Resolved">
+                                                <input type="checkbox" name="direction_resolved" onchange="this.form.requestSubmit()">
+                                            </label>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3">No unresolved directions found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h3>Resolved</h3>
+                    <table class="project-results">
+                        <thead>
+                            <tr>
+                                <th>Meeting Date</th>
+                                <th>Direction</th>
+                                <th>Resolved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for direction in resolved_directions %}
+                                <tr>
+                                    <td>{% if direction.connect.meeting_at %}{{ direction.connect.meeting_at|date:"Y-m-d H:i" }}{% else %}No meeting date{% endif %}</td>
+                                    <td>{{ direction.description }}</td>
+                                    <td>
+                                        <form method="post" class="professional-direction-resolved-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="page" value="{{ current_page }}">
+                                            <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                                            <input type="hidden" name="update_direction" value="{{ direction.pk }}">
+                                            <label aria-label="Resolved">
+                                                <input type="checkbox" name="direction_resolved" checked onchange="this.form.requestSubmit()">
+                                            </label>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3">No resolved directions found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -786,4 +894,29 @@
         });
     })();
 </script>
+<style>
+    .professional-notes-document {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .professional-note-entry {
+        padding: 1rem;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+    }
+
+    .professional-note-entry h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    .professional-note-entry div {
+        white-space: pre-wrap;
+    }
+
+    .professional-directions-groups {
+        display: grid;
+        gap: 1.5rem;
+    }
+</style>
 {% endblock %}

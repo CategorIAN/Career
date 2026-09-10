@@ -782,6 +782,11 @@ class Professional(models.Model):
 
 
 class ProfessionalConnect(models.Model):
+    description = models.CharField(
+        max_length=200,
+        blank=True,
+    )
+
     person = models.ForeignKey(
         "Professional",
         related_name="connects",
@@ -812,7 +817,7 @@ class ProfessionalConnect(models.Model):
     notes = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.peer} - {self.invite_date or self.meeting_at or self.pk}"
+        return self.description or f"Connection {self.pk}"
 
     @property
     def notes_preview(self):
@@ -852,7 +857,7 @@ class ProfessionalConnect(models.Model):
 
 
 class Direction(models.Model):
-    meeting = models.ForeignKey(
+    connect = models.ForeignKey(
         "ProfessionalConnect",
         related_name="directions",
         on_delete=models.CASCADE,

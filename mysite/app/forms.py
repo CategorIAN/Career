@@ -381,9 +381,12 @@ class ProfessionalConnectForm(forms.ModelForm):
                 format="%Y-%m-%d",
                 attrs={
                     "type": "date",
-                    "autocomplete": "new-password",
+                    "autocomplete": "off",
                     "class": "autofill-blocked",
                     "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
                     "readonly": "readonly",
                 },
             ),

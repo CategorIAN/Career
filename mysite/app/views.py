@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
@@ -6,13 +7,16 @@ from django.db import transaction
 from django.db.models import Case, F, IntegerField, Prefetch, Q, Value, When
 from django.conf import settings
 from django.urls import reverse
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from datetime import date, datetime, timedelta, UTC
 from calendar import monthrange
 import hashlib
+import json
 import logging
 import re
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie
 from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
@@ -34,6 +38,7 @@ from .forms import (
 from .models import (
     Company,
     Course,
+    Direction,
     Feature,
     FeatureLink,
     Platform,
@@ -918,6 +923,50 @@ def professional_formset_view(request):
         if displayed_professional is not None
         else ProfessionalConnect.objects.none()
     )
+    connection_notes = []
+    if displayed_professional is not None:
+        for connection in ProfessionalConnect.objects.filter(
+            person=displayed_professional,
+        ).only("meeting_at", "invite_date", "notes"):
+            notes = connection.notes.strip()
+            if not notes:
+                continue
+
+            if connection.meeting_at is not None:
+                connection_date = connection.meeting_at
+                date_heading = timezone.localtime(connection_date).strftime("%Y-%m-%d %H:%M")
+            elif connection.invite_date is not None:
+                connection_date = datetime.combine(
+                    connection.invite_date,
+                    datetime.min.time(),
+                    tzinfo=UTC,
+                )
+                date_heading = connection.invite_date.strftime("%Y-%m-%d")
+            else:
+                connection_date = datetime.min.replace(tzinfo=UTC)
+                date_heading = "No connection date"
+
+            connection_notes.append(
+                {
+                    "connection_date": connection_date,
+                    "date_heading": date_heading,
+                    "notes": notes,
+                }
+            )
+        connection_notes.sort(key=lambda note: note["connection_date"], reverse=True)
+    directions_by_meeting = (
+        Direction.objects.filter(connect__person=displayed_professional)
+        .select_related("connect")
+        .order_by(F("connect__meeting_at").desc(nulls_last=True), "pk")
+        if displayed_professional is not None
+        else Direction.objects.none()
+    )
+    unresolved_directions = [
+        direction for direction in directions_by_meeting if not direction.resolved
+    ]
+    resolved_directions = [
+        direction for direction in directions_by_meeting if direction.resolved
+    ]
     current_page = page_obj.number if page_obj is not None else 1
     redirect_params = f"?page={current_page}"
     if selected_professional_id:
@@ -954,6 +1003,7 @@ def professional_formset_view(request):
         )
         add_professional_requested = "add_professional" in request.POST
         invite_professional_id = request.POST.get("invite_professional", "").strip()
+        pass_professional_id = request.POST.get("pass_professional", "").strip()
         save_professional_id = request.POST.get("save_professional", "").strip()
         delete_professional_id = request.POST.get("delete_professional", "").strip()
         add_company_professional_id = request.POST.get("add_company", "").strip()
@@ -970,6 +1020,8 @@ def professional_formset_view(request):
         referrer_id = request.POST.get("referrer_id", "").strip()
         company_id = request.POST.get("company_id", "").strip()
         save_invitation_id = request.POST.get("save_invitation", "").strip()
+        delete_invitation_id = request.POST.get("delete_invitation", "").strip()
+        update_direction_id = request.POST.get("update_direction", "").strip()
         add_connection_professional_id = request.POST.get("add_connection", "").strip()
 
         if add_professional_requested:
@@ -1022,6 +1074,23 @@ def professional_formset_view(request):
                 referrer.referrals.add(professional)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_referrer_modal = True
+        elif update_direction_id:
+            Direction.objects.filter(
+                pk=update_direction_id,
+                connect__person=displayed_professional,
+            ).update(resolved="direction_resolved" in request.POST)
+            return redirect(f"{request.path}{redirect_params}")
+        elif pass_professional_id:
+            professional = Professional.objects.filter(pk=pass_professional_id).first()
+            if professional is not None:
+                with transaction.atomic():
+                    ProfessionalConnect.objects.create(
+                        person=professional,
+                        invite_date=timezone.localdate(),
+                        description=f"Passed on {professional.name}",
+                    )
+                    professional.delete()
+            return redirect(f"{request.path}{redirect_params}")
         elif add_connection_professional_id:
             professional = Professional.objects.filter(
                 pk=add_connection_professional_id
@@ -1029,9 +1098,17 @@ def professional_formset_view(request):
             if professional is not None and new_connection_form.is_valid():
                 connection = new_connection_form.save(commit=False)
                 connection.person = professional
+                connection.description = f"Ian x {professional.name}"
                 connection.save()
                 return redirect(f"{request.path}{redirect_params}")
             show_add_connection_modal = True
+        elif delete_invitation_id:
+            ProfessionalConnect.objects.filter(
+                pk=delete_invitation_id,
+                person=displayed_professional,
+                invite_date__isnull=False,
+            ).delete()
+            return redirect(f"{request.path}{redirect_params}")
         elif save_invitation_id:
             invitation = ProfessionalConnect.objects.filter(
                 pk=save_invitation_id,
@@ -1055,6 +1132,7 @@ def professional_formset_view(request):
                 ProfessionalConnect.objects.create(
                     person=professional,
                     invite_date=timezone.localdate(),
+                    description=f"Ian x {professional.name}",
                 )
                 return redirect(
                     f"{request.path}{redirect_params}"
@@ -1122,6 +1200,9 @@ def professional_formset_view(request):
             "referred_by": referred_by,
             "available_referrers": available_referrers,
             "invitations": invitations,
+            "connection_notes": connection_notes,
+            "unresolved_directions": unresolved_directions,
+            "resolved_directions": resolved_directions,
             "all_professionals": searchable_professionals,
             "selected_professional": selected_professional,
             "selected_professional_id": selected_professional_id,
@@ -1928,3 +2009,244 @@ def courses_view(request):
             "course_groups": grouped_courses,
         },
     )
+
+
+@ensure_csrf_cookie
+def connections_view(request):
+    return render(request, "app/connections.html")
+
+
+def connection_events_view(request):
+    date_mode = request.GET.get("date_mode", "meeting")
+    if date_mode == "invite":
+        connections = (
+            ProfessionalConnect.objects.filter(invite_date__isnull=False)
+            .select_related("person")
+            .order_by("invite_date", "pk")
+        )
+    else:
+        date_mode = "meeting"
+        connections = (
+            ProfessionalConnect.objects.filter(meeting_at__isnull=False)
+            .select_related("person")
+            .order_by("meeting_at", "pk")
+        )
+
+    events = [
+        {
+            "id": str(connection.pk),
+            "title": connection.description,
+            "start": (
+                connection.invite_date.isoformat()
+                if date_mode == "invite"
+                else connection.meeting_at.isoformat()
+            ),
+            "allDay": date_mode == "invite",
+            "extendedProps": {
+                "status": connection.status,
+                "description": connection.description,
+                "rating": connection.rating,
+                "notes": connection.notes,
+            },
+        }
+        for connection in connections
+    ]
+    return JsonResponse(events, safe=False)
+
+
+def connection_weekly_total_view(request):
+    date_mode = request.GET.get("date_mode", "meeting")
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    if date_mode == "invite":
+        total = ProfessionalConnect.objects.filter(
+            invite_date__range=(week_start, week_end),
+        ).count()
+    else:
+        total = ProfessionalConnect.objects.filter(
+            meeting_at__date__range=(week_start, week_end),
+        ).count()
+
+    return JsonResponse({"total": total})
+
+
+@require_POST
+def update_connection_meeting_view(request):
+    try:
+        payload = json.loads(request.body)
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid request data."}, status=400)
+
+    connection_id = payload.get("id")
+    start_value = payload.get("start")
+    date_mode = payload.get("date_mode", "meeting")
+    if date_mode not in {"meeting", "invite"}:
+        return JsonResponse({"error": "Invalid date mode."}, status=400)
+
+    meeting_at = None
+    invite_date = None
+    if date_mode == "meeting":
+        meeting_at = parse_datetime(start_value) if isinstance(start_value, str) else None
+        if meeting_at is None:
+            return JsonResponse({"error": "A meeting datetime is required."}, status=400)
+    else:
+        invite_date = parse_date(start_value) if isinstance(start_value, str) else None
+        if invite_date is None:
+            return JsonResponse({"error": "An invite date is required."}, status=400)
+    if not connection_id:
+        return JsonResponse({"error": "A connection ID is required."}, status=400)
+
+    try:
+        connection = ProfessionalConnect.objects.get(pk=connection_id)
+    except ProfessionalConnect.DoesNotExist:
+        return JsonResponse({"error": "Connection not found."}, status=404)
+
+    if meeting_at is not None and timezone.is_naive(meeting_at):
+        meeting_at = timezone.make_aware(meeting_at, timezone.get_current_timezone())
+
+    rating = connection.rating
+    if "rating" in payload:
+        rating_value = payload["rating"]
+        if rating_value in (None, ""):
+            rating = None
+        elif (
+            isinstance(rating_value, int)
+            and not isinstance(rating_value, bool)
+            and 0 <= rating_value <= 5
+        ):
+            rating = rating_value
+        else:
+            return JsonResponse({"error": "Rating must be a whole number from 0 to 5."}, status=400)
+
+    notes = connection.notes
+    if "notes" in payload:
+        notes_value = payload["notes"]
+        if not isinstance(notes_value, str):
+            return JsonResponse({"error": "Notes must be text."}, status=400)
+        notes = notes_value
+
+    description = connection.description
+    if "description" in payload:
+        description_value = payload["description"]
+        if not isinstance(description_value, str):
+            return JsonResponse({"error": "Description must be text."}, status=400)
+        if len(description_value) > 200:
+            return JsonResponse({"error": "Description must be 200 characters or fewer."}, status=400)
+        description = description_value
+
+    if date_mode == "meeting":
+        connection.meeting_at = meeting_at
+    else:
+        connection.invite_date = invite_date
+    connection.description = description
+    connection.rating = rating
+    connection.notes = notes
+    update_fields = ["description", "rating", "notes"]
+    update_fields.append("meeting_at" if date_mode == "meeting" else "invite_date")
+    connection.save(update_fields=update_fields)
+
+    return JsonResponse(
+        {
+            "id": str(connection.pk),
+            "start": (
+                connection.invite_date.isoformat()
+                if date_mode == "invite"
+                else connection.meeting_at.isoformat()
+            ),
+            "date_mode": date_mode,
+            "status": connection.status,
+            "description": connection.description,
+            "rating": connection.rating,
+            "notes": connection.notes,
+        }
+    )
+
+
+@require_POST
+def delete_connection_view(request):
+    try:
+        payload = json.loads(request.body)
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid request data."}, status=400)
+
+    connection_id = payload.get("id")
+    if not connection_id:
+        return JsonResponse({"error": "A connection ID is required."}, status=400)
+
+    try:
+        connection = ProfessionalConnect.objects.get(pk=connection_id)
+    except ProfessionalConnect.DoesNotExist:
+        return JsonResponse({"error": "Connection not found."}, status=404)
+
+    connection.delete()
+    return JsonResponse({"id": str(connection_id)})
+
+
+@require_http_methods(["GET", "POST"])
+def connection_directions_view(request, connection_id):
+    try:
+        connection = ProfessionalConnect.objects.get(pk=connection_id)
+    except ProfessionalConnect.DoesNotExist:
+        return JsonResponse({"error": "Connection not found."}, status=404)
+
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body)
+        except (TypeError, json.JSONDecodeError):
+            return JsonResponse({"error": "Invalid request data."}, status=400)
+
+        description = payload.get("description")
+        if not isinstance(description, str) or not description.strip():
+            return JsonResponse({"error": "A direction description is required."}, status=400)
+
+        Direction.objects.create(connect=connection, description=description.strip())
+
+    directions = [
+        {
+            "id": direction.pk,
+            "description": direction.description,
+            "resolved": direction.resolved,
+        }
+        for direction in connection.directions.order_by("pk")
+    ]
+    return JsonResponse({"directions": directions})
+
+
+@require_POST
+def update_direction_view(request, direction_id):
+    try:
+        payload = json.loads(request.body)
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid request data."}, status=400)
+
+    resolved = payload.get("resolved")
+    if not isinstance(resolved, bool):
+        return JsonResponse({"error": "Resolved must be true or false."}, status=400)
+
+    try:
+        direction = Direction.objects.get(pk=direction_id)
+    except Direction.DoesNotExist:
+        return JsonResponse({"error": "Direction not found."}, status=404)
+
+    direction.resolved = resolved
+    direction.save(update_fields=["resolved"])
+    return JsonResponse(
+        {
+            "id": direction.pk,
+            "description": direction.description,
+            "resolved": direction.resolved,
+        }
+    )
+
+
+@require_POST
+def delete_direction_view(request, direction_id):
+    try:
+        direction = Direction.objects.get(pk=direction_id)
+    except Direction.DoesNotExist:
+        return JsonResponse({"error": "Direction not found."}, status=404)
+
+    direction.delete()
+    return JsonResponse({"id": direction_id})
