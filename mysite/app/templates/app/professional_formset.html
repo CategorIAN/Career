@@ -203,9 +203,9 @@
                 <tr>
                     <th>Name</th>
                     <th>Wait</th>
-                    <th>Last Invited</th>
+                    <th>Average Rating</th>
+                    <th>Invite Success</th>
                     <th>Invite Due</th>
-                    <th>Last Connected</th>
                     <th>Connect Due</th>
                     <th>Invite</th>
                     <th>Send Invite</th>
@@ -223,10 +223,18 @@
                             {% endif %}
                         </td>
                         <td>{{ professional.wait_display }}</td>
-                        <td>{{ professional.last_invited|date:"Y-m-d" }}</td>
+                        <td>
+                            {% if professional.average_rating is not None %}
+                                <span title="{{ professional.average_rating|floatformat:1 }} out of 5">{{ professional.average_rating_stars }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if professional.invite_success is not None %}
+                                {{ professional.invite_success|floatformat:1 }}%
+                            {% endif %}
+                        </td>
                         <td>{{ professional.invite_due|date:"Y-m-d" }}</td>
-                        <td>{{ professional.last_connected|date:"Y-m-d H:i" }}</td>
-                        <td>{{ professional.connect_due|date:"Y-m-d H:i" }}</td>
+                        <td>{{ professional.connect_due|date:"Y-m-d" }}</td>
                         <td>{{ professional.invite }}</td>
                         <td>
                             <form method="post">
@@ -528,8 +536,15 @@
 
     {% if displayed_professional %}
         <section style="margin-top: 1.5rem;">
-            <h2>Invitations</h2>
-            <table class="project-results">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Connections</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="copy-button professional-section-toggle" data-target="connections-section-body">Show</button>
+                    <button type="button" class="copy-button open-professional-modal" data-target="connection-add-modal">Add Connection</button>
+                </div>
+            </div>
+            <div id="connections-section-body" class="hidden">
+                <table class="project-results">
                 <thead>
                     <tr>
                         <th>Invite Date</th>
@@ -547,7 +562,7 @@
                             <td>{{ invitation.status }}</td>
                             <td>{{ invitation.meeting_at|date:"Y-m-d H:i" }}</td>
                             <td>{{ invitation.rating }}</td>
-                            <td>{{ invitation.notes }}</td>
+                            <td>{{ invitation.notes_preview }}</td>
                             <td>
                                 <button
                                     type="button"
@@ -564,8 +579,8 @@
                         </tr>
                     {% endfor %}
                 </tbody>
-            </table>
-            {% for invitation in invitations %}
+                </table>
+                {% for invitation in invitations %}
                 <div
                     id="invitation-edit-modal-{{ invitation.pk }}"
                     class="modal professional-modal{% if show_edit_invitation_id != invitation.pk %} hidden{% endif %}"
@@ -606,7 +621,48 @@
                         </form>
                     </div>
                 </div>
-            {% endfor %}
+                {% endfor %}
+            </div>
+            <div
+                id="connection-add-modal"
+                class="modal professional-modal{% if not show_add_connection_modal %} hidden{% endif %}"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="connection-add-modal-title"
+            >
+                <div class="modal-content">
+                    <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
+                    <h2 id="connection-add-modal-title">Add Connection</h2>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="page" value="{{ current_page }}">
+                        <input type="hidden" name="professional_id" value="{{ selected_professional_id }}">
+                        <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                            <label for="{{ new_connection_form.invite_date.id_for_label }}">Invite Date</label>
+                            <div>
+                                {{ new_connection_form.invite_date.errors }}
+                                {{ new_connection_form.invite_date }}
+                            </div>
+                            <label for="{{ new_connection_form.meeting_at.id_for_label }}">Meeting At</label>
+                            <div>
+                                {{ new_connection_form.meeting_at.errors }}
+                                {{ new_connection_form.meeting_at }}
+                            </div>
+                            <label for="{{ new_connection_form.rating.id_for_label }}">Rating</label>
+                            <div>
+                                {{ new_connection_form.rating.errors }}
+                                {{ new_connection_form.rating }}
+                            </div>
+                            <label for="{{ new_connection_form.notes.id_for_label }}">Notes</label>
+                            <div>
+                                {{ new_connection_form.notes.errors }}
+                                {{ new_connection_form.notes }}
+                            </div>
+                            <button type="submit" name="add_connection" value="{{ displayed_professional.pk }}" style="grid-column: 2; justify-self: start;">Add Connection</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </section>
     {% endif %}
 

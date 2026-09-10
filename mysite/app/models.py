@@ -1,6 +1,19 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+from django.utils.functional import cached_property
+from calendar import monthrange
+
+
+def _add_calendar_months(date_value, months):
+    if not months:
+        return date_value
+
+    total_month_index = (date_value.month - 1) + months
+    year = date_value.year + (total_month_index // 12)
+    month = (total_month_index % 12) + 1
+    day = min(date_value.day, monthrange(year, month)[1])
+    return date_value.replace(year=year, month=month, day=day)
 
 
 class Skill(models.Model):
@@ -681,6 +694,92 @@ class Professional(models.Model):
     def __str__(self):
         return self.name
 
+    @cached_property
+    def _connection_records(self):
+        if self.pk is None:
+            return []
+        return list(self.connects.all())
+
+    @cached_property
+    def last_invited(self):
+        invite_dates = (
+            connection.invite_date
+            for connection in self._connection_records
+            if connection.invite_date is not None
+        )
+        return max(invite_dates, default=None)
+
+    @cached_property
+    def last_connected(self):
+        meeting_times = (
+            connection.meeting_at
+            for connection in self._connection_records
+            if connection.meeting_at is not None
+        )
+        return max(meeting_times, default=None)
+
+    @cached_property
+    def last_attended(self):
+        if self.last_connected is None:
+            return None
+        return timezone.localtime(self.last_connected).date()
+
+    @cached_property
+    def invite_due(self):
+        if self.last_invited is None:
+            return None
+        return _add_calendar_months(self.last_invited, 1)
+
+    @cached_property
+    def connect_due(self):
+        if self.last_connected is None or self.wait is None:
+            return None
+        return timezone.localtime(self.last_connected + self.wait).date()
+
+    @cached_property
+    def average_rating(self):
+        ratings = [
+            connection.rating
+            for connection in self._connection_records
+            if connection.rating is not None
+        ]
+        if not ratings:
+            return None
+        return sum(ratings) / len(ratings)
+
+    @cached_property
+    def average_rating_stars(self):
+        if self.average_rating is None:
+            return ""
+        filled_stars = min(5, int(self.average_rating + 0.5))
+        return f"{'★' * filled_stars}{'☆' * (5 - filled_stars)}"
+
+    @cached_property
+    def invite_success(self):
+        if not self._connection_records:
+            return None
+        attended_connections = sum(
+            connection.meeting_at is not None
+            for connection in self._connection_records
+        )
+        return (attended_connections / len(self._connection_records)) * 100
+
+    @property
+    def invite(self):
+        current_date = timezone.localdate()
+
+        if self.invite_due is None:
+            return True
+        if self.connect_due is None:
+            return self.invite_due <= current_date
+        return (
+            self.connect_due <= current_date
+            and (
+                self.last_invited <= self.last_attended
+                or self.invite_due <= current_date
+            )
+        )
+
 
 class ProfessionalConnect(models.Model):
     person = models.ForeignKey(
@@ -705,7 +804,7 @@ class ProfessionalConnect(models.Model):
         null=True,
         blank=True,
         validators=[
-            MinValueValidator(1),
+            MinValueValidator(0),
             MaxValueValidator(5),
         ],
     )
@@ -716,28 +815,34 @@ class ProfessionalConnect(models.Model):
         return f"{self.peer} - {self.invite_date or self.meeting_at or self.pk}"
 
     @property
+    def notes_preview(self):
+        if len(self.notes) <= 10:
+            return self.notes
+        return f"{self.notes[:10]}..."
+
+    @property
     def status(self):
         now = timezone.now()
 
-        # A future meeting has been scheduled.
+        # Meeting is scheduled for the future.
         if self.meeting_at is not None and self.meeting_at > now:
             return "Meeting Planned"
 
-        # A meeting has occurred but still needs to be reviewed.
+        # Meeting already happened.
         if self.meeting_at is not None:
             if self.rating is None or not self.notes.strip():
                 return "Needs Review"
 
-        # Invitation statuses only matter if the Professional still exists.
+            return "Reviewed"
+
+        # No meeting was scheduled from this invitation.
         if (
                 self.person_id is not None
                 and self.invite_date is not None
-                and self.meeting_at is None
         ):
             if ProfessionalConnect.objects.filter(
                     person_id=self.person_id,
                     invite_date__gt=self.invite_date,
-                    meeting_at__isnull=True,
             ).exists():
                 return "Invited Again"
 
@@ -759,9 +864,3 @@ class Direction(models.Model):
 
     def __str__(self):
         return self.description
-
-
-
-
-
-

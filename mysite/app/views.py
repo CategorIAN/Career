@@ -3,7 +3,7 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, F, IntegerField, Max, Prefetch, Q, Value, When
+from django.db.models import Case, F, IntegerField, Prefetch, Q, Value, When
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
@@ -830,13 +830,7 @@ def professional_formset_view(request):
     selected_professional_id = (
         request.POST.get("professional_id") or request.GET.get("professional_id", "")
     ).strip()
-    queryset = (
-        Professional.objects
-        .annotate(
-            last_invited=Max("connects__invite_date"),
-            last_connected=Max("connects__meeting_at"),
-        )
-    )
+    queryset = Professional.objects.prefetch_related("connects")
     current_date = timezone.localdate()
     current_datetime = timezone.now()
     all_professionals = list(queryset)
@@ -849,39 +843,11 @@ def professional_formset_view(request):
         professional.wait_display = (
             f"{professional.wait.days} days" if professional.wait else ""
         )
-        professional.invite_due = (
-            _add_calendar_months(professional.last_invited, 1)
-            if professional.last_invited
-            else None
-        )
-        professional.connect_due = (
-            professional.last_connected + professional.wait
-            if professional.last_connected and professional.wait
-            else None
-        )
-        professional.last_attended = (
-            timezone.localtime(professional.last_connected).date()
-            if professional.last_connected
-            else None
-        )
-        if professional.invite_due is None:
-            professional.invite = True
-        elif professional.connect_due is None:
-            professional.invite = professional.invite_due <= current_date
-        else:
-            professional.invite = (
-                professional.connect_due <= current_datetime
-                and (
-                    professional.last_invited <= professional.last_attended
-                    or professional.invite_due <= current_date
-                )
-            )
-
     all_professionals.sort(
         key=lambda professional: (
             not professional.invite,
             professional.connect_due is None,
-            professional.connect_due or current_datetime,
+            professional.connect_due or current_date,
             professional.invite_due is None,
             professional.invite_due or current_date,
             professional.last_connected is None,
@@ -962,6 +928,7 @@ def professional_formset_view(request):
     show_add_referrer_modal = False
     show_edit_modal_id = None
     show_edit_invitation_id = None
+    show_add_connection_modal = False
     invited_professional_id = request.GET.get("invited_professional", "").strip()
     invited_professional_name = (
         Professional.objects.filter(pk=invited_professional_id)
@@ -980,6 +947,11 @@ def professional_formset_view(request):
         new_company_form = CompanyForm(request.POST, prefix="new-company")
         new_referral_form = ProfessionalForm(request.POST, prefix="new-referral")
         new_referrer_form = ProfessionalForm(request.POST, prefix="new-referrer")
+        new_connection_form = ProfessionalConnectForm(
+            request.POST,
+            prefix="new-connection",
+            require_invite_date=True,
+        )
         add_professional_requested = "add_professional" in request.POST
         invite_professional_id = request.POST.get("invite_professional", "").strip()
         save_professional_id = request.POST.get("save_professional", "").strip()
@@ -998,6 +970,7 @@ def professional_formset_view(request):
         referrer_id = request.POST.get("referrer_id", "").strip()
         company_id = request.POST.get("company_id", "").strip()
         save_invitation_id = request.POST.get("save_invitation", "").strip()
+        add_connection_professional_id = request.POST.get("add_connection", "").strip()
 
         if add_professional_requested:
             if new_form.is_valid():
@@ -1049,6 +1022,16 @@ def professional_formset_view(request):
                 referrer.referrals.add(professional)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_referrer_modal = True
+        elif add_connection_professional_id:
+            professional = Professional.objects.filter(
+                pk=add_connection_professional_id
+            ).first()
+            if professional is not None and new_connection_form.is_valid():
+                connection = new_connection_form.save(commit=False)
+                connection.person = professional
+                connection.save()
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_connection_modal = True
         elif save_invitation_id:
             invitation = ProfessionalConnect.objects.filter(
                 pk=save_invitation_id,
@@ -1099,6 +1082,10 @@ def professional_formset_view(request):
         new_company_form = CompanyForm(prefix="new-company")
         new_referral_form = ProfessionalForm(prefix="new-referral")
         new_referrer_form = ProfessionalForm(prefix="new-referrer")
+        new_connection_form = ProfessionalConnectForm(
+            prefix="new-connection",
+            require_invite_date=True,
+        )
 
     for professional in professionals:
         professional.edit_form = (
@@ -1124,6 +1111,7 @@ def professional_formset_view(request):
             "new_company_form": new_company_form,
             "new_referral_form": new_referral_form,
             "new_referrer_form": new_referrer_form,
+            "new_connection_form": new_connection_form,
             "page_obj": page_obj,
             "professionals": professionals,
             "displayed_professional": displayed_professional,
@@ -1145,6 +1133,7 @@ def professional_formset_view(request):
             "show_add_referrer_modal": show_add_referrer_modal,
             "show_edit_modal_id": show_edit_modal_id,
             "show_edit_invitation_id": show_edit_invitation_id,
+            "show_add_connection_modal": show_add_connection_modal,
             "invited_professional_name": invited_professional_name,
         },
     )

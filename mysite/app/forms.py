@@ -394,10 +394,11 @@ class ProfessionalConnectForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 3, "style": "width: 20rem;"}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, require_invite_date=False, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("invite_date", "meeting_at", "rating"):
+        for field_name in ("meeting_at", "rating"):
             self.fields[field_name].required = False
+        self.fields["invite_date"].required = require_invite_date
         self.fields["meeting_at"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 

@@ -772,9 +772,9 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, '<table class="project-results">', html=False)
         self.assertContains(response, "<th>Name</th>", html=False)
         self.assertContains(response, "<th>Wait</th>", html=False)
-        self.assertContains(response, "<th>Last Invited</th>", html=False)
+        self.assertContains(response, "<th>Average Rating</th>", html=False)
+        self.assertContains(response, "<th>Invite Success</th>", html=False)
         self.assertContains(response, "<th>Invite Due</th>", html=False)
-        self.assertContains(response, "<th>Last Connected</th>", html=False)
         self.assertContains(response, "<th>Connect Due</th>", html=False)
         self.assertContains(response, "<th>Invite</th>", html=False)
         self.assertContains(response, "<th>Send Invite</th>", html=False)
@@ -783,10 +783,10 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, 'name="new-linkedin_url"', html=False)
         self.assertContains(response, 'name="new-email"', html=False)
         self.assertContains(response, 'name="new-phone"', html=False)
-        self.assertContains(response, 'autocomplete="new-password"', count=14, html=False)
-        self.assertContains(response, 'class="autofill-blocked"', count=14, html=False)
-        self.assertContains(response, 'readonly="readonly"', count=14, html=False)
-        self.assertContains(response, 'data-form-type="other"', count=14, html=False)
+        self.assertContains(response, 'autocomplete="new-password"', count=15, html=False)
+        self.assertContains(response, 'class="autofill-blocked"', count=15, html=False)
+        self.assertContains(response, 'readonly="readonly"', count=15, html=False)
+        self.assertContains(response, 'data-form-type="other"', count=15, html=False)
         self.assertContains(response, 'name="new-linkedin_url" autocomplete="off"', html=False)
         self.assertContains(response, 'name="new-wait_0"', html=False)
         self.assertContains(response, 'name="add_professional" value="1"', html=False)
@@ -1158,7 +1158,7 @@ class ProfessionalPageTests(TestCase):
 
         response = self.client.get(reverse("professionals"))
 
-        self.assertContains(response, "<h2>Invitations</h2>", html=False)
+        self.assertContains(response, '<h2 style="margin: 0;">Connections</h2>', html=False)
         self.assertContains(response, "<th>Status</th>", html=False)
         self.assertContains(response, "<th>Edit</th>", html=False)
         self.assertContains(
@@ -1173,13 +1173,13 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertContains(response, "Waiting For Response")
         self.assertContains(response, "Invited Again")
-        self.assertContains(response, "Newer invitation")
-        self.assertContains(response, "Older invitation")
+        self.assertContains(response, "Newer invi...")
+        self.assertContains(response, "Older invi...")
         self.assertNotContains(response, "No invitation")
         self.assertNotContains(response, "Other professional invitation")
         self.assertLess(
-            response.content.find(b"Newer invitation"),
-            response.content.find(b"Older invitation"),
+            response.content.find(b"Newer invi..."),
+            response.content.find(b"Older invi..."),
         )
         self.assertEqual(
             list(response.context["invitations"]),
@@ -1211,6 +1211,35 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(invitation.invite_date, date(2026, 8, 2))
         self.assertEqual(invitation.rating, 5)
         self.assertEqual(invitation.notes, "Updated notes")
+
+    def test_professionals_page_adds_connection_for_current_professional(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        page_response = self.client.get(reverse("professionals"))
+        self.assertContains(
+            page_response,
+            'data-target="connections-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(page_response, 'id="connections-section-body" class="hidden"', html=False)
+        self.assertContains(page_response, 'data-target="connection-add-modal"', html=False)
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-connection-invite_date": "2026-09-01",
+                "new-connection-rating": "5",
+                "new-connection-notes": "New connection",
+                "add_connection": str(professional.pk),
+            },
+        )
+
+        connection = ProfessionalConnect.objects.get(person=professional)
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertEqual(connection.invite_date, date(2026, 9, 1))
+        self.assertEqual(connection.rating, 5)
+        self.assertEqual(connection.notes, "New connection")
 
     def test_professionals_edit_existing_cards(self):
         professional = Professional.objects.create(
@@ -1267,8 +1296,36 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(displayed_professional.invite_due, date(2026, 8, 15))
         self.assertEqual(
             displayed_professional.connect_due,
-            timezone.make_aware(datetime(2026, 8, 17, 10, 45)),
+            date(2026, 8, 17),
         )
+
+    def test_professionals_page_calculates_average_rating(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        ProfessionalConnect.objects.create(person=professional, rating=4)
+        ProfessionalConnect.objects.create(person=professional, rating=5)
+        ProfessionalConnect.objects.create(person=professional)
+
+        response = self.client.get(reverse("professionals"))
+
+        displayed_professional = list(response.context["professionals"])[0]
+        self.assertEqual(displayed_professional.average_rating, 4.5)
+        self.assertEqual(displayed_professional.average_rating_stars, "★★★★★")
+        self.assertContains(response, "★★★★★")
+
+    def test_professionals_page_calculates_invite_success(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        ProfessionalConnect.objects.create(
+            person=professional,
+            meeting_at=timezone.make_aware(datetime(2026, 8, 1, 9, 0)),
+        )
+        ProfessionalConnect.objects.create(person=professional)
+        ProfessionalConnect.objects.create(person=professional)
+
+        response = self.client.get(reverse("professionals"))
+
+        displayed_professional = list(response.context["professionals"])[0]
+        self.assertAlmostEqual(displayed_professional.invite_success, 100 / 3)
+        self.assertContains(response, "33.3%")
 
     def test_professionals_page_calculates_invite_without_database_field(self):
         never_invited = Professional.objects.create(name="Never Invited")
@@ -1313,7 +1370,11 @@ class ProfessionalPageTests(TestCase):
         self.assertTrue(displayed_professionals[overdue_invite.name].invite)
         self.assertTrue(displayed_professionals[current_connect.name].invite)
         self.assertFalse(displayed_professionals[future_connect.name].invite)
-        self.assertFalse(hasattr(never_invited, "invite"))
+        self.assertTrue(never_invited.invite)
+        self.assertNotIn(
+            "invite",
+            [field.name for field in Professional._meta.get_fields()],
+        )
 
     def test_professionals_page_sorts_by_invite_and_due_dates(self):
         current_date = timezone.localdate()
