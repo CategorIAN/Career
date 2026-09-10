@@ -805,6 +805,8 @@ class ProfessionalConnect(models.Model):
         blank=True,
     )
 
+    meeting_end = models.DateTimeField(null=True, blank=True)
+
     rating = models.IntegerField(
         null=True,
         blank=True,
@@ -815,6 +817,16 @@ class ProfessionalConnect(models.Model):
     )
 
     notes = models.TextField(blank=True)
+
+    google_meeting_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+    )
+
+    google_invite_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+    )
 
     def __str__(self):
         return self.description or f"Connection {self.pk}"
