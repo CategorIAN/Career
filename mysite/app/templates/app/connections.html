@@ -22,8 +22,10 @@
         <form id="connection-edit-form" class="connection-edit-dialog" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
             <h2 id="connection-edit-title">Edit Connection</h2>
             <label id="connection-date-label" for="connection-meeting-at">Meeting date and time</label>
-            <input id="connection-meeting-at" type="datetime-local" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required>
+            <input id="connection-meeting-at" type="datetime-local" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
             <div id="connection-invite-date-display" class="connection-invite-date-display hidden" aria-labelledby="connection-date-label"></div>
+            <label id="connection-meeting-end-label" for="connection-meeting-end">Meeting end</label>
+            <input id="connection-meeting-end" type="datetime-local" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
             <label for="connection-rating">Rating</label>
             <input id="connection-rating" type="number" min="0" max="5" step="1">
             <label for="connection-description">Description</label>
@@ -35,6 +37,7 @@
                 <button type="button" id="connection-edit-cancel">Cancel</button>
                 <button type="submit">Save</button>
             </div>
+            <p id="connection-sync-status" class="connection-sync-status" role="status"></p>
             <button type="button" id="connection-directions-button">Directions</button>
         </form>
         <aside id="directions-panel" class="directions-panel hidden" aria-labelledby="directions-title">
@@ -59,12 +62,15 @@
         const editForm = document.getElementById("connection-edit-form");
         const dateLabel = document.getElementById("connection-date-label");
         const meetingAtInput = document.getElementById("connection-meeting-at");
+        const meetingEndLabel = document.getElementById("connection-meeting-end-label");
+        const meetingEndInput = document.getElementById("connection-meeting-end");
         const inviteDateDisplay = document.getElementById("connection-invite-date-display");
         const descriptionInput = document.getElementById("connection-description");
         const ratingInput = document.getElementById("connection-rating");
         const notesInput = document.getElementById("connection-notes");
         const cancelEditButton = document.getElementById("connection-edit-cancel");
         const deleteEditButton = document.getElementById("connection-edit-delete");
+        const syncStatus = document.getElementById("connection-sync-status");
         const directionsButton = document.getElementById("connection-directions-button");
         const directionsPanel = document.getElementById("directions-panel");
         const directionsList = document.getElementById("directions-list");
@@ -80,25 +86,85 @@
             directionsPanel.classList.add("hidden");
             directionsList.replaceChildren();
             newDirectionForm.reset();
+            syncStatus.textContent = "";
+            syncStatus.classList.remove("error");
             selectedEvent = null;
         };
 
-        const formatDatetimeLocal = date => {
-            const timezoneOffset = date.getTimezoneOffset() * 60_000;
-            return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+        const formatDenverDatetime = date => {
+            const parts = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "America/Denver",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hourCycle: "h23",
+            }).formatToParts(date).reduce((values, part) => {
+                values[part.type] = part.value;
+                return values;
+            }, {});
+            return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+        };
+
+        const calendarDateTimeParts = value => {
+            const [dateValue, timeValue = "00:00:00"] = value.split("T");
+            return {dateValue, timeValue: timeValue.slice(0, 8)};
+        };
+
+        const eventDateTimeInputValue = event => event.startStr.slice(0, 16);
+
+        const shiftCalendarDate = (dateValue, days) => {
+            const [year, month, day] = dateValue.split("-").map(Number);
+            const shiftedDate = new Date(Date.UTC(year, month - 1, day + days));
+            return shiftedDate.toISOString().slice(0, 10);
+        };
+
+        const draggedMeetingTimes = info => {
+            const oldStart = calendarDateTimeParts(info.oldEvent.startStr);
+            const newStart = calendarDateTimeParts(info.event.startStr);
+            const oldStartDate = Date.parse(`${oldStart.dateValue}T00:00:00Z`);
+            const newStartDate = Date.parse(`${newStart.dateValue}T00:00:00Z`);
+            const start = `${newStart.dateValue}T${oldStart.timeValue}`;
+            const changes = {};
+
+            if (info.oldEvent.endStr) {
+                const oldEnd = calendarDateTimeParts(info.oldEvent.endStr);
+                const dayDifference = Math.round(
+                    (newStartDate - oldStartDate) / (24 * 60 * 60 * 1000),
+                );
+                changes.meeting_end = `${shiftCalendarDate(oldEnd.dateValue, dayDifference)}T${oldEnd.timeValue}`;
+            }
+
+            return {start, changes};
         };
 
         const configureDateInput = event => {
             const inviteMode = dateMode === "invite";
             dateLabel.textContent = inviteMode ? "Invite date" : "Meeting date and time";
             meetingAtInput.classList.toggle("hidden", inviteMode);
-            meetingAtInput.required = !inviteMode;
+            meetingEndLabel.classList.toggle("hidden", inviteMode);
+            meetingEndInput.classList.toggle("hidden", inviteMode);
             inviteDateDisplay.classList.toggle("hidden", !inviteMode);
             if (inviteMode) {
                 inviteDateDisplay.textContent = event.startStr;
             } else {
-                meetingAtInput.value = formatDatetimeLocal(event.start);
+                meetingAtInput.value = eventDateTimeInputValue(event);
+                if (event.endStr) {
+                    meetingEndInput.value = event.endStr.slice(0, 16);
+                } else {
+                    const meetingEnd = new Date(event.start.getTime() + 60 * 60 * 1000);
+                    meetingEndInput.value = formatDenverDatetime(meetingEnd).slice(0, 16);
+                }
             }
+        };
+
+        const restoreConnectionForm = event => {
+            configureDateInput(event);
+            descriptionInput.value = event.extendedProps.description ?? "";
+            ratingInput.value = event.extendedProps.rating ?? "";
+            notesInput.value = event.extendedProps.notes ?? "";
         };
 
         const loadWeeklyTotal = () => fetch(
@@ -124,11 +190,12 @@
             },
             body: JSON.stringify({id: event.id, start, date_mode: dateMode, ...changes}),
         })
-            .then(response => {
+            .then(async response => {
+                const data = await response.json();
                 if (!response.ok) {
-                    throw new Error("Unable to update the meeting.");
+                    throw new Error(data.error || "Unable to update the meeting.");
                 }
-                return response.json();
+                return data;
             })
             .then(updatedEvent => {
                 event.setExtendedProp("status", updatedEvent.status);
@@ -226,6 +293,7 @@
 
         const calendar = new FullCalendar.Calendar(calendarElement, {
             initialView: "dayGridMonth",
+            timeZone: "America/Denver",
             firstDay: 1,
             headerToolbar: {
                 left: "prev,next today",
@@ -245,47 +313,60 @@
             },
             eventClick(info) {
                 selectedEvent = info.event;
-                configureDateInput(info.event);
-                descriptionInput.value = info.event.extendedProps.description ?? "";
-                ratingInput.value = info.event.extendedProps.rating ?? "";
-                notesInput.value = info.event.extendedProps.notes ?? "";
+                restoreConnectionForm(info.event);
+                syncStatus.textContent = "";
+                syncStatus.classList.remove("error");
                 editModal.classList.remove("hidden");
                 if (dateMode !== "invite") {
                     meetingAtInput.focus();
                 }
             },
             eventDrop(info) {
-                const start = dateMode === "invite"
-                    ? info.event.startStr
-                    : info.event.start.toISOString();
-                updateMeeting(info.event, start)
-                    .catch(() => info.revert());
+                const meetingUpdate = dateMode === "meeting" ? draggedMeetingTimes(info) : null;
+                const start = dateMode === "invite" ? info.event.startStr : meetingUpdate.start;
+                updateMeeting(info.event, start, meetingUpdate?.changes)
+                    .catch(error => {
+                        info.revert();
+                        window.alert(error.message);
+                    });
             },
         });
 
         editForm.addEventListener("submit", event => {
             event.preventDefault();
             const inviteDate = inviteDateDisplay.textContent.trim();
-            if (!selectedEvent || (dateMode === "invite" ? !inviteDate : !meetingAtInput.value)) {
+            if (!selectedEvent || (dateMode === "invite" && !inviteDate)) {
                 return;
             }
 
             const updatedStart = dateMode === "invite"
                 ? inviteDate
-                : new Date(meetingAtInput.value);
+                : meetingAtInput.value;
             const rating = ratingInput.value === "" ? null : Number(ratingInput.value);
-            const start = dateMode === "invite"
-                ? updatedStart
-                : updatedStart.toISOString();
+            const start = updatedStart;
             updateMeeting(selectedEvent, start, {
                 description: descriptionInput.value,
                 rating,
                 notes: notesInput.value,
+                meeting_end: dateMode === "meeting" ? meetingEndInput.value : undefined,
+                clear_meeting: dateMode === "meeting" && !meetingAtInput.value,
             })
-                .then(() => {
+                .then(updatedEvent => {
+                    if (updatedEvent.removed_from_calendar) {
+                        selectedEvent.remove();
+                        closeEditModal();
+                        return;
+                    }
                     selectedEvent.setProp("title", descriptionInput.value);
                     calendar.refetchEvents();
-                    closeEditModal();
+                    syncStatus.textContent = updatedEvent.sync_message;
+                    syncStatus.classList.toggle("error", updatedEvent.sync_failed);
+                    syncStatus.classList.remove("hidden");
+                })
+                .catch(error => {
+                    restoreConnectionForm(selectedEvent);
+                    syncStatus.textContent = error.message || "Unable to save the connection.";
+                    syncStatus.classList.add("error");
                 });
         });
 
@@ -340,7 +421,7 @@
 
         cancelEditButton.addEventListener("click", closeEditModal);
         editModal.addEventListener("click", event => {
-            if (event.target === editModal) {
+            if (!event.target.closest(".connection-panels")) {
                 closeEditModal();
             }
         });
@@ -488,6 +569,15 @@
         border-color: #b91c1c;
         background: #fee2e2;
         color: #991b1b;
+    }
+
+    .connection-sync-status {
+        min-height: 1.2rem;
+        margin: 0;
+    }
+
+    .connection-sync-status.error {
+        color: #b91c1c;
     }
 
     .directions-panel {

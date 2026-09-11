@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.core.cache import cache
@@ -59,6 +60,7 @@ from .models import (
     RoleTask,
     Supervisor,
 )
+from .services.google_calendar import delete_meeting_event, sync_professional_connect
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -76,6 +78,50 @@ FREELANCER_RATE_LIMIT_MESSAGE = (
 
 logger = logging.getLogger(__name__)
 USER_TIMEZONE = ZoneInfo("America/Denver")
+
+
+def _sync_connection_after_save(connection):
+    try:
+        results = sync_professional_connect(connection)
+    except Exception:
+        logger.exception(
+            "Google Calendar sync failed after saving connection %s.", connection.pk
+        )
+        return False
+
+    if any(result["status"] == "error" for result in results.values()):
+        logger.warning("Google Calendar sync failed for connection %s: %s", connection.pk, results)
+        return False
+    return True
+
+
+def _delete_connection_with_google_event(connection):
+    if connection.google_meeting_event_id:
+        try:
+            delete_meeting_event(connection)
+        except Exception:
+            logger.exception(
+                "Google Calendar deletion failed for connection %s.", connection.pk
+            )
+    connection.delete()
+
+
+def _calendar_datetime_value(datetime_value):
+    if timezone.is_naive(datetime_value):
+        datetime_value = timezone.make_aware(datetime_value, USER_TIMEZONE)
+    return timezone.localtime(datetime_value, USER_TIMEZONE).replace(tzinfo=None).isoformat()
+
+
+def _meeting_conflict_message(error_messages):
+    return next(
+        (
+            str(error_message)
+            for error_message in error_messages
+            if "conflicts with another scheduled Connection" in str(error_message)
+            or "conflicts with \"" in str(error_message)
+        ),
+        None,
+    )
 
 
 def _join_copy_parts(parts):
@@ -990,6 +1036,7 @@ def professional_formset_view(request):
     submitted_edit_professional_id = None
     submitted_invitation_form = None
     submitted_invitation_id = None
+    connection_conflict_message = None
 
     if request.method == "POST":
         new_form = ProfessionalForm(request.POST, prefix="new")
@@ -1099,15 +1146,44 @@ def professional_formset_view(request):
                 connection = new_connection_form.save(commit=False)
                 connection.person = professional
                 connection.description = f"Ian x {professional.name}"
-                connection.save()
-                return redirect(f"{request.path}{redirect_params}")
+                try:
+                    connection.save()
+                except ValidationError as error:
+                    conflict_message = _meeting_conflict_message(
+                        error.message_dict.get("meeting_at", error.messages)
+                    )
+                    if conflict_message:
+                        messages.error(request, conflict_message)
+                        connection_conflict_message = conflict_message
+                        new_connection_form = ProfessionalConnectForm(
+                            prefix="new-connection",
+                            require_invite_date=True,
+                        )
+                        show_add_connection_modal = True
+                    else:
+                        raise
+                else:
+                    _sync_connection_after_save(connection)
+                    return redirect(f"{request.path}{redirect_params}")
+            conflict_message = _meeting_conflict_message(
+                new_connection_form.errors.get("meeting_at", [])
+            )
+            if conflict_message:
+                messages.error(request, conflict_message)
+                connection_conflict_message = conflict_message
+                new_connection_form = ProfessionalConnectForm(
+                    prefix="new-connection",
+                    require_invite_date=True,
+                )
             show_add_connection_modal = True
         elif delete_invitation_id:
-            ProfessionalConnect.objects.filter(
+            invitation = ProfessionalConnect.objects.filter(
                 pk=delete_invitation_id,
                 person=displayed_professional,
                 invite_date__isnull=False,
-            ).delete()
+            ).first()
+            if invitation is not None:
+                _delete_connection_with_google_event(invitation)
             return redirect(f"{request.path}{redirect_params}")
         elif save_invitation_id:
             invitation = ProfessionalConnect.objects.filter(
@@ -1123,8 +1199,47 @@ def professional_formset_view(request):
                     prefix=f"invitation-{invitation.pk}",
                 )
                 if submitted_invitation_form.is_valid():
-                    submitted_invitation_form.save()
-                    return redirect(f"{request.path}{redirect_params}")
+                    try:
+                        saved_connection = submitted_invitation_form.save()
+                    except ValidationError as error:
+                        conflict_message = _meeting_conflict_message(
+                            error.message_dict.get("meeting_at", error.messages)
+                        )
+                        if conflict_message:
+                            messages.error(request, conflict_message)
+                            connection_conflict_message = conflict_message
+                            invitation.refresh_from_db()
+                            submitted_invitation_form = ProfessionalConnectForm(
+                                instance=invitation,
+                                prefix=f"invitation-{invitation.pk}",
+                            )
+                            show_edit_invitation_id = invitation.pk
+                        else:
+                            raise
+                    else:
+                        if _sync_connection_after_save(saved_connection):
+                            messages.success(
+                                request,
+                                "Connection saved and synchronized to Google Calendar.",
+                            )
+                        else:
+                            messages.warning(
+                                request,
+                                "Connection saved, but Google Calendar sync failed.",
+                            )
+                        return redirect(f"{request.path}{redirect_params}")
+                else:
+                    conflict_message = _meeting_conflict_message(
+                        submitted_invitation_form.errors.get("meeting_at", [])
+                    )
+                    if conflict_message:
+                        messages.error(request, conflict_message)
+                        connection_conflict_message = conflict_message
+                        invitation.refresh_from_db()
+                        submitted_invitation_form = ProfessionalConnectForm(
+                            instance=invitation,
+                            prefix=f"invitation-{invitation.pk}",
+                        )
                 show_edit_invitation_id = invitation.pk
         elif invite_professional_id:
             professional = Professional.objects.filter(pk=invite_professional_id).first()
@@ -1215,6 +1330,7 @@ def professional_formset_view(request):
             "show_edit_modal_id": show_edit_modal_id,
             "show_edit_invitation_id": show_edit_invitation_id,
             "show_add_connection_modal": show_add_connection_modal,
+            "connection_conflict_message": connection_conflict_message,
             "invited_professional_name": invited_professional_name,
         },
     )
@@ -2039,7 +2155,12 @@ def connection_events_view(request):
             "start": (
                 connection.invite_date.isoformat()
                 if date_mode == "invite"
-                else connection.meeting_at.isoformat()
+                else _calendar_datetime_value(connection.meeting_at)
+            ),
+            "end": (
+                _calendar_datetime_value(connection.meeting_end)
+                if date_mode == "meeting" and connection.meeting_end is not None
+                else None
             ),
             "allDay": date_mode == "invite",
             "extendedProps": {
@@ -2086,10 +2207,11 @@ def update_connection_meeting_view(request):
         return JsonResponse({"error": "Invalid date mode."}, status=400)
 
     meeting_at = None
+    meeting_end = None
     invite_date = None
     if date_mode == "meeting":
         meeting_at = parse_datetime(start_value) if isinstance(start_value, str) else None
-        if meeting_at is None:
+        if meeting_at is None and payload.get("clear_meeting") is not True:
             return JsonResponse({"error": "A meeting datetime is required."}, status=400)
     else:
         invite_date = parse_date(start_value) if isinstance(start_value, str) else None
@@ -2104,7 +2226,26 @@ def update_connection_meeting_view(request):
         return JsonResponse({"error": "Connection not found."}, status=404)
 
     if meeting_at is not None and timezone.is_naive(meeting_at):
-        meeting_at = timezone.make_aware(meeting_at, timezone.get_current_timezone())
+        meeting_at = timezone.make_aware(meeting_at, USER_TIMEZONE)
+
+    if "meeting_end" in payload:
+        meeting_end_value = payload["meeting_end"]
+        if meeting_end_value in (None, ""):
+            meeting_end = None
+        elif isinstance(meeting_end_value, str):
+            meeting_end = parse_datetime(meeting_end_value)
+            if meeting_end is None:
+                return JsonResponse({"error": "A valid meeting end is required."}, status=400)
+            if timezone.is_naive(meeting_end):
+                meeting_end = timezone.make_aware(meeting_end, USER_TIMEZONE)
+        else:
+            return JsonResponse({"error": "A valid meeting end is required."}, status=400)
+
+        if meeting_at is not None and meeting_end is not None and meeting_end <= meeting_at:
+            return JsonResponse(
+                {"error": "Meeting end must be after the meeting start."},
+                status=400,
+            )
 
     rating = connection.rating
     if "rating" in payload:
@@ -2138,6 +2279,10 @@ def update_connection_meeting_view(request):
 
     if date_mode == "meeting":
         connection.meeting_at = meeting_at
+        if meeting_at is None:
+            connection.meeting_end = None
+        elif "meeting_end" in payload:
+            connection.meeting_end = meeting_end
     else:
         connection.invite_date = invite_date
     connection.description = description
@@ -2145,7 +2290,20 @@ def update_connection_meeting_view(request):
     connection.notes = notes
     update_fields = ["description", "rating", "notes"]
     update_fields.append("meeting_at" if date_mode == "meeting" else "invite_date")
-    connection.save(update_fields=update_fields)
+    if date_mode == "meeting" and ("meeting_end" in payload or meeting_at is None):
+        update_fields.append("meeting_end")
+    try:
+        connection.save(update_fields=update_fields)
+    except ValidationError as error:
+        errors = error.message_dict.get("meeting_at", error.messages)
+        return JsonResponse({"error": " ".join(errors)}, status=400)
+
+    sync_failed = not _sync_connection_after_save(connection)
+    sync_message = (
+        "Connection saved, but Google Calendar sync failed."
+        if sync_failed
+        else "Connection saved and synchronized to Google Calendar."
+    )
 
     return JsonResponse(
         {
@@ -2153,13 +2311,23 @@ def update_connection_meeting_view(request):
             "start": (
                 connection.invite_date.isoformat()
                 if date_mode == "invite"
-                else connection.meeting_at.isoformat()
+                else _calendar_datetime_value(connection.meeting_at)
+                if connection.meeting_at
+                else None
             ),
             "date_mode": date_mode,
             "status": connection.status,
             "description": connection.description,
             "rating": connection.rating,
             "notes": connection.notes,
+            "meeting_end": (
+                _calendar_datetime_value(connection.meeting_end)
+                if connection.meeting_end is not None
+                else None
+            ),
+            "sync_message": sync_message,
+            "sync_failed": sync_failed,
+            "removed_from_calendar": date_mode == "meeting" and connection.meeting_at is None,
         }
     )
 
@@ -2180,7 +2348,7 @@ def delete_connection_view(request):
     except ProfessionalConnect.DoesNotExist:
         return JsonResponse({"error": "Connection not found."}, status=404)
 
-    connection.delete()
+    _delete_connection_with_google_event(connection)
     return JsonResponse({"id": str(connection_id)})
 
 

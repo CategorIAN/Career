@@ -1,10 +1,12 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 import json
 
 from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from django.contrib.messages import get_messages
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -44,6 +46,7 @@ from .views import (
     _build_search_cache_key,
     _normalize_search_query,
 )
+from .services.google_calendar import sync_meeting_event, sync_professional_connect
 
 
 def make_project(
@@ -1191,6 +1194,7 @@ class ProfessionalPageTests(TestCase):
             f'name="delete_invitation" value="{newer_invitation.pk}"',
             html=False,
         )
+        self.assertNotContains(response, "Sync to Google Calendar")
         self.assertContains(response, "No invitation")
         self.assertNotContains(response, "Other professional invitation")
         self.assertLess(
@@ -1202,13 +1206,17 @@ class ProfessionalPageTests(TestCase):
             [newer_invitation, older_invitation],
         )
 
-    def test_professionals_page_edits_current_professionals_invitation(self):
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_page_edits_current_professionals_invitation(self, mock_sync):
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
             person=professional,
             invite_date=date(2026, 8, 1),
             notes="Initial notes",
         )
+        mock_sync.return_value = {
+            "meeting": {"status": "updated", "message": "Meeting updated."},
+        }
 
         response = self.client.post(
             reverse("professionals"),
@@ -1220,13 +1228,51 @@ class ProfessionalPageTests(TestCase):
                 f"invitation-{invitation.pk}-notes": "Updated notes",
                 "save_invitation": str(invitation.pk),
             },
+            follow=True,
         )
 
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertContains(response, "Connection saved and synchronized to Google Calendar.")
         invitation.refresh_from_db()
         self.assertEqual(invitation.invite_date, date(2026, 8, 2))
         self.assertEqual(invitation.rating, 5)
         self.assertEqual(invitation.notes, "Updated notes")
+        mock_sync.assert_called_once_with(invitation)
+
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_page_keeps_connection_save_when_google_sync_fails(
+        self, mock_sync
+    ):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        invitation = ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 8, 1),
+            notes="Initial notes",
+        )
+        mock_sync.return_value = {
+            "meeting": {"status": "error", "message": "Google API unavailable."},
+        }
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                f"invitation-{invitation.pk}-invite_date": "2026-08-02",
+                f"invitation-{invitation.pk}-meeting_at": "2026-08-03T09:30",
+                f"invitation-{invitation.pk}-rating": "4",
+                f"invitation-{invitation.pk}-notes": "Saved despite sync failure",
+                "save_invitation": str(invitation.pk),
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertContains(
+            response, "Connection saved, but Google Calendar sync failed."
+        )
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.rating, 4)
+        self.assertEqual(invitation.notes, "Saved despite sync failure")
 
     def test_professionals_page_builds_notes_from_connections_newest_first(self):
         professional = Professional.objects.create(name="Ada Lovelace")
@@ -1337,11 +1383,15 @@ class ProfessionalPageTests(TestCase):
         recent_unresolved.refresh_from_db()
         self.assertTrue(recent_unresolved.resolved)
 
-    def test_professionals_page_deletes_current_professionals_connection(self):
+    @patch("app.views.delete_meeting_event")
+    def test_professionals_page_deletes_current_professionals_connection(
+        self, mock_delete_meeting_event
+    ):
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
             person=professional,
             invite_date=date(2026, 8, 1),
+            google_meeting_event_id="google-event-id",
         )
 
         response = self.client.post(
@@ -1354,9 +1404,14 @@ class ProfessionalPageTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertFalse(ProfessionalConnect.objects.filter(pk=invitation.pk).exists())
+        mock_delete_meeting_event.assert_called_once()
 
-    def test_professionals_page_adds_connection_for_current_professional(self):
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_page_adds_connection_for_current_professional(self, mock_sync):
         professional = Professional.objects.create(name="Ada Lovelace")
+        mock_sync.return_value = {
+            "meeting": {"status": "created", "message": "Meeting created."}
+        }
 
         page_response = self.client.get(reverse("professionals"))
         self.assertContains(
@@ -1372,6 +1427,7 @@ class ProfessionalPageTests(TestCase):
             data={
                 "page": "1",
                 "new-connection-invite_date": "2026-09-01",
+                "new-connection-meeting_at": "2026-09-02T09:30",
                 "new-connection-rating": "5",
                 "new-connection-notes": "New connection",
                 "add_connection": str(professional.pk),
@@ -1384,6 +1440,44 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(connection.invite_date, date(2026, 9, 1))
         self.assertEqual(connection.rating, 5)
         self.assertEqual(connection.notes, "New connection")
+        mock_sync.assert_called_once_with(connection)
+
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_connection_time_matches_connections_calendar(self, mock_sync):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        mock_sync.return_value = {
+            "meeting": {"status": "created", "message": "Meeting created."}
+        }
+
+        self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-connection-invite_date": "2026-09-10",
+                "new-connection-meeting_at": "2026-09-10T22:25",
+                "add_connection": str(professional.pk),
+            },
+        )
+
+        connection = ProfessionalConnect.objects.get(person=professional)
+        self.assertEqual(
+            timezone.localtime(connection.meeting_at, ZoneInfo("America/Denver")),
+            datetime(2026, 9, 10, 22, 25, tzinfo=ZoneInfo("America/Denver")),
+        )
+        calendar_event = self.client.get(reverse("connection_events")).json()[0]
+        self.assertEqual(calendar_event["start"], "2026-09-10T22:25:00")
+
+    def test_professionals_connections_table_uses_am_pm_for_meeting_time(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        ProfessionalConnect.objects.create(
+            person=professional,
+            invite_date=date(2026, 9, 10),
+            meeting_at=datetime(2026, 9, 10, 14, 25, tzinfo=UTC),
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, "2026-09-10 8:25 AM")
 
     def test_professionals_edit_existing_cards(self):
         professional = Professional.objects.create(
@@ -1635,6 +1729,34 @@ class ProfessionalPageTests(TestCase):
             "I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL.",
         )
 
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_connection_form_prevents_overlapping_meeting(
+        self, mock_sync
+    ):
+        mountain_timezone = ZoneInfo("America/Denver")
+        professional = Professional.objects.create(name="Ada Lovelace")
+        ProfessionalConnect.objects.create(
+            person=professional,
+            description="Existing connection",
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
+        )
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "add_connection": str(professional.pk),
+                "new-connection-invite_date": "2026-09-15",
+                "new-connection-meeting_at": "2026-09-15T09:30",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This meeting conflicts with")
+        self.assertEqual(ProfessionalConnect.objects.count(), 1)
+        mock_sync.assert_not_called()
+
     def test_professionals_pass_deletes_professional_and_logs_connection(self):
         professional = Professional.objects.create(name="Ada Lovelace")
 
@@ -1691,20 +1813,26 @@ class ConnectionsCalendarTests(TestCase):
         self.assertContains(response, 'id="connection-invite-date-display"', html=False)
         self.assertContains(response, 'id="connection-edit-form" class="connection-edit-dialog" autocomplete="off"', html=False)
         self.assertContains(response, 'meetingAtInput.classList.toggle("hidden", inviteMode)')
+        self.assertContains(response, 'id="connection-meeting-end"')
         self.assertContains(response, 'id="connection-description"')
         self.assertContains(response, 'id="connection-rating"')
         self.assertContains(response, 'id="connection-notes"')
         self.assertContains(response, 'id="connection-edit-delete"')
+        self.assertNotContains(response, "Sync to Google Calendar")
         self.assertContains(response, 'id="connection-directions-button"')
         self.assertContains(response, 'id="directions-panel"')
         self.assertContains(response, "direction-delete-button")
         self.assertContains(response, ">Description<")
         self.assertContains(response, "eventDrop(info)")
+        self.assertContains(response, "draggedMeetingTimes(info)")
+        self.assertContains(response, "eventDateTimeInputValue(event)")
         self.assertContains(response, "info.revert()")
+        self.assertContains(response, "window.alert(error.message)")
+        self.assertContains(response, 'event.target.closest(".connection-panels")')
         self.assertContains(response, reverse("connection_events"))
 
     def test_connection_events_returns_only_scheduled_connections(self):
-        scheduled_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
+        scheduled_at = datetime(2026, 9, 15, 14, 20, tzinfo=UTC)
         scheduled = ProfessionalConnect.objects.create(
             person=self.professional,
             invite_date=date(2026, 9, 1),
@@ -1725,7 +1853,8 @@ class ConnectionsCalendarTests(TestCase):
                 {
                     "id": str(scheduled.pk),
                     "title": "Career discussion",
-                    "start": scheduled_at.isoformat(),
+                    "start": "2026-09-15T08:20:00",
+                    "end": "2026-09-15T09:20:00",
                     "allDay": False,
                     "extendedProps": {
                         "status": scheduled.status,
@@ -1737,11 +1866,58 @@ class ConnectionsCalendarTests(TestCase):
             ],
         )
 
-    def test_connection_event_update_requires_csrf_and_updates_meeting(self):
+    @patch("app.views.sync_professional_connect")
+    def test_calendar_update_rejects_overlapping_meeting_before_google_sync(
+        self, mock_sync
+    ):
+        mountain_timezone = ZoneInfo("America/Denver")
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="Existing connection",
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
+        )
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="Moved connection",
+            meeting_at=datetime(2026, 9, 15, 11, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 12, 0, tzinfo=mountain_timezone),
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": "2026-09-15T09:30:00",
+                    "meeting_end": "2026-09-15T10:30:00",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("conflicts with", response.json()["error"])
+        connection.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(connection.meeting_at, mountain_timezone),
+            datetime(2026, 9, 15, 11, 0, tzinfo=mountain_timezone),
+        )
+        mock_sync.assert_not_called()
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_event_update_saves_then_syncs_to_google_calendar(self, mock_sync):
         connection = ProfessionalConnect.objects.create(
             person=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
         )
+        mock_sync.return_value = {
+            "meeting": {"status": "updated", "message": "Meeting updated."},
+        }
         csrf_client = Client(enforce_csrf_checks=True)
         page_response = csrf_client.get(reverse("connections"))
         csrf_token = page_response.cookies["csrftoken"].value
@@ -1756,6 +1932,7 @@ class ConnectionsCalendarTests(TestCase):
                     "description": "Follow-up call",
                     "rating": 4,
                     "notes": "Discussed next steps.",
+                    "meeting_end": "2026-09-20T20:15:00+00:00",
                 }
             ),
             content_type="application/json",
@@ -1765,10 +1942,129 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(response.status_code, 200)
         connection.refresh_from_db()
         self.assertEqual(connection.meeting_at, updated_at)
+        self.assertEqual(
+            connection.meeting_end,
+            datetime(2026, 9, 20, 20, 15, tzinfo=UTC),
+        )
         self.assertEqual(connection.description, "Follow-up call")
         self.assertEqual(connection.rating, 4)
         self.assertEqual(connection.notes, "Discussed next steps.")
         self.assertEqual(response.json()["status"], connection.status)
+        self.assertEqual(
+            response.json()["sync_message"],
+            "Connection saved and synchronized to Google Calendar.",
+        )
+        self.assertFalse(response.json()["sync_failed"])
+        mock_sync.assert_called_once_with(connection)
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_event_update_preserves_save_when_google_sync_fails(self, mock_sync):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+        )
+        mock_sync.return_value = {
+            "meeting": {"status": "error", "message": "Google API unavailable."},
+        }
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": "2026-09-20T18:45:00+00:00",
+                    "meeting_end": "2026-09-20T19:45:00+00:00",
+                    "notes": "Saved locally",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["sync_message"],
+            "Connection saved, but Google Calendar sync failed.",
+        )
+        self.assertTrue(response.json()["sync_failed"])
+        connection.refresh_from_db()
+        self.assertEqual(connection.notes, "Saved locally")
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_event_update_interprets_naive_datetime_as_mountain_time(
+        self, mock_sync
+    ):
+        connection = ProfessionalConnect.objects.create(person=self.professional)
+        mock_sync.return_value = {
+            "meeting": {"status": "created", "message": "Meeting created."}
+        }
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": "2026-09-10T08:20",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(connection.meeting_at, ZoneInfo("America/Denver")),
+            datetime(2026, 9, 10, 8, 20, tzinfo=ZoneInfo("America/Denver")),
+        )
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_event_date_update_preserves_mountain_clock_times(
+        self, mock_sync
+    ):
+        mountain_timezone = ZoneInfo("America/Denver")
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 10, 8, 20, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 10, 9, 20, tzinfo=mountain_timezone),
+        )
+        mock_sync.return_value = {
+            "meeting": {"status": "updated", "message": "Meeting updated."}
+        }
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "start": "2026-09-11T08:20:00",
+                    "meeting_end": "2026-09-11T09:20:00",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(connection.meeting_at, mountain_timezone),
+            datetime(2026, 9, 11, 8, 20, tzinfo=mountain_timezone),
+        )
+        self.assertEqual(
+            timezone.localtime(connection.meeting_end, mountain_timezone),
+            datetime(2026, 9, 11, 9, 20, tzinfo=mountain_timezone),
+        )
+        mock_sync.assert_called_once_with(connection)
 
     def test_connection_events_supports_all_day_invite_date_mode(self):
         connection = ProfessionalConnect.objects.create(
@@ -1798,7 +2094,11 @@ class ConnectionsCalendarTests(TestCase):
     def test_connection_weekly_total_uses_the_active_date_mode(self):
         today = timezone.localdate()
         week_start = today - timedelta(days=today.weekday())
-        in_week_meeting = datetime.combine(week_start, datetime.min.time(), tzinfo=UTC)
+        in_week_meeting = datetime.combine(
+            week_start,
+            datetime.min.time(),
+            tzinfo=ZoneInfo("America/Denver"),
+        )
         ProfessionalConnect.objects.create(
             person=self.professional,
             meeting_at=in_week_meeting,
@@ -1821,13 +2121,19 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(meeting_response.json(), {"total": 1})
         self.assertEqual(invite_response.json(), {"total": 1})
 
-    def test_connection_invite_date_update_requires_csrf_and_updates_invite_date(self):
+    @patch("app.views.sync_professional_connect")
+    def test_connection_invite_date_update_requires_csrf_and_updates_invite_date(
+        self, mock_sync
+    ):
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
             person=self.professional,
             invite_date=date(2026, 9, 1),
             meeting_at=meeting_at,
         )
+        mock_sync.return_value = {
+            "meeting": {"status": "updated", "message": "Meeting updated."}
+        }
         csrf_client = Client(enforce_csrf_checks=True)
         page_response = csrf_client.get(reverse("connections"))
         csrf_token = page_response.cookies["csrftoken"].value
@@ -1850,10 +2156,14 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(connection.invite_date, date(2026, 9, 20))
         self.assertEqual(connection.meeting_at, meeting_at)
 
-    def test_connection_event_delete_requires_csrf_and_deletes_connection(self):
+    @patch("app.views.delete_meeting_event")
+    def test_connection_event_delete_requires_csrf_and_deletes_connection(
+        self, mock_delete_meeting_event
+    ):
         connection = ProfessionalConnect.objects.create(
             person=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+            google_meeting_event_id="google-event-id",
         )
         csrf_client = Client(enforce_csrf_checks=True)
         page_response = csrf_client.get(reverse("connections"))
@@ -1868,6 +2178,42 @@ class ConnectionsCalendarTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(ProfessionalConnect.objects.filter(pk=connection.pk).exists())
+        mock_delete_meeting_event.assert_called_once()
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_event_update_removes_google_event_when_meeting_is_cleared(
+        self, mock_sync
+    ):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
+            google_meeting_event_id="google-event-id",
+        )
+        mock_sync.return_value = {
+            "meeting": {
+                "status": "deleted",
+                "message": "Meeting deleted from Google Calendar.",
+            },
+        }
+        csrf_client = Client(enforce_csrf_checks=True)
+        page_response = csrf_client.get(reverse("connections"))
+        csrf_token = page_response.cookies["csrftoken"].value
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {"id": connection.pk, "start": "", "clear_meeting": True}
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["removed_from_calendar"])
+        connection.refresh_from_db()
+        self.assertIsNone(connection.meeting_at)
+        self.assertIsNone(connection.meeting_end)
+        mock_sync.assert_called_once_with(connection)
 
     def test_connection_directions_can_be_loaded_added_and_resolved(self):
         connection = ProfessionalConnect.objects.create(
@@ -1925,6 +2271,132 @@ class ConnectionsCalendarTests(TestCase):
         )
         self.assertEqual(delete_response.status_code, 200)
         self.assertFalse(Direction.objects.filter(pk=direction.pk).exists())
+
+
+class GoogleCalendarSyncTests(TestCase):
+    def setUp(self):
+        self.professional = Professional.objects.create(name="Calendar Professional")
+
+    def test_professional_connect_defaults_meeting_end_to_one_hour(self):
+        meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=meeting_at,
+        )
+        custom_end = meeting_at + timedelta(hours=2)
+        custom_connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            meeting_at=meeting_at + timedelta(hours=2),
+            meeting_end=custom_end + timedelta(hours=2),
+        )
+        no_meeting = ProfessionalConnect.objects.create(person=self.professional)
+
+        self.assertEqual(connection.meeting_end, meeting_at + timedelta(hours=1))
+        self.assertEqual(
+            custom_connection.meeting_end,
+            custom_end + timedelta(hours=2),
+        )
+        self.assertIsNone(no_meeting.meeting_end)
+
+    def test_meeting_overlap_validation_allows_adjacent_meetings(self):
+        mountain_timezone = ZoneInfo("America/Denver")
+        ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="First connection",
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
+        )
+        adjacent = ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="Adjacent connection",
+            meeting_at=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 11, 0, tzinfo=mountain_timezone),
+        )
+        conflicting = ProfessionalConnect(
+            person=self.professional,
+            description="Overlapping connection",
+            meeting_at=datetime(2026, 9, 15, 9, 30, tzinfo=mountain_timezone),
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            conflicting.save()
+
+        self.assertIsNotNone(adjacent.pk)
+        self.assertIn("First connection", str(error.exception))
+        self.assertIn("conflicts with", str(error.exception))
+
+    def test_meeting_sync_creates_then_updates_one_google_event(self):
+        meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="Ian x Calendar Professional",
+            meeting_at=meeting_at,
+        )
+        service = MagicMock()
+        service.events.return_value.insert.return_value.execute.return_value = {
+            "id": "meeting-event-id"
+        }
+
+        created_result = sync_meeting_event(connection, service=service)
+
+        self.assertEqual(created_result["status"], "created")
+        connection.refresh_from_db()
+        self.assertEqual(connection.google_meeting_event_id, "meeting-event-id")
+        insert_body = service.events.return_value.insert.call_args.kwargs["body"]
+        self.assertEqual(insert_body["summary"], "Ian x Calendar Professional")
+        self.assertEqual(
+            insert_body["start"]["dateTime"],
+            timezone.localtime(meeting_at, ZoneInfo("America/Denver")).isoformat(),
+        )
+        self.assertEqual(
+            insert_body["end"]["dateTime"],
+            timezone.localtime(
+                meeting_at + timedelta(hours=1), ZoneInfo("America/Denver")
+            ).isoformat(),
+        )
+        self.assertEqual(insert_body["start"]["timeZone"], "America/Denver")
+        self.assertEqual(insert_body["end"]["timeZone"], "America/Denver")
+
+        updated_result = sync_meeting_event(connection, service=service)
+
+        self.assertEqual(updated_result["status"], "updated")
+        service.events.return_value.update.assert_called_once_with(
+            calendarId="primary",
+            eventId="meeting-event-id",
+            body=insert_body,
+        )
+
+    def test_meeting_sync_deletes_linked_event_when_meeting_is_removed(self):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            google_meeting_event_id="meeting-event-id",
+        )
+        service = MagicMock()
+
+        result = sync_meeting_event(connection, service=service)
+
+        self.assertEqual(result["status"], "deleted")
+        service.events.return_value.delete.assert_called_once_with(
+            calendarId="primary",
+            eventId="meeting-event-id",
+        )
+        connection.refresh_from_db()
+        self.assertEqual(connection.google_meeting_event_id, "")
+
+    @patch("app.services.google_calendar.get_calendar_service")
+    def test_invite_only_connection_does_not_sync_to_google_calendar(self, mock_service):
+        connection = ProfessionalConnect.objects.create(
+            person=self.professional,
+            description="Ian x Calendar Professional",
+            invite_date=date(2026, 9, 15),
+        )
+
+        result = sync_professional_connect(connection)
+
+        self.assertEqual(result["meeting"]["status"], "skipped")
+        connection.refresh_from_db()
+        self.assertEqual(connection.google_invite_event_id, "")
+        mock_service.assert_not_called()
 
 
 class SkillPageTests(TestCase):

@@ -4,6 +4,13 @@
 
 {% block content %}
 <section class="utility-page">
+    {% if messages %}
+        <div aria-live="polite" style="margin-bottom: 1rem;">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}" style="margin: 0.5rem 0;">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
     <div class="utility-card-header">
         <h1>Professionals</h1>
         <button type="button" class="copy-button open-professional-modal" data-target="professional-add-modal">Add Professional</button>
@@ -571,7 +578,7 @@
                         <tr>
                             <td>{{ invitation.invite_date|date:"Y-m-d" }}</td>
                             <td>{{ invitation.status }}</td>
-                            <td>{{ invitation.meeting_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ invitation.meeting_at|date:"Y-m-d g:i A" }}</td>
                             <td>{{ invitation.rating }}</td>
                             <td>{{ invitation.notes_preview }}</td>
                             <td>
@@ -602,6 +609,9 @@
                     <div class="modal-content">
                         <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
                         <h2 id="invitation-edit-modal-title-{{ invitation.pk }}">Edit Invitation</h2>
+                        {% if connection_conflict_message and show_edit_invitation_id == invitation.pk %}
+                            <p role="alert" style="color: #991b1b; margin: 0 0 1rem;">{{ connection_conflict_message }}</p>
+                        {% endif %}
                         <form method="post" autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="page" value="{{ current_page }}">
@@ -625,7 +635,7 @@
                                 <label for="{{ invitation.edit_form.notes.id_for_label }}">Notes</label>
                                 <div>
                                     {{ invitation.edit_form.notes.errors }}
-                                    {{ invitation.edit_form.notes }}
+                                {{ invitation.edit_form.notes }}
                                 </div>
                                 <div style="grid-column: 2; display: flex; gap: 0.5rem; justify-self: start;">
                                     <button type="submit" name="delete_invitation" value="{{ invitation.pk }}" style="border-color: #b91c1c; background: #fee2e2; color: #991b1b;">Delete</button>
@@ -647,6 +657,9 @@
                 <div class="modal-content">
                     <button type="button" class="close-professional-modal" aria-label="Close">&times;</button>
                     <h2 id="connection-add-modal-title">Add Connection</h2>
+                    {% if connection_conflict_message and show_add_connection_modal %}
+                        <p role="alert" style="color: #991b1b; margin: 0 0 1rem;">{{ connection_conflict_message }}</p>
+                    {% endif %}
                     <form method="post" autocomplete="off">
                         {% csrf_token %}
                         <input type="hidden" name="page" value="{{ current_page }}">
@@ -918,5 +931,6 @@
         display: grid;
         gap: 1.5rem;
     }
+
 </style>
 {% endblock %}

@@ -1,8 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import modelformset_factory
+from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
 from .models import (
@@ -16,6 +18,9 @@ from .models import (
     ProfessionalConnect,
     Skill,
 )
+
+
+MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
 
 class CompanyForm(forms.ModelForm):
@@ -403,6 +408,21 @@ class ProfessionalConnectForm(forms.ModelForm):
             self.fields[field_name].required = False
         self.fields["invite_date"].required = require_invite_date
         self.fields["meeting_at"].input_formats = ["%Y-%m-%dT%H:%M"]
+
+    def clean_meeting_at(self):
+        value = self.cleaned_data.get("meeting_at")
+        if value is None:
+            return None
+
+        raw_value = self.data.get(self.add_prefix("meeting_at"))
+        if raw_value:
+            try:
+                local_value = datetime.strptime(raw_value, "%Y-%m-%dT%H:%M")
+            except ValueError:
+                return value
+            return timezone.make_aware(local_value, MOUNTAIN_TIME_ZONE)
+
+        return timezone.localtime(value, MOUNTAIN_TIME_ZONE)
 
 
 ProfessionalFormSet = modelformset_factory(

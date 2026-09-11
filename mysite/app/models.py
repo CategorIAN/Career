@@ -1,8 +1,14 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.utils.functional import cached_property
 from calendar import monthrange
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+
+
+MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
 
 def _add_calendar_months(date_value, months):
@@ -827,6 +833,74 @@ class ProfessionalConnect(models.Model):
         max_length=255,
         blank=True,
     )
+
+    def _prepare_meeting_interval(self):
+        changed_fields = set()
+        for field_name in ("meeting_at", "meeting_end"):
+            value = getattr(self, field_name)
+            if value is not None and timezone.is_naive(value):
+                setattr(self, field_name, timezone.make_aware(value, MOUNTAIN_TIME_ZONE))
+                changed_fields.add(field_name)
+
+        if self.meeting_at is not None and self.meeting_end is None:
+            self.meeting_end = self.meeting_at + timedelta(hours=1)
+            changed_fields.add("meeting_end")
+
+        return changed_fields
+
+    def clean(self):
+        self._prepare_meeting_interval()
+
+        if self.meeting_at is None or self.meeting_end is None:
+            return
+
+        if self.meeting_end <= self.meeting_at:
+            raise ValidationError(
+                {"meeting_end": "Meeting end must be after the meeting start."}
+            )
+
+        conflict = (
+            ProfessionalConnect.objects.filter(
+                meeting_at__isnull=False,
+                meeting_end__isnull=False,
+                meeting_at__lt=self.meeting_end,
+                meeting_end__gt=self.meeting_at,
+            )
+            .exclude(pk=self.pk)
+            .order_by("meeting_at", "pk")
+            .first()
+        )
+        if conflict is None:
+            return
+
+        conflict_start = timezone.localtime(conflict.meeting_at, MOUNTAIN_TIME_ZONE)
+        conflict_end = timezone.localtime(conflict.meeting_end, MOUNTAIN_TIME_ZONE)
+        start_hour = conflict_start.hour % 12 or 12
+        end_hour = conflict_end.hour % 12 or 12
+        start_label = (
+            f"{start_hour}:{conflict_start:%M} "
+            f"{'AM' if conflict_start.hour < 12 else 'PM'}"
+        )
+        end_label = (
+            f"{end_hour}:{conflict_end:%M} "
+            f"{'AM' if conflict_end.hour < 12 else 'PM'}"
+        )
+        raise ValidationError(
+            {
+                "meeting_at": (
+                    f'This meeting conflicts with "{conflict}", scheduled from '
+                    f"{start_label} to {end_label}."
+                )
+            }
+        )
+
+    def save(self, *args, **kwargs):
+        changed_fields = self._prepare_meeting_interval()
+        if kwargs.get("update_fields") is not None and changed_fields:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | changed_fields
+
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.description or f"Connection {self.pk}"
