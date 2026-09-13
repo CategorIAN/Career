@@ -6,6 +6,7 @@ urlpatterns = [
     path("skills/", views.skill_formset_view, name="skills"),
     path("platforms/", views.platform_formset_view, name="platforms"),
     path("professionals/", views.professional_formset_view, name="professionals"),
+    path("recruiters/", views.recruiter_formset_view, name="recruiters"),
     path("connections/", views.connections_view, name="connections"),
     path("connections/events/", views.connection_events_view, name="connection_events"),
     path(

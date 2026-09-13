@@ -29,6 +29,8 @@ from .models import (
     PlatformSkill,
     Professional,
     ProfessionalConnect,
+    Recruiter,
+    Connect,
     Project,
     ProjectTask,
     Residency,
@@ -757,6 +759,22 @@ class PlatformPageTests(TestCase):
 
 
 class ProfessionalPageTests(TestCase):
+    def test_professional_reverse_connections_use_professional_relation(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        connection = ProfessionalConnect.objects.create(
+            professional=professional,
+            invite_date=date(2026, 9, 12),
+        )
+
+        response = self.client.get(
+            reverse("professionals"),
+            {"professional_id": professional.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(professional.connects.all()), [connection])
+        self.assertContains(response, "Ada Lovelace")
+
     def test_professionals_page_shows_modal_add_form_and_existing_cards(self):
         professional = Professional.objects.create(
             name="Ada Lovelace",
@@ -848,7 +866,10 @@ class ProfessionalPageTests(TestCase):
         )
 
         professional = Professional.objects.get(name="Grace Hopper")
-        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        self.assertRedirects(
+            response,
+            f"{reverse('professionals')}?page=1&professional_id={professional.pk}",
+        )
         self.assertEqual(professional.email, "grace@example.com")
         self.assertEqual(professional.phone, "555-0100")
         self.assertEqual(str(professional.wait), "15 days, 0:00:00")
@@ -1149,22 +1170,22 @@ class ProfessionalPageTests(TestCase):
         professional = Professional.objects.create(name="Ada Lovelace")
         other_professional = Professional.objects.create(name="Grace Hopper")
         older_invitation = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 8, 1),
             notes="Older invitation",
         )
         newer_invitation = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 8, 2),
             notes="Newer invitation",
         )
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             meeting_at=timezone.make_aware(datetime(2026, 8, 3, 9, 0)),
             notes="No invitation",
         )
         ProfessionalConnect.objects.create(
-            person=other_professional,
+            professional=other_professional,
             invite_date=date(2026, 8, 4),
             notes="Other professional invitation",
         )
@@ -1210,7 +1231,7 @@ class ProfessionalPageTests(TestCase):
     def test_professionals_page_edits_current_professionals_invitation(self, mock_sync):
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 8, 1),
             notes="Initial notes",
         )
@@ -1245,7 +1266,7 @@ class ProfessionalPageTests(TestCase):
     ):
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 8, 1),
             notes="Initial notes",
         )
@@ -1277,22 +1298,22 @@ class ProfessionalPageTests(TestCase):
     def test_professionals_page_builds_notes_from_connections_newest_first(self):
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 9, 1),
             notes="Old invite note",
         )
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             meeting_at=datetime(2026, 9, 3, 14, 30, tzinfo=UTC),
             notes="Meeting note",
         )
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 9, 5),
             notes="Newest invite note",
         )
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 9, 6),
             notes="   ",
         )
@@ -1318,16 +1339,16 @@ class ProfessionalPageTests(TestCase):
         professional = Professional.objects.create(name="Ada Lovelace")
         other_professional = Professional.objects.create(name="Grace Hopper")
         recent_connection = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             meeting_at=datetime(2026, 9, 5, 14, 30, tzinfo=UTC),
         )
         older_connection = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             meeting_at=datetime(2026, 9, 3, 9, 0, tzinfo=UTC),
         )
-        undated_connection = ProfessionalConnect.objects.create(person=professional)
+        undated_connection = ProfessionalConnect.objects.create(professional=professional)
         other_connection = ProfessionalConnect.objects.create(
-            person=other_professional,
+            professional=other_professional,
             meeting_at=datetime(2026, 9, 6, 9, 0, tzinfo=UTC),
         )
         recent_unresolved = Direction.objects.create(
@@ -1389,7 +1410,7 @@ class ProfessionalPageTests(TestCase):
     ):
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 8, 1),
             google_meeting_event_id="google-event-id",
         )
@@ -1434,7 +1455,7 @@ class ProfessionalPageTests(TestCase):
             },
         )
 
-        connection = ProfessionalConnect.objects.get(person=professional)
+        connection = ProfessionalConnect.objects.get(professional=professional)
         self.assertEqual(connection.description, "Ian x Ada Lovelace")
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(connection.invite_date, date(2026, 9, 1))
@@ -1459,7 +1480,7 @@ class ProfessionalPageTests(TestCase):
             },
         )
 
-        connection = ProfessionalConnect.objects.get(person=professional)
+        connection = ProfessionalConnect.objects.get(professional=professional)
         self.assertEqual(
             timezone.localtime(connection.meeting_at, ZoneInfo("America/Denver")),
             datetime(2026, 9, 10, 22, 25, tzinfo=ZoneInfo("America/Denver")),
@@ -1470,7 +1491,7 @@ class ProfessionalPageTests(TestCase):
     def test_professionals_connections_table_uses_am_pm_for_meeting_time(self):
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 9, 10),
             meeting_at=datetime(2026, 9, 10, 14, 25, tzinfo=UTC),
         )
@@ -1516,12 +1537,12 @@ class ProfessionalPageTests(TestCase):
         first_connected_at = timezone.make_aware(datetime(2026, 8, 1, 9, 30))
         last_connected_at = timezone.make_aware(datetime(2026, 8, 2, 10, 45))
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 7, 1),
             meeting_at=first_connected_at,
         )
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             invite_date=date(2026, 7, 15),
             meeting_at=last_connected_at,
         )
@@ -1537,11 +1558,23 @@ class ProfessionalPageTests(TestCase):
             date(2026, 8, 17),
         )
 
+    def test_professional_connect_due_uses_calendar_months(self):
+        professional = Professional.objects.create(
+            name="Jacob Pyrett",
+            wait=timedelta(days=90),
+        )
+        ProfessionalConnect.objects.create(
+            professional=professional,
+            meeting_at=datetime(2026, 6, 13, 0, 0, tzinfo=ZoneInfo("America/Denver")),
+        )
+
+        self.assertEqual(professional.connect_due, date(2026, 9, 13))
+
     def test_professionals_page_calculates_average_rating(self):
         professional = Professional.objects.create(name="Ada Lovelace")
-        ProfessionalConnect.objects.create(person=professional, rating=4)
-        ProfessionalConnect.objects.create(person=professional, rating=5)
-        ProfessionalConnect.objects.create(person=professional)
+        ProfessionalConnect.objects.create(professional=professional, rating=4)
+        ProfessionalConnect.objects.create(professional=professional, rating=5)
+        ProfessionalConnect.objects.create(professional=professional)
 
         response = self.client.get(reverse("professionals"))
 
@@ -1553,11 +1586,11 @@ class ProfessionalPageTests(TestCase):
     def test_professionals_page_calculates_invite_success(self):
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             meeting_at=timezone.make_aware(datetime(2026, 8, 1, 9, 0)),
         )
-        ProfessionalConnect.objects.create(person=professional)
-        ProfessionalConnect.objects.create(person=professional)
+        ProfessionalConnect.objects.create(professional=professional)
+        ProfessionalConnect.objects.create(professional=professional)
 
         response = self.client.get(reverse("professionals"))
 
@@ -1581,16 +1614,16 @@ class ProfessionalPageTests(TestCase):
         attended_at = current_datetime - timedelta(days=2)
 
         ProfessionalConnect.objects.create(
-            person=overdue_invite,
+            professional=overdue_invite,
             invite_date=current_date - timedelta(days=35),
         )
         ProfessionalConnect.objects.create(
-            person=current_connect,
+            professional=current_connect,
             invite_date=current_date - timedelta(days=3),
             meeting_at=attended_at,
         )
         ProfessionalConnect.objects.create(
-            person=future_connect,
+            professional=future_connect,
             invite_date=current_date - timedelta(days=3),
             meeting_at=current_datetime,
         )
@@ -1639,23 +1672,23 @@ class ProfessionalPageTests(TestCase):
         )
 
         ProfessionalConnect.objects.create(
-            person=first,
+            professional=first,
             invite_date=current_date - timedelta(days=40),
             meeting_at=current_datetime - timedelta(days=11),
         )
         ProfessionalConnect.objects.create(
-            person=second,
+            professional=second,
             invite_date=current_date - timedelta(days=35),
             meeting_at=current_datetime - timedelta(days=11),
         )
         for professional in (third, fourth):
             ProfessionalConnect.objects.create(
-                person=professional,
+                professional=professional,
                 invite_date=current_date - timedelta(days=35),
                 meeting_at=current_datetime - timedelta(days=12),
             )
         ProfessionalConnect.objects.create(
-            person=last,
+            professional=last,
             invite_date=current_date - timedelta(days=3),
             meeting_at=current_datetime,
         )
@@ -1707,7 +1740,7 @@ class ProfessionalPageTests(TestCase):
             invite_response,
             f"{reverse('professionals')}?page=1&invited_professional={professional.pk}",
         )
-        connect = ProfessionalConnect.objects.get(person=professional)
+        connect = ProfessionalConnect.objects.get(professional=professional)
         self.assertEqual(connect.description, "Ian x Ada Lovelace")
         self.assertEqual(connect.invite_date, timezone.localdate())
 
@@ -1736,7 +1769,7 @@ class ProfessionalPageTests(TestCase):
         mountain_timezone = ZoneInfo("America/Denver")
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
-            person=professional,
+            professional=professional,
             description="Existing connection",
             meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
@@ -1774,7 +1807,7 @@ class ProfessionalPageTests(TestCase):
             description="Passed on Ada Lovelace"
         )
         self.assertEqual(passed_connection.invite_date, timezone.localdate())
-        self.assertIsNone(passed_connection.person)
+        self.assertIsNone(passed_connection.professional)
 
     def test_professionals_delete_existing_cards_from_edit_modal(self):
         professional = Professional.objects.create(name="Ada Lovelace")
@@ -1789,6 +1822,83 @@ class ProfessionalPageTests(TestCase):
 
         self.assertRedirects(delete_response, f"{reverse('professionals')}?page=1")
         self.assertFalse(Professional.objects.filter(pk=professional.pk).exists())
+
+
+class RecruiterPageTests(TestCase):
+    def test_recruiters_page_adds_recruiter_and_selects_it(self):
+        response = self.client.post(
+            reverse("recruiters"),
+            {
+                "page": "1",
+                "new-name": "Ada Recruiter",
+                "new-linkedin_url": "https://www.linkedin.com/in/ada-recruiter",
+                "new-email": "ada@example.com",
+                "new-phone": "555-0100",
+                "new-wait_0": "0",
+                "new-wait_1": "1",
+                "new-wait_2": "0",
+                "add_recruiter": "1",
+            },
+        )
+
+        recruiter = Recruiter.objects.get(name="Ada Recruiter")
+        self.assertRedirects(
+            response,
+            f"{reverse('recruiters')}?page=1&recruiter_id={recruiter.pk}",
+        )
+
+    @patch("app.views.sync_professional_connect")
+    def test_recruiter_connection_uses_shared_connect_without_professional(
+        self, mock_sync
+    ):
+        recruiter = Recruiter.objects.create(name="Ada Recruiter")
+        professional = Professional.objects.create(name="Ada Professional")
+        mock_sync.return_value = {"meeting": {"status": "created"}}
+
+        response = self.client.post(
+            reverse("recruiters"),
+            {
+                "page": "1",
+                "recruiter_id": recruiter.pk,
+                "new-connection-invite_date": "2026-09-12",
+                "new-connection-meeting_at": "2026-09-13T10:00",
+                "add_connection": recruiter.pk,
+            },
+        )
+
+        connection = Connect.objects.get(recruiter=recruiter)
+        self.assertRedirects(response, f"{reverse('recruiters')}?page=1&recruiter_id={recruiter.pk}")
+        self.assertIsNone(connection.professional)
+        self.assertNotEqual(connection.professional_id, professional.pk)
+        self.assertEqual(list(recruiter.connects.all()), [connection])
+        mock_sync.assert_called_once_with(connection)
+
+    @patch("app.views.sync_professional_connect")
+    def test_recruiter_connection_conflicts_with_professional_meeting(self, mock_sync):
+        mountain_timezone = ZoneInfo("America/Denver")
+        professional = Professional.objects.create(name="Ada Professional")
+        recruiter = Recruiter.objects.create(name="Ada Recruiter")
+        Connect.objects.create(
+            professional=professional,
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
+            meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
+        )
+
+        response = self.client.post(
+            reverse("recruiters"),
+            {
+                "page": "1",
+                "recruiter_id": recruiter.pk,
+                "new-connection-invite_date": "2026-09-15",
+                "new-connection-meeting_at": "2026-09-15T09:30",
+                "add_connection": recruiter.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This meeting conflicts with")
+        self.assertFalse(Connect.objects.filter(recruiter=recruiter).exists())
+        mock_sync.assert_not_called()
 
 
 class ConnectionsCalendarTests(TestCase):
@@ -1834,13 +1944,13 @@ class ConnectionsCalendarTests(TestCase):
     def test_connection_events_returns_only_scheduled_connections(self):
         scheduled_at = datetime(2026, 9, 15, 14, 20, tzinfo=UTC)
         scheduled = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=date(2026, 9, 1),
             meeting_at=scheduled_at,
             description="Career discussion",
         )
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=date(2026, 9, 2),
         )
 
@@ -1872,13 +1982,13 @@ class ConnectionsCalendarTests(TestCase):
     ):
         mountain_timezone = ZoneInfo("America/Denver")
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="Existing connection",
             meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
         )
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="Moved connection",
             meeting_at=datetime(2026, 9, 15, 11, 0, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 15, 12, 0, tzinfo=mountain_timezone),
@@ -1912,7 +2022,7 @@ class ConnectionsCalendarTests(TestCase):
     @patch("app.views.sync_professional_connect")
     def test_connection_event_update_saves_then_syncs_to_google_calendar(self, mock_sync):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
         )
         mock_sync.return_value = {
@@ -1960,7 +2070,7 @@ class ConnectionsCalendarTests(TestCase):
     @patch("app.views.sync_professional_connect")
     def test_connection_event_update_preserves_save_when_google_sync_fails(self, mock_sync):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
         )
         mock_sync.return_value = {
@@ -1997,7 +2107,7 @@ class ConnectionsCalendarTests(TestCase):
     def test_connection_event_update_interprets_naive_datetime_as_mountain_time(
         self, mock_sync
     ):
-        connection = ProfessionalConnect.objects.create(person=self.professional)
+        connection = ProfessionalConnect.objects.create(professional=self.professional)
         mock_sync.return_value = {
             "meeting": {"status": "created", "message": "Meeting created."}
         }
@@ -2030,7 +2140,7 @@ class ConnectionsCalendarTests(TestCase):
     ):
         mountain_timezone = ZoneInfo("America/Denver")
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 10, 8, 20, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 10, 9, 20, tzinfo=mountain_timezone),
         )
@@ -2068,12 +2178,12 @@ class ConnectionsCalendarTests(TestCase):
 
     def test_connection_events_supports_all_day_invite_date_mode(self):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=date(2026, 9, 15),
             description="Invite conversation",
         )
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 16, 16, 30, tzinfo=UTC),
             description="Meeting only",
         )
@@ -2100,15 +2210,15 @@ class ConnectionsCalendarTests(TestCase):
             tzinfo=ZoneInfo("America/Denver"),
         )
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=in_week_meeting,
         )
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=week_start + timedelta(days=1),
         )
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=week_start - timedelta(days=1),
         )
 
@@ -2127,7 +2237,7 @@ class ConnectionsCalendarTests(TestCase):
     ):
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             invite_date=date(2026, 9, 1),
             meeting_at=meeting_at,
         )
@@ -2161,7 +2271,7 @@ class ConnectionsCalendarTests(TestCase):
         self, mock_delete_meeting_event
     ):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
             google_meeting_event_id="google-event-id",
         )
@@ -2185,7 +2295,7 @@ class ConnectionsCalendarTests(TestCase):
         self, mock_sync
     ):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
             google_meeting_event_id="google-event-id",
         )
@@ -2217,7 +2327,7 @@ class ConnectionsCalendarTests(TestCase):
 
     def test_connection_directions_can_be_loaded_added_and_resolved(self):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
         )
         direction = Direction.objects.create(
@@ -2280,16 +2390,16 @@ class GoogleCalendarSyncTests(TestCase):
     def test_professional_connect_defaults_meeting_end_to_one_hour(self):
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=meeting_at,
         )
         custom_end = meeting_at + timedelta(hours=2)
         custom_connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             meeting_at=meeting_at + timedelta(hours=2),
             meeting_end=custom_end + timedelta(hours=2),
         )
-        no_meeting = ProfessionalConnect.objects.create(person=self.professional)
+        no_meeting = ProfessionalConnect.objects.create(professional=self.professional)
 
         self.assertEqual(connection.meeting_end, meeting_at + timedelta(hours=1))
         self.assertEqual(
@@ -2301,19 +2411,19 @@ class GoogleCalendarSyncTests(TestCase):
     def test_meeting_overlap_validation_allows_adjacent_meetings(self):
         mountain_timezone = ZoneInfo("America/Denver")
         ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="First connection",
             meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
         )
         adjacent = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="Adjacent connection",
             meeting_at=datetime(2026, 9, 15, 10, 0, tzinfo=mountain_timezone),
             meeting_end=datetime(2026, 9, 15, 11, 0, tzinfo=mountain_timezone),
         )
         conflicting = ProfessionalConnect(
-            person=self.professional,
+            professional=self.professional,
             description="Overlapping connection",
             meeting_at=datetime(2026, 9, 15, 9, 30, tzinfo=mountain_timezone),
         )
@@ -2328,7 +2438,7 @@ class GoogleCalendarSyncTests(TestCase):
     def test_meeting_sync_creates_then_updates_one_google_event(self):
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="Ian x Calendar Professional",
             meeting_at=meeting_at,
         )
@@ -2368,7 +2478,7 @@ class GoogleCalendarSyncTests(TestCase):
 
     def test_meeting_sync_deletes_linked_event_when_meeting_is_removed(self):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             google_meeting_event_id="meeting-event-id",
         )
         service = MagicMock()
@@ -2386,7 +2496,7 @@ class GoogleCalendarSyncTests(TestCase):
     @patch("app.services.google_calendar.get_calendar_service")
     def test_invite_only_connection_does_not_sync_to_google_calendar(self, mock_service):
         connection = ProfessionalConnect.objects.create(
-            person=self.professional,
+            professional=self.professional,
             description="Ian x Calendar Professional",
             invite_date=date(2026, 9, 15),
         )

@@ -15,7 +15,8 @@ from .models import (
     PlatformFeature,
     PlatformSkill,
     Professional,
-    ProfessionalConnect,
+    Recruiter,
+    Connect,
     Skill,
 )
 
@@ -377,9 +378,14 @@ class ProfessionalForm(forms.ModelForm):
         return name
 
 
+class RecruiterForm(ProfessionalForm):
+    class Meta(ProfessionalForm.Meta):
+        model = Recruiter
+
+
 class ProfessionalConnectForm(forms.ModelForm):
     class Meta:
-        model = ProfessionalConnect
+        model = Connect
         fields = ["invite_date", "meeting_at", "rating", "notes"]
         widgets = {
             "invite_date": forms.DateInput(
@@ -423,6 +429,10 @@ class ProfessionalConnectForm(forms.ModelForm):
             return timezone.make_aware(local_value, MOUNTAIN_TIME_ZONE)
 
         return timezone.localtime(value, MOUNTAIN_TIME_ZONE)
+
+
+class RecruiterConnectForm(ProfessionalConnectForm):
+    pass
 
 
 ProfessionalFormSet = modelformset_factory(

@@ -1,0 +1,937 @@
+{% extends "app/base.html" %}
+
+{% block title %}Recruiters{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    {% if messages %}
+        <div aria-live="polite" style="margin-bottom: 1rem;">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}" style="margin: 0.5rem 0;">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <div class="utility-card-header">
+        <h1>Recruiters</h1>
+        <button type="button" class="copy-button open-recruiter-modal" data-target="recruiter-add-modal">Add Recruiter</button>
+    </div>
+
+    <div
+        id="recruiter-add-modal"
+        class="modal recruiter-modal{% if not show_add_modal %} hidden{% endif %}"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recruiter-add-modal-title"
+    >
+        <div class="modal-content">
+            <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+            <h2 id="recruiter-add-modal-title">Add Recruiter</h2>
+            <form method="post" autocomplete="off">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ current_page }}">
+                <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                    <label for="{{ new_form.name.id_for_label }}">Name</label>
+                    <div>
+                        {{ new_form.name.errors }}
+                        {{ new_form.name }}
+                    </div>
+                    <label for="{{ new_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                    <div>
+                        {{ new_form.linkedin_url.errors }}
+                        {{ new_form.linkedin_url }}
+                    </div>
+                    <label for="{{ new_form.email.id_for_label }}">Email</label>
+                    <div>
+                        {{ new_form.email.errors }}
+                        {{ new_form.email }}
+                    </div>
+                    <label for="{{ new_form.phone.id_for_label }}">Phone</label>
+                    <div>
+                        {{ new_form.phone.errors }}
+                        {{ new_form.phone }}
+                    </div>
+                    <label>Wait</label>
+                    <div>
+                        {{ new_form.wait.errors }}
+                        {{ new_form.wait }}
+                    </div>
+                    <button type="submit" name="add_recruiter" value="1" style="grid-column: 2; justify-self: start;">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div
+        id="recruiter-invite-modal"
+        class="modal recruiter-modal{% if not invited_recruiter_name %} hidden{% endif %}"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recruiter-invite-modal-title"
+    >
+        <div class="modal-content">
+            <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+            <h2 id="recruiter-invite-modal-title">Invitation</h2>
+            <button type="button" class="copy-button" data-copy-source="recruiter-invite-message">Copy</button>
+            <p>Hello {{ invited_recruiter_name }}. I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL. I would like to video chat with you to learn about your background and possibly get insight for my job search and/or projects.</p>
+            <textarea id="recruiter-invite-message" class="copy-source">Hello {{ invited_recruiter_name }}. I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL. I would like to video chat with you to learn about your background and possibly get insight for my job search and/or projects.</textarea>
+        </div>
+    </div>
+
+    {% if displayed_recruiter %}
+        <div
+            id="recruiter-add-company-modal"
+            class="modal recruiter-modal{% if not show_add_company_modal %} hidden{% endif %}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recruiter-add-company-modal-title"
+        >
+            <div class="modal-content">
+                <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                <h2 id="recruiter-add-company-modal-title">Add New Company</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ current_page }}">
+                    <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                    <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                        {% for field in new_company_form %}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div>
+                                {{ field.errors }}
+                                {{ field }}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" name="add_new_company" value="{{ displayed_recruiter.pk }}" style="grid-column: 2; justify-self: start;">Add Company</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if displayed_recruiter %}
+        <div
+            id="recruiter-add-referrer-modal"
+            class="modal recruiter-modal{% if not show_add_referrer_modal %} hidden{% endif %}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recruiter-add-referrer-modal-title"
+        >
+            <div class="modal-content">
+                <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                <h2 id="recruiter-add-referrer-modal-title">Add New Referrer</h2>
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ current_page }}">
+                    <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                    <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                        <label for="{{ new_referrer_form.name.id_for_label }}">Name</label>
+                        <div>
+                            {{ new_referrer_form.name.errors }}
+                            {{ new_referrer_form.name }}
+                        </div>
+                        <label for="{{ new_referrer_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                        <div>
+                            {{ new_referrer_form.linkedin_url.errors }}
+                            {{ new_referrer_form.linkedin_url }}
+                        </div>
+                        <label for="{{ new_referrer_form.email.id_for_label }}">Email</label>
+                        <div>
+                            {{ new_referrer_form.email.errors }}
+                            {{ new_referrer_form.email }}
+                        </div>
+                        <label for="{{ new_referrer_form.phone.id_for_label }}">Phone</label>
+                        <div>
+                            {{ new_referrer_form.phone.errors }}
+                            {{ new_referrer_form.phone }}
+                        </div>
+                        <label>Wait</label>
+                        <div>
+                            {{ new_referrer_form.wait.errors }}
+                            {{ new_referrer_form.wait }}
+                        </div>
+                        <button type="submit" name="add_new_referrer" value="{{ displayed_recruiter.pk }}" style="grid-column: 2; justify-self: start;">Add Referrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if displayed_recruiter %}
+        <div
+            id="recruiter-add-referral-modal"
+            class="modal recruiter-modal{% if not show_add_referral_modal %} hidden{% endif %}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recruiter-add-referral-modal-title"
+        >
+            <div class="modal-content">
+                <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                <h2 id="recruiter-add-referral-modal-title">Add New Referral</h2>
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ current_page }}">
+                    <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                    <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                        <label for="{{ new_referral_form.name.id_for_label }}">Name</label>
+                        <div>
+                            {{ new_referral_form.name.errors }}
+                            {{ new_referral_form.name }}
+                        </div>
+                        <label for="{{ new_referral_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                        <div>
+                            {{ new_referral_form.linkedin_url.errors }}
+                            {{ new_referral_form.linkedin_url }}
+                        </div>
+                        <label for="{{ new_referral_form.email.id_for_label }}">Email</label>
+                        <div>
+                            {{ new_referral_form.email.errors }}
+                            {{ new_referral_form.email }}
+                        </div>
+                        <label for="{{ new_referral_form.phone.id_for_label }}">Phone</label>
+                        <div>
+                            {{ new_referral_form.phone.errors }}
+                            {{ new_referral_form.phone }}
+                        </div>
+                        <label>Wait</label>
+                        <div>
+                            {{ new_referral_form.wait.errors }}
+                            {{ new_referral_form.wait }}
+                        </div>
+                        <button type="submit" name="add_new_referral" value="{{ displayed_recruiter.pk }}" style="grid-column: 2; justify-self: start;">Add Referral</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if recruiters %}
+        <table class="project-results">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Wait</th>
+                    <th>Average Rating</th>
+                    <th>Invite Success</th>
+                    <th>Invite Due</th>
+                    <th>Connect Due</th>
+                    <th>Invite</th>
+                    <th>Send Invite</th>
+                    <th>Pass</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recruiter in recruiters %}
+                    <tr{% if recruiter.invite %} style="background: #f4cccc;"{% endif %}>
+                        <td>
+                            {% if recruiter.linkedin_url %}
+                                <a href="{{ recruiter.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ recruiter.name }}</a>
+                            {% else %}
+                                {{ recruiter.name }}
+                            {% endif %}
+                        </td>
+                        <td>{{ recruiter.wait_display }}</td>
+                        <td>
+                            {% if recruiter.average_rating is not None %}
+                                <span title="{{ recruiter.average_rating|floatformat:1 }} out of 5">{{ recruiter.average_rating_stars }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if recruiter.invite_success is not None %}
+                                {{ recruiter.invite_success|floatformat:1 }}%
+                            {% endif %}
+                        </td>
+                        <td>{{ recruiter.invite_due|date:"Y-m-d" }}</td>
+                        <td>{{ recruiter.connect_due|date:"Y-m-d" }}</td>
+                        <td>{{ recruiter.invite }}</td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="page" value="{{ current_page }}">
+                                <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                                <button type="submit" class="copy-button" name="invite_recruiter" value="{{ recruiter.pk }}">Invite</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="page" value="{{ current_page }}">
+                                <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                                <button type="submit" class="copy-button" name="pass_recruiter" value="{{ recruiter.pk }}">Pass</button>
+                            </form>
+                        </td>
+                        <td>
+                            <button
+                                type="button"
+                                class="copy-button open-recruiter-modal"
+                                data-target="recruiter-edit-modal-{{ recruiter.pk }}"
+                            >
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% for recruiter in recruiters %}
+            <div
+                id="recruiter-edit-modal-{{ recruiter.pk }}"
+                class="modal recruiter-modal{% if show_edit_modal_id != recruiter.pk %} hidden{% endif %}"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="recruiter-edit-modal-title-{{ recruiter.pk }}"
+            >
+                <div class="modal-content">
+                    <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                    <h2 id="recruiter-edit-modal-title-{{ recruiter.pk }}">Edit Recruiter</h2>
+                    <form method="post" autocomplete="off">
+                        {% csrf_token %}
+                        <input type="hidden" name="page" value="{{ current_page }}">
+                        <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                        <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                            <label for="{{ recruiter.edit_form.name.id_for_label }}">Name</label>
+                            <div>
+                                {{ recruiter.edit_form.name.errors }}
+                                {{ recruiter.edit_form.name }}
+                            </div>
+                            <label for="{{ recruiter.edit_form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+                            <div>
+                                {{ recruiter.edit_form.linkedin_url.errors }}
+                                {{ recruiter.edit_form.linkedin_url }}
+                            </div>
+                            <label for="{{ recruiter.edit_form.email.id_for_label }}">Email</label>
+                            <div>
+                                {{ recruiter.edit_form.email.errors }}
+                                {{ recruiter.edit_form.email }}
+                            </div>
+                            <label for="{{ recruiter.edit_form.phone.id_for_label }}">Phone</label>
+                            <div>
+                                {{ recruiter.edit_form.phone.errors }}
+                                {{ recruiter.edit_form.phone }}
+                            </div>
+                            <label>Wait</label>
+                            <div>
+                                {{ recruiter.edit_form.wait.errors }}
+                                {{ recruiter.edit_form.wait }}
+                            </div>
+                            <div style="grid-column: 2; display: flex; gap: 0.5rem;">
+                                <button type="submit" name="save_recruiter" value="{{ recruiter.pk }}">Save</button>
+                                <button type="submit" name="delete_recruiter" value="{{ recruiter.pk }}">Delete</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No recruiters found.</p>
+    {% endif %}
+
+    {% if not is_filtered %}
+        <div style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous recruiter">&larr;</a>
+            {% endif %}
+            <span>Recruiter {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next recruiter">&rarr;</a>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <form method="get" style="margin-top: 1rem;">
+        <label for="recruiter-search">Search Recruiter</label>
+        <input
+            id="recruiter-search"
+            type="text"
+            list="recruiter-search-options"
+            value="{% if selected_recruiter %}{{ selected_recruiter.name }}{% endif %}"
+            autocomplete="off"
+            style="width: 20rem;"
+        >
+        <datalist id="recruiter-search-options">
+            {% for recruiter in all_recruiters %}
+                <option value="{{ recruiter.name }}" data-recruiter-id="{{ recruiter.pk }}"></option>
+            {% endfor %}
+        </datalist>
+        <input id="recruiter-id-input" type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'recruiters' %}'">Clear</button>
+    </form>
+
+    {% if displayed_recruiter %}
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Companies</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="copy-button recruiter-section-toggle" data-target="companies-section-body">Show</button>
+                    <div style="position: relative;">
+                        <button type="button" class="copy-button" id="add-company-toggle">Add Company</button>
+                        <div id="add-company-menu" class="hidden" style="position: absolute; right: 0; z-index: 1; min-width: 20rem; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #8c8c8c; background: #fff;">
+                        <form method="post" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ current_page }}">
+                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                            <select name="company_id" aria-label="Company" style="flex: 1; min-width: 0;">
+                                {% for company in available_companies %}
+                                    <option value="{{ company.pk }}">{{ company.name }}</option>
+                                {% empty %}
+                                    <option value="" disabled selected>No companies available</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" name="add_company" value="{{ displayed_recruiter.pk }}"{% if not available_companies %} disabled{% endif %} style="white-space: nowrap;">Add Existing</button>
+                        </form>
+                        <button type="button" class="copy-button open-recruiter-modal" data-target="recruiter-add-company-modal" style="margin-top: 0.5rem; white-space: nowrap;">Add New</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="companies-section-body" class="hidden">
+                <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>LinkedIn</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in companies %}
+                        <tr>
+                            <td>
+                                {% if company.website %}
+                                    <a href="{{ company.website }}" target="_blank" rel="noopener noreferrer">{{ company.name }}</a>
+                                {% else %}
+                                    {{ company.name }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if company.linkedin_url %}
+                                    <button type="button" class="copy-button" onclick="window.open('{{ company.linkedin_url }}', '_blank', 'noopener,noreferrer')">LinkedIn</button>
+                                {% endif %}
+                            </td>
+                            <td>{{ company.email }}</td>
+                            <td>{{ company.phone }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No companies found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+        </section>
+
+    {% endif %}
+
+    {% if displayed_recruiter %}
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Referrals</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="copy-button recruiter-section-toggle" data-target="referrals-section-body">Show</button>
+                    <div style="position: relative;">
+                        <button type="button" class="copy-button" id="add-referral-toggle">Add Referral</button>
+                        <div id="add-referral-menu" class="hidden" style="position: absolute; right: 0; z-index: 1; min-width: 20rem; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #8c8c8c; background: #fff;">
+                        <form method="post" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ current_page }}">
+                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                            <select name="referral_id" aria-label="Referral" style="flex: 1; min-width: 0;">
+                                {% for referral in available_referrals %}
+                                    <option value="{{ referral.pk }}">{{ referral.name }}</option>
+                                {% empty %}
+                                    <option value="" disabled selected>No referrals available</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" name="add_referral" value="{{ displayed_recruiter.pk }}"{% if not available_referrals %} disabled{% endif %} style="white-space: nowrap;">Add Existing</button>
+                        </form>
+                        <button type="button" class="copy-button open-recruiter-modal" data-target="recruiter-add-referral-modal" style="margin-top: 0.5rem; white-space: nowrap;">Add New</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="referrals-section-body" class="hidden">
+                <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>LinkedIn URL</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for referral in referrals %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'recruiters' %}?recruiter_id={{ referral.pk }}">{{ referral.name }}</a>
+                            </td>
+                            <td>
+                                {% if referral.linkedin_url %}
+                                    <a href="{{ referral.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ referral.linkedin_url }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ referral.email }}</td>
+                            <td>{{ referral.phone }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No referrals found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+        </section>
+
+    {% endif %}
+
+    {% if displayed_recruiter %}
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Referred By</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="copy-button recruiter-section-toggle" data-target="referred-by-section-body">Show</button>
+                    <div style="position: relative;">
+                        <button type="button" class="copy-button" id="add-referrer-toggle">Add Referrer</button>
+                        <div id="add-referrer-menu" class="hidden" style="position: absolute; right: 0; z-index: 1; min-width: 20rem; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #8c8c8c; background: #fff;">
+                        <form method="post" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ current_page }}">
+                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                            <select name="referrer_id" aria-label="Referrer" style="flex: 1; min-width: 0;">
+                                {% for referrer in available_referrers %}
+                                    <option value="{{ referrer.pk }}">{{ referrer.name }}</option>
+                                {% empty %}
+                                    <option value="" disabled selected>No referrers available</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" name="add_referrer" value="{{ displayed_recruiter.pk }}"{% if not available_referrers %} disabled{% endif %} style="white-space: nowrap;">Add Existing</button>
+                        </form>
+                        <button type="button" class="copy-button open-recruiter-modal" data-target="recruiter-add-referrer-modal" style="margin-top: 0.5rem; white-space: nowrap;">Add New</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="referred-by-section-body" class="hidden">
+                <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>LinkedIn URL</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for referrer in referred_by %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'recruiters' %}?recruiter_id={{ referrer.pk }}">{{ referrer.name }}</a>
+                            </td>
+                            <td>
+                                {% if referrer.linkedin_url %}
+                                    <a href="{{ referrer.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ referrer.linkedin_url }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ referrer.email }}</td>
+                            <td>{{ referrer.phone }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No referrers found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+        </section>
+    {% endif %}
+
+    {% if displayed_recruiter %}
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Connections</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="copy-button recruiter-section-toggle" data-target="connections-section-body">Show</button>
+                    <button type="button" class="copy-button open-recruiter-modal" data-target="connection-add-modal">Add Connection</button>
+                </div>
+            </div>
+            <div id="connections-section-body" class="hidden">
+                <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Invite Date</th>
+                        <th>Status</th>
+                        <th>Meeting At</th>
+                        <th>Rating</th>
+                        <th>Notes</th>
+                        <th>Edit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invitation in invitations %}
+                        <tr>
+                            <td>{{ invitation.invite_date|date:"Y-m-d" }}</td>
+                            <td>{{ invitation.status }}</td>
+                            <td>{{ invitation.meeting_at|date:"Y-m-d g:i A" }}</td>
+                            <td>{{ invitation.rating }}</td>
+                            <td>{{ invitation.notes_preview }}</td>
+                            <td>
+                                <button
+                                    type="button"
+                                    class="copy-button open-recruiter-modal"
+                                    data-target="invitation-edit-modal-{{ invitation.pk }}"
+                                >
+                                    Edit
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">No invitations found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+                {% for invitation in invitations %}
+                <div
+                    id="invitation-edit-modal-{{ invitation.pk }}"
+                    class="modal recruiter-modal{% if show_edit_invitation_id != invitation.pk %} hidden{% endif %}"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="invitation-edit-modal-title-{{ invitation.pk }}"
+                >
+                    <div class="modal-content">
+                        <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                        <h2 id="invitation-edit-modal-title-{{ invitation.pk }}">Edit Invitation</h2>
+                        {% if connection_conflict_message and show_edit_invitation_id == invitation.pk %}
+                            <p role="alert" style="color: #991b1b; margin: 0 0 1rem;">{{ connection_conflict_message }}</p>
+                        {% endif %}
+                        <form method="post" autocomplete="off">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ current_page }}">
+                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                            <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                                <label for="{{ invitation.edit_form.invite_date.id_for_label }}">Invite Date</label>
+                                <div>
+                                    {{ invitation.edit_form.invite_date.errors }}
+                                    {{ invitation.edit_form.invite_date }}
+                                </div>
+                                <label for="{{ invitation.edit_form.meeting_at.id_for_label }}">Meeting At</label>
+                                <div>
+                                    {{ invitation.edit_form.meeting_at.errors }}
+                                    {{ invitation.edit_form.meeting_at }}
+                                </div>
+                                <label for="{{ invitation.edit_form.rating.id_for_label }}">Rating</label>
+                                <div>
+                                    {{ invitation.edit_form.rating.errors }}
+                                    {{ invitation.edit_form.rating }}
+                                </div>
+                                <label for="{{ invitation.edit_form.notes.id_for_label }}">Notes</label>
+                                <div>
+                                    {{ invitation.edit_form.notes.errors }}
+                                {{ invitation.edit_form.notes }}
+                                </div>
+                                <div style="grid-column: 2; display: flex; gap: 0.5rem; justify-self: start;">
+                                    <button type="submit" name="delete_invitation" value="{{ invitation.pk }}" style="border-color: #b91c1c; background: #fee2e2; color: #991b1b;">Delete</button>
+                                    <button type="submit" name="save_invitation" value="{{ invitation.pk }}">Save</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div
+                id="connection-add-modal"
+                class="modal recruiter-modal{% if not show_add_connection_modal %} hidden{% endif %}"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="connection-add-modal-title"
+            >
+                <div class="modal-content">
+                    <button type="button" class="close-recruiter-modal" aria-label="Close">&times;</button>
+                    <h2 id="connection-add-modal-title">Add Connection</h2>
+                    {% if connection_conflict_message and show_add_connection_modal %}
+                        <p role="alert" style="color: #991b1b; margin: 0 0 1rem;">{{ connection_conflict_message }}</p>
+                    {% endif %}
+                    <form method="post" autocomplete="off">
+                        {% csrf_token %}
+                        <input type="hidden" name="page" value="{{ current_page }}">
+                        <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                        <div style="display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 1rem;">
+                            <label for="{{ new_connection_form.invite_date.id_for_label }}">Invite Date</label>
+                            <div>
+                                {{ new_connection_form.invite_date.errors }}
+                                {{ new_connection_form.invite_date }}
+                            </div>
+                            <label for="{{ new_connection_form.meeting_at.id_for_label }}">Meeting At</label>
+                            <div>
+                                {{ new_connection_form.meeting_at.errors }}
+                                {{ new_connection_form.meeting_at }}
+                            </div>
+                            <label for="{{ new_connection_form.rating.id_for_label }}">Rating</label>
+                            <div>
+                                {{ new_connection_form.rating.errors }}
+                                {{ new_connection_form.rating }}
+                            </div>
+                            <label for="{{ new_connection_form.notes.id_for_label }}">Notes</label>
+                            <div>
+                                {{ new_connection_form.notes.errors }}
+                                {{ new_connection_form.notes }}
+                            </div>
+                            <button type="submit" name="add_connection" value="{{ displayed_recruiter.pk }}" style="grid-column: 2; justify-self: start;">Add Connection</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Notes</h2>
+                <button type="button" class="copy-button recruiter-section-toggle" data-target="notes-section-body">Show</button>
+            </div>
+            <div id="notes-section-body" class="hidden">
+                <div class="recruiter-notes-document">
+                    {% for connection_note in connection_notes %}
+                        <article class="recruiter-note-entry">
+                            <h3>{{ connection_note.date_heading }}</h3>
+                            <div>{{ connection_note.notes }}</div>
+                        </article>
+                    {% empty %}
+                        <p>No connection notes found.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Directions</h2>
+                <button type="button" class="copy-button recruiter-section-toggle" data-target="directions-section-body">Show</button>
+            </div>
+            <div id="directions-section-body" class="hidden recruiter-directions-groups">
+                <div>
+                    <h3>Unresolved</h3>
+                    <table class="project-results">
+                        <thead>
+                            <tr>
+                                <th>Meeting Date</th>
+                                <th>Direction</th>
+                                <th>Resolved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for direction in unresolved_directions %}
+                                <tr>
+                                    <td>{% if direction.connect.meeting_at %}{{ direction.connect.meeting_at|date:"Y-m-d H:i" }}{% else %}No meeting date{% endif %}</td>
+                                    <td>{{ direction.description }}</td>
+                                    <td>
+                                        <form method="post" class="recruiter-direction-resolved-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="page" value="{{ current_page }}">
+                                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                                            <input type="hidden" name="update_direction" value="{{ direction.pk }}">
+                                            <label aria-label="Resolved">
+                                                <input type="checkbox" name="direction_resolved" onchange="this.form.requestSubmit()">
+                                            </label>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3">No unresolved directions found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h3>Resolved</h3>
+                    <table class="project-results">
+                        <thead>
+                            <tr>
+                                <th>Meeting Date</th>
+                                <th>Direction</th>
+                                <th>Resolved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for direction in resolved_directions %}
+                                <tr>
+                                    <td>{% if direction.connect.meeting_at %}{{ direction.connect.meeting_at|date:"Y-m-d H:i" }}{% else %}No meeting date{% endif %}</td>
+                                    <td>{{ direction.description }}</td>
+                                    <td>
+                                        <form method="post" class="recruiter-direction-resolved-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="page" value="{{ current_page }}">
+                                            <input type="hidden" name="recruiter_id" value="{{ selected_recruiter_id }}">
+                                            <input type="hidden" name="update_direction" value="{{ direction.pk }}">
+                                            <label aria-label="Resolved">
+                                                <input type="checkbox" name="direction_resolved" checked onchange="this.form.requestSubmit()">
+                                            </label>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3">No resolved directions found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+
+</section>
+<script>
+    (() => {
+        const modals = document.querySelectorAll(".recruiter-modal");
+
+        const openModal = targetId => {
+            const modal = document.getElementById(targetId);
+            if (modal) {
+                modal.classList.remove("hidden");
+            }
+        };
+        const closeModal = modal => modal.classList.add("hidden");
+
+        document.querySelectorAll(".open-recruiter-modal").forEach(button => {
+            button.addEventListener("click", () => openModal(button.dataset.target));
+        });
+        document.querySelectorAll(".close-recruiter-modal").forEach(button => {
+            button.addEventListener("click", () => closeModal(button.closest(".recruiter-modal")));
+        });
+        document.querySelectorAll(".autofill-blocked").forEach(input => {
+            input.addEventListener("focus", () => {
+                input.removeAttribute("readonly");
+            }, { once: true });
+        });
+        document.querySelectorAll(".recruiter-section-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const sectionBody = document.getElementById(button.dataset.target);
+
+                if (!sectionBody) {
+                    return;
+                }
+
+                const isHidden = sectionBody.classList.contains("hidden");
+                sectionBody.classList.toggle("hidden");
+                button.textContent = isHidden ? "Hide" : "Show";
+            });
+        });
+        const searchInput = document.getElementById("recruiter-search");
+        const recruiterIdInput = document.getElementById("recruiter-id-input");
+        const recruiterOptions = document.querySelectorAll("#recruiter-search-options option");
+
+        if (searchInput && recruiterIdInput && recruiterOptions.length) {
+            const recruiterIdByName = new Map(
+                Array.from(recruiterOptions).map(option => [
+                    option.value,
+                    option.dataset.recruiterId,
+                ])
+            );
+            const syncRecruiterId = () => {
+                recruiterIdInput.value = recruiterIdByName.get(searchInput.value) || "";
+            };
+
+            searchInput.addEventListener("input", syncRecruiterId);
+            searchInput.addEventListener("change", syncRecruiterId);
+            searchInput.form?.addEventListener("submit", () => {
+                syncRecruiterId();
+            });
+        }
+        const addCompanyToggle = document.getElementById("add-company-toggle");
+        const addCompanyMenu = document.getElementById("add-company-menu");
+
+        if (addCompanyToggle && addCompanyMenu) {
+            addCompanyToggle.addEventListener("click", () => {
+                addCompanyMenu.classList.toggle("hidden");
+            });
+            document.addEventListener("click", event => {
+                if (
+                    !addCompanyMenu.contains(event.target)
+                    && !addCompanyToggle.contains(event.target)
+                ) {
+                    addCompanyMenu.classList.add("hidden");
+                }
+            });
+        }
+        const addReferralToggle = document.getElementById("add-referral-toggle");
+        const addReferralMenu = document.getElementById("add-referral-menu");
+
+        if (addReferralToggle && addReferralMenu) {
+            addReferralToggle.addEventListener("click", () => {
+                addReferralMenu.classList.toggle("hidden");
+            });
+            document.addEventListener("click", event => {
+                if (
+                    !addReferralMenu.contains(event.target)
+                    && !addReferralToggle.contains(event.target)
+                ) {
+                    addReferralMenu.classList.add("hidden");
+                }
+            });
+        }
+        const addReferrerToggle = document.getElementById("add-referrer-toggle");
+        const addReferrerMenu = document.getElementById("add-referrer-menu");
+
+        if (addReferrerToggle && addReferrerMenu) {
+            addReferrerToggle.addEventListener("click", () => {
+                addReferrerMenu.classList.toggle("hidden");
+            });
+            document.addEventListener("click", event => {
+                if (
+                    !addReferrerMenu.contains(event.target)
+                    && !addReferrerToggle.contains(event.target)
+                ) {
+                    addReferrerMenu.classList.add("hidden");
+                }
+            });
+        }
+        modals.forEach(modal => {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                modals.forEach(closeModal);
+            }
+        });
+    })();
+</script>
+<style>
+    .recruiter-notes-document {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .recruiter-note-entry {
+        padding: 1rem;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+    }
+
+    .recruiter-note-entry h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    .recruiter-note-entry div {
+        white-space: pre-wrap;
+    }
+
+    .recruiter-directions-groups {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+</style>
+{% endblock %}
+

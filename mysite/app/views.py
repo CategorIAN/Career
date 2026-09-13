@@ -33,6 +33,8 @@ from .forms import (
     PlatformSkillFormSet,
     ProfessionalConnectForm,
     ProfessionalForm,
+    RecruiterConnectForm,
+    RecruiterForm,
     SkillForm,
     SkillFormSet,
 )
@@ -46,7 +48,8 @@ from .models import (
     PlatformFeature,
     PlatformSkill,
     Professional,
-    ProfessionalConnect,
+    Recruiter,
+    Connect,
     Skill,
     Education,
     Residency,
@@ -834,7 +837,6 @@ def skill_formset_view(request):
         },
     )
 
-
 def platform_formset_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Platform.objects.all().order_by("name")
@@ -933,7 +935,7 @@ def professional_formset_view(request):
         else Company.objects.none()
     )
     available_companies = (
-        Company.objects.exclude(peers=displayed_professional).order_by("name", "pk")
+        Company.objects.exclude(professionals=displayed_professional).order_by("name", "pk")
         if displayed_professional is not None
         else Company.objects.none()
     )
@@ -962,17 +964,17 @@ def professional_formset_view(request):
         else Professional.objects.none()
     )
     invitations = (
-        ProfessionalConnect.objects.filter(
-            person=displayed_professional,
+        Connect.objects.filter(
+            professional=displayed_professional,
             invite_date__isnull=False,
         ).order_by("-invite_date", "-pk")
         if displayed_professional is not None
-        else ProfessionalConnect.objects.none()
+        else Connect.objects.none()
     )
     connection_notes = []
     if displayed_professional is not None:
-        for connection in ProfessionalConnect.objects.filter(
-            person=displayed_professional,
+        for connection in Connect.objects.filter(
+            professional=displayed_professional,
         ).only("meeting_at", "invite_date", "notes"):
             notes = connection.notes.strip()
             if not notes:
@@ -1001,7 +1003,7 @@ def professional_formset_view(request):
             )
         connection_notes.sort(key=lambda note: note["connection_date"], reverse=True)
     directions_by_meeting = (
-        Direction.objects.filter(connect__person=displayed_professional)
+        Direction.objects.filter(connect__professional=displayed_professional)
         .select_related("connect")
         .order_by(F("connect__meeting_at").desc(nulls_last=True), "pk")
         if displayed_professional is not None
@@ -1073,8 +1075,10 @@ def professional_formset_view(request):
 
         if add_professional_requested:
             if new_form.is_valid():
-                new_form.save()
-                return redirect(f"{request.path}{redirect_params}")
+                professional = new_form.save()
+                return redirect(
+                    f"{request.path}?page={current_page}&professional_id={professional.pk}"
+                )
             show_add_modal = True
         elif add_company_professional_id:
             professional = Professional.objects.filter(pk=add_company_professional_id).first()
@@ -1124,15 +1128,15 @@ def professional_formset_view(request):
         elif update_direction_id:
             Direction.objects.filter(
                 pk=update_direction_id,
-                connect__person=displayed_professional,
+                connect__professional=displayed_professional,
             ).update(resolved="direction_resolved" in request.POST)
             return redirect(f"{request.path}{redirect_params}")
         elif pass_professional_id:
             professional = Professional.objects.filter(pk=pass_professional_id).first()
             if professional is not None:
                 with transaction.atomic():
-                    ProfessionalConnect.objects.create(
-                        person=professional,
+                    Connect.objects.create(
+                        professional=professional,
                         invite_date=timezone.localdate(),
                         description=f"Passed on {professional.name}",
                     )
@@ -1144,7 +1148,7 @@ def professional_formset_view(request):
             ).first()
             if professional is not None and new_connection_form.is_valid():
                 connection = new_connection_form.save(commit=False)
-                connection.person = professional
+                connection.professional = professional
                 connection.description = f"Ian x {professional.name}"
                 try:
                     connection.save()
@@ -1177,18 +1181,18 @@ def professional_formset_view(request):
                 )
             show_add_connection_modal = True
         elif delete_invitation_id:
-            invitation = ProfessionalConnect.objects.filter(
+            invitation = Connect.objects.filter(
                 pk=delete_invitation_id,
-                person=displayed_professional,
+                professional=displayed_professional,
                 invite_date__isnull=False,
             ).first()
             if invitation is not None:
                 _delete_connection_with_google_event(invitation)
             return redirect(f"{request.path}{redirect_params}")
         elif save_invitation_id:
-            invitation = ProfessionalConnect.objects.filter(
+            invitation = Connect.objects.filter(
                 pk=save_invitation_id,
-                person=displayed_professional,
+                professional=displayed_professional,
                 invite_date__isnull=False,
             ).first()
             if invitation is not None:
@@ -1244,8 +1248,8 @@ def professional_formset_view(request):
         elif invite_professional_id:
             professional = Professional.objects.filter(pk=invite_professional_id).first()
             if professional is not None:
-                ProfessionalConnect.objects.create(
-                    person=professional,
+                Connect.objects.create(
+                    professional=professional,
                     invite_date=timezone.localdate(),
                     description=f"Ian x {professional.name}",
                 )
@@ -2136,15 +2140,15 @@ def connection_events_view(request):
     date_mode = request.GET.get("date_mode", "meeting")
     if date_mode == "invite":
         connections = (
-            ProfessionalConnect.objects.filter(invite_date__isnull=False)
-            .select_related("person")
+            Connect.objects.filter(invite_date__isnull=False)
+            .select_related("professional")
             .order_by("invite_date", "pk")
         )
     else:
         date_mode = "meeting"
         connections = (
-            ProfessionalConnect.objects.filter(meeting_at__isnull=False)
-            .select_related("person")
+            Connect.objects.filter(meeting_at__isnull=False)
+            .select_related("professional")
             .order_by("meeting_at", "pk")
         )
 
@@ -2182,11 +2186,11 @@ def connection_weekly_total_view(request):
     week_end = week_start + timedelta(days=6)
 
     if date_mode == "invite":
-        total = ProfessionalConnect.objects.filter(
+        total = Connect.objects.filter(
             invite_date__range=(week_start, week_end),
         ).count()
     else:
-        total = ProfessionalConnect.objects.filter(
+        total = Connect.objects.filter(
             meeting_at__date__range=(week_start, week_end),
         ).count()
 
@@ -2221,8 +2225,8 @@ def update_connection_meeting_view(request):
         return JsonResponse({"error": "A connection ID is required."}, status=400)
 
     try:
-        connection = ProfessionalConnect.objects.get(pk=connection_id)
-    except ProfessionalConnect.DoesNotExist:
+        connection = Connect.objects.get(pk=connection_id)
+    except Connect.DoesNotExist:
         return JsonResponse({"error": "Connection not found."}, status=404)
 
     if meeting_at is not None and timezone.is_naive(meeting_at):
@@ -2344,8 +2348,8 @@ def delete_connection_view(request):
         return JsonResponse({"error": "A connection ID is required."}, status=400)
 
     try:
-        connection = ProfessionalConnect.objects.get(pk=connection_id)
-    except ProfessionalConnect.DoesNotExist:
+        connection = Connect.objects.get(pk=connection_id)
+    except Connect.DoesNotExist:
         return JsonResponse({"error": "Connection not found."}, status=404)
 
     _delete_connection_with_google_event(connection)
@@ -2355,8 +2359,8 @@ def delete_connection_view(request):
 @require_http_methods(["GET", "POST"])
 def connection_directions_view(request, connection_id):
     try:
-        connection = ProfessionalConnect.objects.get(pk=connection_id)
-    except ProfessionalConnect.DoesNotExist:
+        connection = Connect.objects.get(pk=connection_id)
+    except Connect.DoesNotExist:
         return JsonResponse({"error": "Connection not found."}, status=404)
 
     if request.method == "POST":
@@ -2418,3 +2422,469 @@ def delete_direction_view(request, direction_id):
 
     direction.delete()
     return JsonResponse({"id": direction_id})
+
+
+def recruiter_formset_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    selected_recruiter_id = (
+        request.POST.get("recruiter_id") or request.GET.get("recruiter_id", "")
+    ).strip()
+    queryset = Recruiter.objects.prefetch_related("connects")
+    current_date = timezone.localdate()
+    current_datetime = timezone.now()
+    all_recruiters = list(queryset)
+    searchable_recruiters = sorted(
+        all_recruiters,
+        key=lambda recruiter: (recruiter.name.casefold(), recruiter.pk),
+    )
+
+    for recruiter in all_recruiters:
+        recruiter.wait_display = (
+            f"{recruiter.wait.days} days" if recruiter.wait else ""
+        )
+    all_recruiters.sort(
+        key=lambda recruiter: (
+            not recruiter.invite,
+            recruiter.connect_due is None,
+            recruiter.connect_due or current_date,
+            recruiter.invite_due is None,
+            recruiter.invite_due or current_date,
+            recruiter.last_connected is None,
+            recruiter.last_connected or current_datetime,
+            recruiter.last_invited is None,
+            recruiter.last_invited or current_date,
+            recruiter.name.casefold(),
+            recruiter.pk,
+        )
+    )
+    selected_recruiter = next(
+        (
+            recruiter
+            for recruiter in all_recruiters
+            if str(recruiter.pk) == selected_recruiter_id
+        ),
+        None,
+    )
+    is_filtered = selected_recruiter is not None
+    if is_filtered:
+        recruiters = [selected_recruiter]
+        page_obj = None
+    else:
+        paginator = Paginator(all_recruiters, 1)
+        page_obj = paginator.get_page(page_number)
+        recruiters = page_obj.object_list
+
+    displayed_recruiter = recruiters[0] if recruiters else None
+    companies = (
+        displayed_recruiter.companies.order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Company.objects.none()
+    )
+    available_companies = (
+        Company.objects.exclude(recruiters=displayed_recruiter).order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Company.objects.none()
+    )
+    referrals = (
+        displayed_recruiter.referrals.order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Recruiter.objects.none()
+    )
+    available_referrals = (
+        Recruiter.objects.exclude(pk=displayed_recruiter.pk)
+        .exclude(pk__in=referrals.values("pk"))
+        .order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Recruiter.objects.none()
+    )
+    referred_by = (
+        displayed_recruiter.referred_by.order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Recruiter.objects.none()
+    )
+    available_referrers = (
+        Recruiter.objects.exclude(pk=displayed_recruiter.pk)
+        .exclude(pk__in=referred_by.values("pk"))
+        .order_by("name", "pk")
+        if displayed_recruiter is not None
+        else Recruiter.objects.none()
+    )
+    invitations = (
+        Connect.objects.filter(
+            recruiter=displayed_recruiter,
+            invite_date__isnull=False,
+        ).order_by("-invite_date", "-pk")
+        if displayed_recruiter is not None
+        else Connect.objects.none()
+    )
+    connection_notes = []
+    if displayed_recruiter is not None:
+        for connection in Connect.objects.filter(
+            recruiter=displayed_recruiter,
+        ).only("meeting_at", "invite_date", "notes"):
+            notes = connection.notes.strip()
+            if not notes:
+                continue
+
+            if connection.meeting_at is not None:
+                connection_date = connection.meeting_at
+                date_heading = timezone.localtime(connection_date).strftime("%Y-%m-%d %H:%M")
+            elif connection.invite_date is not None:
+                connection_date = datetime.combine(
+                    connection.invite_date,
+                    datetime.min.time(),
+                    tzinfo=UTC,
+                )
+                date_heading = connection.invite_date.strftime("%Y-%m-%d")
+            else:
+                connection_date = datetime.min.replace(tzinfo=UTC)
+                date_heading = "No connection date"
+
+            connection_notes.append(
+                {
+                    "connection_date": connection_date,
+                    "date_heading": date_heading,
+                    "notes": notes,
+                }
+            )
+        connection_notes.sort(key=lambda note: note["connection_date"], reverse=True)
+    directions_by_meeting = (
+        Direction.objects.filter(connect__recruiter=displayed_recruiter)
+        .select_related("connect")
+        .order_by(F("connect__meeting_at").desc(nulls_last=True), "pk")
+        if displayed_recruiter is not None
+        else Direction.objects.none()
+    )
+    unresolved_directions = [
+        direction for direction in directions_by_meeting if not direction.resolved
+    ]
+    resolved_directions = [
+        direction for direction in directions_by_meeting if direction.resolved
+    ]
+    current_page = page_obj.number if page_obj is not None else 1
+    redirect_params = f"?page={current_page}"
+    if selected_recruiter_id:
+        redirect_params += f"&recruiter_id={selected_recruiter_id}"
+    show_add_modal = False
+    show_add_company_modal = False
+    show_add_referral_modal = False
+    show_add_referrer_modal = False
+    show_edit_modal_id = None
+    show_edit_invitation_id = None
+    show_add_connection_modal = False
+    invited_recruiter_id = request.GET.get("invited_recruiter", "").strip()
+    invited_recruiter_name = (
+        Recruiter.objects.filter(pk=invited_recruiter_id)
+        .values_list("name", flat=True)
+        .first()
+        if invited_recruiter_id
+        else None
+    )
+    submitted_edit_form = None
+    submitted_edit_recruiter_id = None
+    submitted_invitation_form = None
+    submitted_invitation_id = None
+    connection_conflict_message = None
+
+    if request.method == "POST":
+        new_form = RecruiterForm(request.POST, prefix="new")
+        new_company_form = CompanyForm(request.POST, prefix="new-company")
+        new_referral_form = RecruiterForm(request.POST, prefix="new-referral")
+        new_referrer_form = RecruiterForm(request.POST, prefix="new-referrer")
+        new_connection_form = RecruiterConnectForm(
+            request.POST,
+            prefix="new-connection",
+            require_invite_date=True,
+        )
+        add_recruiter_requested = "add_recruiter" in request.POST
+        invite_recruiter_id = request.POST.get("invite_recruiter", "").strip()
+        pass_recruiter_id = request.POST.get("pass_recruiter", "").strip()
+        save_recruiter_id = request.POST.get("save_recruiter", "").strip()
+        delete_recruiter_id = request.POST.get("delete_recruiter", "").strip()
+        add_company_recruiter_id = request.POST.get("add_company", "").strip()
+        add_new_company_recruiter_id = request.POST.get("add_new_company", "").strip()
+        add_referral_recruiter_id = request.POST.get("add_referral", "").strip()
+        add_new_referral_recruiter_id = request.POST.get(
+            "add_new_referral", ""
+        ).strip()
+        referral_id = request.POST.get("referral_id", "").strip()
+        add_referrer_recruiter_id = request.POST.get("add_referrer", "").strip()
+        add_new_referrer_recruiter_id = request.POST.get(
+            "add_new_referrer", ""
+        ).strip()
+        referrer_id = request.POST.get("referrer_id", "").strip()
+        company_id = request.POST.get("company_id", "").strip()
+        save_invitation_id = request.POST.get("save_invitation", "").strip()
+        delete_invitation_id = request.POST.get("delete_invitation", "").strip()
+        update_direction_id = request.POST.get("update_direction", "").strip()
+        add_connection_recruiter_id = request.POST.get("add_connection", "").strip()
+
+        if add_recruiter_requested:
+            if new_form.is_valid():
+                recruiter = new_form.save()
+                return redirect(
+                    f"{request.path}?page={current_page}&recruiter_id={recruiter.pk}"
+                )
+            show_add_modal = True
+        elif add_company_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=add_company_recruiter_id).first()
+            company = Company.objects.filter(pk=company_id).first()
+            if recruiter is not None and company is not None:
+                recruiter.companies.add(company)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_company_recruiter_id:
+            recruiter = Recruiter.objects.filter(
+                pk=add_new_company_recruiter_id
+            ).first()
+            if recruiter is not None and new_company_form.is_valid():
+                company = new_company_form.save()
+                recruiter.companies.add(company)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_company_modal = True
+        elif add_referral_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=add_referral_recruiter_id).first()
+            referral = Recruiter.objects.filter(pk=referral_id).first()
+            if recruiter is not None and referral is not None and recruiter != referral:
+                recruiter.referrals.add(referral)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_referral_recruiter_id:
+            recruiter = Recruiter.objects.filter(
+                pk=add_new_referral_recruiter_id
+            ).first()
+            if recruiter is not None and new_referral_form.is_valid():
+                referral = new_referral_form.save()
+                recruiter.referrals.add(referral)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_referral_modal = True
+        elif add_referrer_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=add_referrer_recruiter_id).first()
+            referrer = Recruiter.objects.filter(pk=referrer_id).first()
+            if recruiter is not None and referrer is not None and recruiter != referrer:
+                referrer.referrals.add(recruiter)
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_new_referrer_recruiter_id:
+            recruiter = Recruiter.objects.filter(
+                pk=add_new_referrer_recruiter_id
+            ).first()
+            if recruiter is not None and new_referrer_form.is_valid():
+                referrer = new_referrer_form.save()
+                referrer.referrals.add(recruiter)
+                return redirect(f"{request.path}{redirect_params}")
+            show_add_referrer_modal = True
+        elif update_direction_id:
+            Direction.objects.filter(
+                pk=update_direction_id,
+                connect__recruiter=displayed_recruiter,
+            ).update(resolved="direction_resolved" in request.POST)
+            return redirect(f"{request.path}{redirect_params}")
+        elif pass_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=pass_recruiter_id).first()
+            if recruiter is not None:
+                with transaction.atomic():
+                    Connect.objects.create(
+                        recruiter=recruiter,
+                        professional=None,
+                        invite_date=timezone.localdate(),
+                        description=f"Passed on {recruiter.name}",
+                    )
+                    recruiter.delete()
+            return redirect(f"{request.path}{redirect_params}")
+        elif add_connection_recruiter_id:
+            recruiter = Recruiter.objects.filter(
+                pk=add_connection_recruiter_id
+            ).first()
+            if recruiter is not None and new_connection_form.is_valid():
+                connection = new_connection_form.save(commit=False)
+                connection.recruiter = recruiter
+                connection.professional = None
+                connection.description = f"Ian x {recruiter.name}"
+                try:
+                    connection.save()
+                except ValidationError as error:
+                    conflict_message = _meeting_conflict_message(
+                        error.message_dict.get("meeting_at", error.messages)
+                    )
+                    if conflict_message:
+                        messages.error(request, conflict_message)
+                        connection_conflict_message = conflict_message
+                        new_connection_form = RecruiterConnectForm(
+                            prefix="new-connection",
+                            require_invite_date=True,
+                        )
+                        show_add_connection_modal = True
+                    else:
+                        raise
+                else:
+                    _sync_connection_after_save(connection)
+                    return redirect(f"{request.path}{redirect_params}")
+            conflict_message = _meeting_conflict_message(
+                new_connection_form.errors.get("meeting_at", [])
+            )
+            if conflict_message:
+                messages.error(request, conflict_message)
+                connection_conflict_message = conflict_message
+                new_connection_form = RecruiterConnectForm(
+                    prefix="new-connection",
+                    require_invite_date=True,
+                )
+            show_add_connection_modal = True
+        elif delete_invitation_id:
+            invitation = Connect.objects.filter(
+                pk=delete_invitation_id,
+                recruiter=displayed_recruiter,
+                invite_date__isnull=False,
+            ).first()
+            if invitation is not None:
+                _delete_connection_with_google_event(invitation)
+            return redirect(f"{request.path}{redirect_params}")
+        elif save_invitation_id:
+            invitation = Connect.objects.filter(
+                pk=save_invitation_id,
+                recruiter=displayed_recruiter,
+                invite_date__isnull=False,
+            ).first()
+            if invitation is not None:
+                submitted_invitation_id = invitation.pk
+                submitted_invitation_form = RecruiterConnectForm(
+                    request.POST,
+                    instance=invitation,
+                    prefix=f"invitation-{invitation.pk}",
+                )
+                if submitted_invitation_form.is_valid():
+                    try:
+                        saved_connection = submitted_invitation_form.save()
+                    except ValidationError as error:
+                        conflict_message = _meeting_conflict_message(
+                            error.message_dict.get("meeting_at", error.messages)
+                        )
+                        if conflict_message:
+                            messages.error(request, conflict_message)
+                            connection_conflict_message = conflict_message
+                            invitation.refresh_from_db()
+                            submitted_invitation_form = RecruiterConnectForm(
+                                instance=invitation,
+                                prefix=f"invitation-{invitation.pk}",
+                            )
+                            show_edit_invitation_id = invitation.pk
+                        else:
+                            raise
+                    else:
+                        if _sync_connection_after_save(saved_connection):
+                            messages.success(
+                                request,
+                                "Connection saved and synchronized to Google Calendar.",
+                            )
+                        else:
+                            messages.warning(
+                                request,
+                                "Connection saved, but Google Calendar sync failed.",
+                            )
+                        return redirect(f"{request.path}{redirect_params}")
+                else:
+                    conflict_message = _meeting_conflict_message(
+                        submitted_invitation_form.errors.get("meeting_at", [])
+                    )
+                    if conflict_message:
+                        messages.error(request, conflict_message)
+                        connection_conflict_message = conflict_message
+                        invitation.refresh_from_db()
+                        submitted_invitation_form = RecruiterConnectForm(
+                            instance=invitation,
+                            prefix=f"invitation-{invitation.pk}",
+                        )
+                show_edit_invitation_id = invitation.pk
+        elif invite_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=invite_recruiter_id).first()
+            if recruiter is not None:
+                Connect.objects.create(
+                    recruiter=recruiter,
+                    professional=None,
+                    invite_date=timezone.localdate(),
+                    description=f"Ian x {recruiter.name}",
+                )
+                return redirect(
+                    f"{request.path}{redirect_params}"
+                    f"&invited_recruiter={recruiter.pk}"
+                )
+            return redirect(f"{request.path}{redirect_params}")
+        elif delete_recruiter_id:
+            Recruiter.objects.filter(pk=delete_recruiter_id).delete()
+            return redirect(f"{request.path}{redirect_params}")
+        elif save_recruiter_id:
+            recruiter = Recruiter.objects.filter(pk=save_recruiter_id).first()
+            if recruiter is not None:
+                submitted_edit_recruiter_id = recruiter.pk
+                submitted_edit_form = RecruiterForm(
+                    request.POST,
+                    instance=recruiter,
+                    prefix=f"edit-{recruiter.pk}",
+                )
+                if submitted_edit_form.is_valid():
+                    submitted_edit_form.save()
+                    return redirect(f"{request.path}{redirect_params}")
+                show_edit_modal_id = recruiter.pk
+    else:
+        new_form = RecruiterForm(prefix="new")
+        new_company_form = CompanyForm(prefix="new-company")
+        new_referral_form = RecruiterForm(prefix="new-referral")
+        new_referrer_form = RecruiterForm(prefix="new-referrer")
+        new_connection_form = RecruiterConnectForm(
+            prefix="new-connection",
+            require_invite_date=True,
+        )
+
+    for recruiter in recruiters:
+        recruiter.edit_form = (
+            submitted_edit_form
+            if recruiter.pk == submitted_edit_recruiter_id
+            else RecruiterForm(instance=recruiter, prefix=f"edit-{recruiter.pk}")
+        )
+    for invitation in invitations:
+        invitation.edit_form = (
+            submitted_invitation_form
+            if invitation.pk == submitted_invitation_id
+            else RecruiterConnectForm(
+                instance=invitation,
+                prefix=f"invitation-{invitation.pk}",
+            )
+        )
+
+    return render(
+        request,
+        "app/recruiter_formset.html",
+        {
+            "new_form": new_form,
+            "new_company_form": new_company_form,
+            "new_referral_form": new_referral_form,
+            "new_referrer_form": new_referrer_form,
+            "new_connection_form": new_connection_form,
+            "page_obj": page_obj,
+            "recruiters": recruiters,
+            "displayed_recruiter": displayed_recruiter,
+            "companies": companies,
+            "available_companies": available_companies,
+            "referrals": referrals,
+            "available_referrals": available_referrals,
+            "referred_by": referred_by,
+            "available_referrers": available_referrers,
+            "invitations": invitations,
+            "connection_notes": connection_notes,
+            "unresolved_directions": unresolved_directions,
+            "resolved_directions": resolved_directions,
+            "all_recruiters": searchable_recruiters,
+            "selected_recruiter": selected_recruiter,
+            "selected_recruiter_id": selected_recruiter_id,
+            "is_filtered": is_filtered,
+            "current_page": current_page,
+            "show_add_modal": show_add_modal,
+            "show_add_company_modal": show_add_company_modal,
+            "show_add_referral_modal": show_add_referral_modal,
+            "show_add_referrer_modal": show_add_referrer_modal,
+            "show_edit_modal_id": show_edit_modal_id,
+            "show_edit_invitation_id": show_edit_invitation_id,
+            "show_add_connection_modal": show_add_connection_modal,
+            "connection_conflict_message": connection_conflict_message,
+            "invited_recruiter_name": invited_recruiter_name,
+        },
+    )
+

@@ -22,6 +22,15 @@ def _add_calendar_months(date_value, months):
     return date_value.replace(year=year, month=month, day=day)
 
 
+def _wait_parts(wait_value):
+    total_days = wait_value.days
+    months = total_days // 30
+    remaining_days = total_days % 30
+    weeks = remaining_days // 7
+    days = remaining_days % 7
+    return months, weeks, days
+
+
 class Skill(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
@@ -686,7 +695,7 @@ class Professional(models.Model):
 
     companies = models.ManyToManyField(
         "Company",
-        related_name="peers",
+        related_name="professionals",
         blank=True,
     )
 
@@ -740,7 +749,12 @@ class Professional(models.Model):
     def connect_due(self):
         if self.last_connected is None or self.wait is None:
             return None
-        return timezone.localtime(self.last_connected + self.wait).date()
+        months, weeks, days = _wait_parts(self.wait)
+        due_date = _add_calendar_months(
+            timezone.localtime(self.last_connected, MOUNTAIN_TIME_ZONE).date(),
+            months,
+        )
+        return due_date + timedelta(weeks=weeks, days=days)
 
     @cached_property
     def average_rating(self):
@@ -773,7 +787,8 @@ class Professional(models.Model):
     @property
     def invite(self):
         current_date = timezone.localdate()
-
+        if self.wait is None:
+            return False
         if self.invite_due is None:
             return True
         if self.connect_due is None:
@@ -787,18 +802,152 @@ class Professional(models.Model):
         )
 
 
-class ProfessionalConnect(models.Model):
+class Recruiter(models.Model):
+    name = models.CharField(max_length=200)
+
+    linkedin_url = models.URLField(blank=True)
+
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    email = models.EmailField(blank=True)
+
+    wait = models.DurationField(
+        null=True,
+        blank=True,
+    )
+
+    companies = models.ManyToManyField(
+        "Company",
+        related_name="recruiters",
+        blank=True,
+    )
+
+    referrals = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="referred_by",
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.name
+
+    @cached_property
+    def _connection_records(self):
+        if self.pk is None:
+            return []
+        return list(self.connects.all())
+
+    @cached_property
+    def last_invited(self):
+        invite_dates = (
+            connection.invite_date
+            for connection in self._connection_records
+            if connection.invite_date is not None
+        )
+        return max(invite_dates, default=None)
+
+    @cached_property
+    def last_connected(self):
+        meeting_times = (
+            connection.meeting_at
+            for connection in self._connection_records
+            if connection.meeting_at is not None
+        )
+        return max(meeting_times, default=None)
+
+    @cached_property
+    def last_attended(self):
+        if self.last_connected is None:
+            return None
+        return timezone.localtime(self.last_connected).date()
+
+    @cached_property
+    def invite_due(self):
+        if self.last_invited is None:
+            return None
+        return _add_calendar_months(self.last_invited, 1)
+
+    @cached_property
+    def connect_due(self):
+        if self.last_connected is None or self.wait is None:
+            return None
+        months, weeks, days = _wait_parts(self.wait)
+        due_date = _add_calendar_months(
+            timezone.localtime(self.last_connected, MOUNTAIN_TIME_ZONE).date(),
+            months,
+        )
+        return due_date + timedelta(weeks=weeks, days=days)
+
+    @cached_property
+    def average_rating(self):
+        ratings = [
+            connection.rating
+            for connection in self._connection_records
+            if connection.rating is not None
+        ]
+        if not ratings:
+            return None
+        return sum(ratings) / len(ratings)
+
+    @cached_property
+    def average_rating_stars(self):
+        if self.average_rating is None:
+            return ""
+        filled_stars = min(5, int(self.average_rating + 0.5))
+        return f"{'★' * filled_stars}{'☆' * (5 - filled_stars)}"
+
+    @cached_property
+    def invite_success(self):
+        if not self._connection_records:
+            return None
+        attended_connections = sum(
+            connection.meeting_at is not None
+            for connection in self._connection_records
+        )
+        return (attended_connections / len(self._connection_records)) * 100
+
+    @property
+    def invite(self):
+        current_date = timezone.localdate()
+        if self.wait is None:
+            return False
+        if self.invite_due is None:
+            return True
+        if self.connect_due is None:
+            return self.invite_due <= current_date
+        return (
+            self.connect_due <= current_date
+            and (
+                self.last_invited <= self.last_attended
+                or self.invite_due <= current_date
+            )
+        )
+
+
+class Connect(models.Model):
     description = models.CharField(
         max_length=200,
         blank=True,
     )
 
-    person = models.ForeignKey(
+    professional = models.ForeignKey(
         "Professional",
         related_name="connects",
         on_delete=models.SET_NULL,
         null=True,
         blank=True
+    )
+
+    recruiter = models.ForeignKey(
+        "Recruiter",
+        related_name="connects",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
 
     invite_date = models.DateField(
@@ -860,7 +1009,7 @@ class ProfessionalConnect(models.Model):
             )
 
         conflict = (
-            ProfessionalConnect.objects.filter(
+            Connect.objects.filter(
                 meeting_at__isnull=False,
                 meeting_end__isnull=False,
                 meeting_at__lt=self.meeting_end,
@@ -928,13 +1077,17 @@ class ProfessionalConnect(models.Model):
 
         # No meeting was scheduled from this invitation.
         if (
-                self.person_id is not None
+                (self.professional_id is not None or self.recruiter_id is not None)
                 and self.invite_date is not None
         ):
-            if ProfessionalConnect.objects.filter(
-                    person_id=self.person_id,
-                    invite_date__gt=self.invite_date,
-            ).exists():
+            later_invitation_filters = {
+                "invite_date__gt": self.invite_date,
+            }
+            if self.professional_id is not None:
+                later_invitation_filters["professional_id"] = self.professional_id
+            else:
+                later_invitation_filters["recruiter_id"] = self.recruiter_id
+            if Connect.objects.filter(**later_invitation_filters).exists():
                 return "Invited Again"
 
             return "Waiting For Response"
@@ -942,9 +1095,12 @@ class ProfessionalConnect(models.Model):
         return None
 
 
+ProfessionalConnect = Connect
+
+
 class Direction(models.Model):
     connect = models.ForeignKey(
-        "ProfessionalConnect",
+        "Connect",
         related_name="directions",
         on_delete=models.CASCADE,
     )
