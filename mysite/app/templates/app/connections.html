@@ -8,7 +8,8 @@
         <h1>Connections</h1>
         <div class="date-mode-toggle" role="group" aria-label="Calendar date mode">
             <button type="button" class="date-mode-button active" data-date-mode="meeting">Meeting Date</button>
-            <button type="button" class="date-mode-button" data-date-mode="invite">Invite Date</button>
+            <button type="button" class="date-mode-button" data-date-mode="invite-professionals">Invite Professionals</button>
+            <button type="button" class="date-mode-button" data-date-mode="invite-recruiters">Invite Recruiters</button>
         </div>
         <strong id="connections-weekly-total">Connections this week: 0</strong>
     </div>
@@ -80,6 +81,7 @@
         const weeklyTotal = document.getElementById("connections-weekly-total");
         let selectedEvent = null;
         let dateMode = "meeting";
+        const isInviteMode = () => dateMode !== "meeting";
 
         const closeEditModal = () => {
             editModal.classList.add("hidden");
@@ -141,7 +143,7 @@
         };
 
         const configureDateInput = event => {
-            const inviteMode = dateMode === "invite";
+            const inviteMode = isInviteMode();
             dateLabel.textContent = inviteMode ? "Invite date" : "Meeting date and time";
             meetingAtInput.classList.toggle("hidden", inviteMode);
             meetingEndLabel.classList.toggle("hidden", inviteMode);
@@ -317,13 +319,13 @@
                 syncStatus.textContent = "";
                 syncStatus.classList.remove("error");
                 editModal.classList.remove("hidden");
-                if (dateMode !== "invite") {
+                if (!isInviteMode()) {
                     meetingAtInput.focus();
                 }
             },
             eventDrop(info) {
                 const meetingUpdate = dateMode === "meeting" ? draggedMeetingTimes(info) : null;
-                const start = dateMode === "invite" ? info.event.startStr : meetingUpdate.start;
+                const start = isInviteMode() ? info.event.startStr : meetingUpdate.start;
                 updateMeeting(info.event, start, meetingUpdate?.changes)
                     .catch(error => {
                         info.revert();
@@ -335,11 +337,11 @@
         editForm.addEventListener("submit", event => {
             event.preventDefault();
             const inviteDate = inviteDateDisplay.textContent.trim();
-            if (!selectedEvent || (dateMode === "invite" && !inviteDate)) {
+            if (!selectedEvent || (isInviteMode() && !inviteDate)) {
                 return;
             }
 
-            const updatedStart = dateMode === "invite"
+            const updatedStart = isInviteMode()
                 ? inviteDate
                 : meetingAtInput.value;
             const rating = ratingInput.value === "" ? null : Number(ratingInput.value);
@@ -348,8 +350,8 @@
                 description: descriptionInput.value,
                 rating,
                 notes: notesInput.value,
-                meeting_end: dateMode === "meeting" ? meetingEndInput.value : undefined,
-                clear_meeting: dateMode === "meeting" && !meetingAtInput.value,
+                meeting_end: !isInviteMode() ? meetingEndInput.value : undefined,
+                clear_meeting: !isInviteMode() && !meetingAtInput.value,
             })
                 .then(updatedEvent => {
                     if (updatedEvent.removed_from_calendar) {
@@ -397,7 +399,7 @@
                 dateModeButtons.forEach(modeButton => {
                     modeButton.classList.toggle("active", modeButton === button);
                 });
-                calendarElement.classList.toggle("invite-date-mode", dateMode === "invite");
+                calendarElement.classList.toggle("invite-date-mode", isInviteMode());
                 closeEditModal();
                 calendar.refetchEvents();
                 loadWeeklyTotal();

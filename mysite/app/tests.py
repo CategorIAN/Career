@@ -1911,7 +1911,8 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="connections-calendar"')
         self.assertContains(response, 'data-date-mode="meeting"')
-        self.assertContains(response, 'data-date-mode="invite"')
+        self.assertContains(response, 'data-date-mode="invite-professionals"')
+        self.assertContains(response, 'data-date-mode="invite-recruiters"')
         self.assertContains(response, 'id="connections-weekly-total"')
         self.assertContains(response, "invite-date-mode")
         self.assertContains(response, "FullCalendar.Calendar")
@@ -2200,6 +2201,37 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(event["title"], "Invite conversation")
         self.assertEqual(event["start"], "2026-09-15")
         self.assertTrue(event["allDay"])
+
+    def test_connection_events_split_invites_by_relationship_type(self):
+        recruiter = Recruiter.objects.create(name="Calendar Recruiter")
+        professional_invite = Connect.objects.create(
+            professional=self.professional,
+            invite_date=date(2026, 9, 15),
+            description="Professional invite",
+        )
+        recruiter_invite = Connect.objects.create(
+            recruiter=recruiter,
+            invite_date=date(2026, 9, 15),
+            description="Recruiter invite",
+        )
+
+        professional_response = self.client.get(
+            reverse("connection_events"),
+            {"date_mode": "invite-professionals"},
+        )
+        recruiter_response = self.client.get(
+            reverse("connection_events"),
+            {"date_mode": "invite-recruiters"},
+        )
+
+        self.assertEqual(
+            [event["id"] for event in professional_response.json()],
+            [str(professional_invite.pk)],
+        )
+        self.assertEqual(
+            [event["id"] for event in recruiter_response.json()],
+            [str(recruiter_invite.pk)],
+        )
 
     def test_connection_weekly_total_uses_the_active_date_mode(self):
         today = timezone.localdate()

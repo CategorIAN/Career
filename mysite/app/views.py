@@ -2138,17 +2138,22 @@ def connections_view(request):
 
 def connection_events_view(request):
     date_mode = request.GET.get("date_mode", "meeting")
-    if date_mode == "invite":
+    if date_mode in {"invite", "invite-professionals", "invite-recruiters"}:
+        invite_filters = {"invite_date__isnull": False}
+        if date_mode == "invite-professionals":
+            invite_filters["professional__isnull"] = False
+        elif date_mode == "invite-recruiters":
+            invite_filters["recruiter__isnull"] = False
         connections = (
-            Connect.objects.filter(invite_date__isnull=False)
-            .select_related("professional")
+            Connect.objects.filter(**invite_filters)
+            .select_related("professional", "recruiter")
             .order_by("invite_date", "pk")
         )
     else:
         date_mode = "meeting"
         connections = (
             Connect.objects.filter(meeting_at__isnull=False)
-            .select_related("professional")
+            .select_related("professional", "recruiter")
             .order_by("meeting_at", "pk")
         )
 
@@ -2158,7 +2163,7 @@ def connection_events_view(request):
             "title": connection.description,
             "start": (
                 connection.invite_date.isoformat()
-                if date_mode == "invite"
+                if date_mode != "meeting"
                 else _calendar_datetime_value(connection.meeting_at)
             ),
             "end": (
@@ -2166,7 +2171,7 @@ def connection_events_view(request):
                 if date_mode == "meeting" and connection.meeting_end is not None
                 else None
             ),
-            "allDay": date_mode == "invite",
+            "allDay": date_mode != "meeting",
             "extendedProps": {
                 "status": connection.status,
                 "description": connection.description,
@@ -2185,10 +2190,13 @@ def connection_weekly_total_view(request):
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
 
-    if date_mode == "invite":
-        total = Connect.objects.filter(
-            invite_date__range=(week_start, week_end),
-        ).count()
+    if date_mode in {"invite", "invite-professionals", "invite-recruiters"}:
+        invite_filters = {"invite_date__range": (week_start, week_end)}
+        if date_mode == "invite-professionals":
+            invite_filters["professional__isnull"] = False
+        elif date_mode == "invite-recruiters":
+            invite_filters["recruiter__isnull"] = False
+        total = Connect.objects.filter(**invite_filters).count()
     else:
         total = Connect.objects.filter(
             meeting_at__date__range=(week_start, week_end),
@@ -2207,7 +2215,12 @@ def update_connection_meeting_view(request):
     connection_id = payload.get("id")
     start_value = payload.get("start")
     date_mode = payload.get("date_mode", "meeting")
-    if date_mode not in {"meeting", "invite"}:
+    if date_mode not in {
+        "meeting",
+        "invite",
+        "invite-professionals",
+        "invite-recruiters",
+    }:
         return JsonResponse({"error": "Invalid date mode."}, status=400)
 
     meeting_at = None
@@ -2314,7 +2327,7 @@ def update_connection_meeting_view(request):
             "id": str(connection.pk),
             "start": (
                 connection.invite_date.isoformat()
-                if date_mode == "invite"
+                if date_mode != "meeting"
                 else _calendar_datetime_value(connection.meeting_at)
                 if connection.meeting_at
                 else None
