@@ -1,0 +1,137 @@
+{% extends "app/base.html" %}
+
+{% block title %}Companies{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <div class="utility-card-header">
+        <h1>Companies</h1>
+        <button type="button" class="copy-button" id="open-add-company-modal">Add Company</button>
+    </div>
+
+    <table class="project-results">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>LinkedIn</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Edit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for company in companies %}
+                <tr>
+                    <td>
+                        {% if company.website %}
+                            <a href="{{ company.website }}" target="_blank" rel="noopener noreferrer">{{ company.name }}</a>
+                        {% else %}
+                            {{ company.name }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if company.linkedin_url %}
+                            <button type="button" class="copy-button" onclick="window.open('{{ company.linkedin_url }}', '_blank', 'noopener,noreferrer')">LinkedIn</button>
+                        {% endif %}
+                    </td>
+                    <td>{{ company.email }}</td>
+                    <td>{{ company.phone }}</td>
+                    <td><button type="button" class="copy-button open-edit-company-modal" data-target="edit-company-modal-{{ company.pk }}">Edit</button></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">No companies found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="pagination" aria-label="Companies pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous companies">&larr;</a>
+            {% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next companies">&rarr;</a>
+            {% endif %}
+        </nav>
+    {% endif %}
+</section>
+
+{% for company in companies %}
+    <div id="edit-company-modal-{{ company.pk }}" class="company-modal{% if show_edit_company_id != company.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-company-modal-title-{{ company.pk }}">
+        <div class="company-modal-content">
+            <button type="button" class="company-modal-close close-edit-company-modal" aria-label="Close">&times;</button>
+            <h2 id="edit-company-modal-title-{{ company.pk }}">Edit Company</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="company-form-grid">
+                    {% for field in company.edit_form %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div>{{ field.errors }}{{ field }}</div>
+                    {% endfor %}
+                    <div class="company-edit-actions">
+                        <button type="submit" name="delete_company" value="{{ company.pk }}" class="company-delete-button">Delete</button>
+                        <button type="submit" name="save_company" value="{{ company.pk }}">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+
+<div id="add-company-modal" class="company-modal{% if not show_add_modal %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="add-company-modal-title">
+    <div class="company-modal-content">
+        <button type="button" id="close-add-company-modal" class="company-modal-close" aria-label="Close">&times;</button>
+        <h2 id="add-company-modal-title">Add New Company</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="company-form-grid">
+                {% for field in new_company_form %}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div>{{ field.errors }}{{ field }}</div>
+                {% endfor %}
+                <button type="submit" name="add_company" value="1">Add Company</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const modal = document.getElementById("add-company-modal");
+        document.getElementById("open-add-company-modal").addEventListener("click", () => modal.classList.remove("hidden"));
+        document.getElementById("close-add-company-modal").addEventListener("click", () => modal.classList.add("hidden"));
+        document.querySelectorAll(".open-edit-company-modal").forEach(button => {
+            button.addEventListener("click", () => document.getElementById(button.dataset.target).classList.remove("hidden"));
+        });
+        document.querySelectorAll(".close-edit-company-modal").forEach(button => {
+            button.addEventListener("click", () => button.closest(".company-modal").classList.add("hidden"));
+        });
+        document.querySelectorAll(".company-modal").forEach(companyModal => {
+            companyModal.addEventListener("click", event => {
+                if (event.target === companyModal) companyModal.classList.add("hidden");
+            });
+        });
+        window.setTimeout(() => {
+            document.querySelectorAll(".autofill-blocked").forEach(input => {
+                input.removeAttribute("readonly");
+            });
+        }, 100);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) modal.classList.add("hidden");
+        });
+    });
+</script>
+
+<style>
+    .company-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.35); }
+    .company-modal.hidden { display: none; }
+    .company-modal-content { position: relative; width: min(42rem, 100%); padding: 1.5rem; border: 1px solid #8c8c8c; border-radius: 0.5rem; background: #fff; }
+    .company-modal-close { position: absolute; top: 0.5rem; right: 0.75rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; }
+    .company-form-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1rem; align-items: start; }
+    .company-form-grid button { grid-column: 2; justify-self: start; }
+    .company-edit-actions { grid-column: 2; display: flex; gap: 0.5rem; }
+    .company-edit-actions button { grid-column: auto; }
+    .company-delete-button { border-color: #b91c1c; background: #fee2e2; color: #991b1b; }
+</style>
+{% endblock %}

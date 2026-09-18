@@ -1340,6 +1340,62 @@ def professional_formset_view(request):
     )
 
 
+def companies_view(request):
+    show_add_modal = False
+    show_edit_company_id = None
+    submitted_edit_form = None
+    submitted_edit_company_id = None
+    if request.method == "POST":
+        new_company_form = CompanyForm(request.POST, prefix="new-company")
+        save_company_id = request.POST.get("save_company", "").strip()
+        delete_company_id = request.POST.get("delete_company", "").strip()
+        if "add_company" in request.POST:
+            if new_company_form.is_valid():
+                new_company_form.save()
+                return redirect("companies")
+            show_add_modal = True
+        elif delete_company_id:
+            Company.objects.filter(pk=delete_company_id).delete()
+            return redirect("companies")
+        elif save_company_id:
+            company = Company.objects.filter(pk=save_company_id).first()
+            if company is not None:
+                submitted_edit_company_id = company.pk
+                submitted_edit_form = CompanyForm(
+                    request.POST,
+                    instance=company,
+                    prefix=f"edit-company-{company.pk}",
+                )
+                if submitted_edit_form.is_valid():
+                    submitted_edit_form.save()
+                    return redirect("companies")
+                show_edit_company_id = company.pk
+    else:
+        new_company_form = CompanyForm(prefix="new-company")
+
+    paginator = Paginator(Company.objects.order_by("name", "pk"), 10)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    companies = list(page_obj.object_list)
+    for company in companies:
+        company.edit_form = (
+            submitted_edit_form
+            if company.pk == submitted_edit_company_id
+            else CompanyForm(instance=company, prefix=f"edit-company-{company.pk}")
+        )
+
+    return render(
+        request,
+        "app/companies.html",
+        {
+            "companies": companies,
+            "page_obj": page_obj,
+            "new_company_form": new_company_form,
+            "show_add_modal": show_add_modal,
+            "show_edit_company_id": show_edit_company_id,
+        },
+    )
+
+
 def _feature_wait_parts(wait_value):
     if not wait_value:
         return 0, 0, 0

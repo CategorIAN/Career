@@ -7,9 +7,9 @@
           <value>
             <TabSessionState>
               <option name="provider" value="codex" />
-              <option name="sessionId" value="01a054b3-df26-7783-be13-4e4f2730a48d" />
-              <option name="cwd" value="$PROJECT_DIR$" />
-              <option name="model" value="gpt-5.4" />
+              <option name="sessionId" value="01a073b5-7f7c-7751-9bb9-7fb3cf0bb651" />
+              <option name="cwd" value="C:\Users\Ian\PycharmProjects\Career" />
+              <option name="model" value="gpt-5.6-terra" />
               <option name="permissionMode" value="default" />
               <option name="reasoningEffort" value="medium" />
             </TabSessionState>

@@ -1824,6 +1824,109 @@ class ProfessionalPageTests(TestCase):
         self.assertFalse(Professional.objects.filter(pk=professional.pk).exists())
 
 
+class CompanyPageTests(TestCase):
+    def test_companies_page_paginates_ten_companies_per_page(self):
+        companies = [
+            Company(name=f"Company {index:02d}") for index in range(1, 12)
+        ]
+        Company.objects.bulk_create(companies)
+
+        first_page = self.client.get(reverse("companies"))
+        second_page = self.client.get(reverse("companies"), {"page": 2})
+
+        self.assertContains(first_page, "Company 10")
+        self.assertNotContains(first_page, "Company 11")
+        self.assertContains(first_page, "Page 1 of 2")
+        self.assertContains(second_page, "Company 11")
+        self.assertNotContains(second_page, "Company 01")
+        self.assertContains(second_page, "Page 2 of 2")
+
+    def test_companies_page_displays_companies_and_add_modal(self):
+        company = Company.objects.create(
+            name="Analytical Engines",
+            website="https://analytical-engines.example.com",
+            linkedin_url="https://www.linkedin.com/company/analytical-engines",
+            email="contact@example.com",
+            phone="555-0100",
+        )
+
+        response = self.client.get(reverse("companies"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Companies")
+        self.assertContains(response, 'id="open-add-company-modal"', html=False)
+        self.assertContains(response, 'id="add-company-modal"', html=False)
+        self.assertContains(response, company.website)
+        self.assertContains(response, company.linkedin_url)
+        self.assertContains(response, company.email)
+        self.assertContains(response, company.phone)
+
+    def test_companies_page_creates_company_from_modal_form(self):
+        response = self.client.post(
+            reverse("companies"),
+            {
+                "new-company-name": "New Company",
+                "new-company-website": "https://new-company.example.com",
+                "new-company-linkedin_url": "https://www.linkedin.com/company/new-company",
+                "new-company-email": "contact@new-company.example.com",
+                "new-company-phone": "555-0101",
+                "new-company-description": "A new company.",
+                "add_company": "1",
+            },
+        )
+
+        self.assertRedirects(response, reverse("companies"))
+        self.assertTrue(Company.objects.filter(name="New Company").exists())
+
+    def test_companies_page_edits_and_deletes_company_from_edit_modal(self):
+        company = Company.objects.create(
+            name="Analytical Engines",
+            website="https://analytical-engines.example.com",
+        )
+
+        page_response = self.client.get(reverse("companies"))
+        self.assertContains(page_response, "<th>Edit</th>", html=False)
+        self.assertContains(
+            page_response,
+            f'data-target="edit-company-modal-{company.pk}"',
+            html=False,
+        )
+        self.assertContains(page_response, "Edit Company")
+        self.assertContains(
+            page_response,
+            f'name="edit-company-{company.pk}-website"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'autocomplete="new-password" class="autofill-blocked" data-form-type="other"',
+            html=False,
+        )
+
+        save_response = self.client.post(
+            reverse("companies"),
+            {
+                f"edit-company-{company.pk}-name": "Analytical Engines Updated",
+                f"edit-company-{company.pk}-website": "https://updated.example.com",
+                f"edit-company-{company.pk}-linkedin_url": "",
+                f"edit-company-{company.pk}-email": "",
+                f"edit-company-{company.pk}-phone": "",
+                f"edit-company-{company.pk}-description": "",
+                "save_company": company.pk,
+            },
+        )
+        self.assertRedirects(save_response, reverse("companies"))
+        company.refresh_from_db()
+        self.assertEqual(company.name, "Analytical Engines Updated")
+
+        delete_response = self.client.post(
+            reverse("companies"),
+            {"delete_company": company.pk},
+        )
+        self.assertRedirects(delete_response, reverse("companies"))
+        self.assertFalse(Company.objects.filter(pk=company.pk).exists())
+
+
 class RecruiterPageTests(TestCase):
     def test_recruiters_page_adds_recruiter_and_selects_it(self):
         response = self.client.post(
