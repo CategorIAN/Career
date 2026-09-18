@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 import json
+from io import StringIO
 
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -7,6 +8,7 @@ from zoneinfo import ZoneInfo
 from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -2030,6 +2032,67 @@ class SearchTermsPageTests(TestCase):
         search_path.refresh_from_db()
         self.assertIsNone(search_path.search_term)
         self.assertTrue(SearchObservation.objects.filter(pk=observation.pk).exists())
+
+
+class CreateSearchPathsCommandTests(TestCase):
+    def test_command_creates_only_missing_valid_search_paths_idempotently(self):
+        active_first = SearchTerm.objects.create(term="Django")
+        active_second = SearchTerm.objects.create(term="Python")
+        inactive = SearchTerm.objects.create(term="Inactive", active=False)
+        disabled_company = Company.objects.create(
+            name="Disabled Company",
+            job_search_enabled=False,
+        )
+        company_without_terms = Company.objects.create(
+            name="Company Without Terms",
+            supports_job_search_terms=False,
+        )
+        company_with_terms = Company.objects.create(name="Company With Terms")
+        disabled_platform = Platform.objects.create(
+            name="Disabled Platform",
+            job_search_enabled=False,
+        )
+        platform = Platform.objects.create(name="Platform")
+        SearchPath.objects.create(company=company_without_terms)
+
+        output = StringIO()
+        call_command("create_search_paths", stdout=output)
+
+        self.assertIn("SearchPaths created: 5", output.getvalue())
+        self.assertIn("SearchPaths already existed: 1", output.getvalue())
+        self.assertFalse(SearchPath.objects.filter(company=disabled_company).exists())
+        self.assertFalse(SearchPath.objects.filter(platform=disabled_platform).exists())
+        self.assertFalse(SearchPath.objects.filter(search_term=inactive).exists())
+        self.assertEqual(
+            SearchPath.objects.filter(company=company_without_terms).count(),
+            1,
+        )
+        self.assertEqual(
+            SearchPath.objects.filter(company=company_with_terms).count(),
+            3,
+        )
+        self.assertEqual(SearchPath.objects.filter(platform=platform).count(), 2)
+        self.assertFalse(
+            SearchPath.objects.filter(platform=platform, search_term__isnull=True).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(
+                company=company_with_terms,
+                search_term=active_first,
+            ).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(
+                company=company_with_terms,
+                search_term=active_second,
+            ).exists()
+        )
+
+        repeated_output = StringIO()
+        call_command("create_search_paths", stdout=repeated_output)
+
+        self.assertIn("SearchPaths created: 0", repeated_output.getvalue())
+        self.assertIn("SearchPaths already existed: 6", repeated_output.getvalue())
 
 
 class RecruiterPageTests(TestCase):

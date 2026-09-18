@@ -1147,6 +1147,11 @@ class SearchPath(models.Model):
         Indeed + "Python"
         Acme Corp + "Backend Developer"
     """
+    url = models.URLField(
+        max_length=1000,
+        blank=True,
+    )
+
     platform = models.ForeignKey(
         Platform,
         on_delete=models.CASCADE,
@@ -1195,6 +1200,29 @@ class SearchPath(models.Model):
                 name="unique_company_search_path",
             ),
         ]
+
+    @property
+    def completed_observations(self):
+        return self.observations.filter(complete=True)
+
+    @property
+    def observation_count(self):
+        return self.completed_observations.count()
+
+    @property
+    def success_count(self):
+        return sum(
+            observation.success is True
+            for observation in self.completed_observations
+        )
+
+    @property
+    def success_probability(self):
+        return (self.success_count + 1) / (self.observation_count + 2)
+
+    @property
+    def alpha(self):
+        return self.observation_count / self.success_probability
 
     def __str__(self):
         source = self.platform or self.company
