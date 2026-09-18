@@ -6,6 +6,7 @@ from django.utils.functional import cached_property
 from calendar import monthrange
 from datetime import timedelta
 from zoneinfo import ZoneInfo
+from django.db.models import Q
 
 
 MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
@@ -240,6 +241,8 @@ class Company(models.Model):
     )
 
     description = models.TextField(blank=True)
+    job_search_enabled = models.BooleanField(default=True)
+    supports_job_search_terms = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -567,6 +570,8 @@ class Platform(models.Model):
         related_name="platforms",
         blank=True,
     )
+
+    job_search_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -1111,3 +1116,139 @@ class Direction(models.Model):
 
     def __str__(self):
         return self.description
+
+
+class SearchTerm(models.Model):
+    """
+    The literal text entered into a job search.
+
+    Examples:
+        Data Engineer
+        Python
+        Django
+        ETL
+        Backend Developer
+    """
+    term = models.CharField(max_length=200, unique=True)
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.term
+
+
+class SearchPath(models.Model):
+    """
+    A reusable method of searching for jobs.
+
+    Exactly one of platform/company should be populated.
+
+    Examples:
+        LinkedIn + "Data Engineer"
+        Indeed + "Python"
+        Acme Corp + "Backend Developer"
+    """
+    platform = models.ForeignKey(
+        Platform,
+        on_delete=models.CASCADE,
+        related_name="search_paths",
+        null=True,
+        blank=True,
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="search_paths",
+        null=True,
+        blank=True,
+    )
+    search_term = models.ForeignKey(
+        SearchTerm,
+        on_delete=models.SET_NULL,
+        related_name="search_paths",
+        null=True,
+        blank=True,
+    )
+
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                        (Q(platform__isnull=False) & Q(company__isnull=True))
+                        | (Q(platform__isnull=True) & Q(company__isnull=False))
+                ),
+                name="search_path_exactly_one_source",
+            ),
+
+            models.UniqueConstraint(
+                fields=["platform", "search_term"],
+                condition=Q(platform__isnull=False),
+                nulls_distinct=False,
+                name="unique_platform_search_path",
+            ),
+
+            models.UniqueConstraint(
+                fields=["company", "search_term"],
+                condition=Q(company__isnull=False),
+                nulls_distinct=False,
+                name="unique_company_search_path",
+            ),
+        ]
+
+    def __str__(self):
+        source = self.platform or self.company
+        return f'{source} — {self.search_term}'
+
+
+class JobPosting(models.Model):
+    """
+    A job posting encountered during a search.
+    """
+    title = models.CharField(max_length=200)
+    company_name = models.CharField(max_length=200)
+    url = models.URLField(blank=True)
+    description = models.TextField(blank=True)
+
+    apply_to = models.BooleanField(
+        null=True,
+        blank=True,
+    )
+
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} — {self.company_name}"
+
+
+class SearchObservation(models.Model):
+    search_path = models.ForeignKey(
+        SearchPath,
+        on_delete=models.CASCADE,
+        related_name="observations",
+    )
+
+    job_posting = models.ForeignKey(
+        JobPosting,
+        on_delete=models.SET_NULL,
+        related_name="search_observations",
+        null=True,
+        blank=True,
+    )
+
+    complete = models.BooleanField(default=False)
+
+    created = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def success(self):
+        if not self.complete:
+            return None
+
+        return (
+                self.job_posting is not None
+                and self.job_posting.apply_to is True
+        )
+
+    def __str__(self):
+        return f"{self.search_path} — {self.created:%Y-%m-%d}"

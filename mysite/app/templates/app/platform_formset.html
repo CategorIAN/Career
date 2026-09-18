@@ -15,6 +15,7 @@
                 <th>Name</th>
                 <th>URL</th>
                 <th>Max Skills</th>
+                <th>Job Search Enabled</th>
                 <th>Add/Delete</th>
             </tr>
         </thead>
@@ -31,6 +32,10 @@
                 <td>
                     {{ new_form.max_skills.errors }}
                     {{ new_form.max_skills }}
+                </td>
+                <td>
+                    {{ new_form.job_search_enabled.errors }}
+                    {{ new_form.job_search_enabled }}
                 </td>
                 <td>
                     <button type="submit" name="add_platform" value="1">Add</button>
@@ -52,6 +57,10 @@
                     <td>
                         {{ form.max_skills.errors }}
                         {{ form.max_skills }}
+                    </td>
+                    <td>
+                        {{ form.job_search_enabled.errors }}
+                        {{ form.job_search_enabled }}
                     </td>
                     <td>
                         <button type="submit" name="delete_platform" value="{{ form.instance.pk }}">Delete</button>

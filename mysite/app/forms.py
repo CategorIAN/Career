@@ -16,6 +16,7 @@ from .models import (
     PlatformSkill,
     Professional,
     Recruiter,
+    SearchTerm,
     Connect,
     Skill,
 )
@@ -34,6 +35,8 @@ class CompanyForm(forms.ModelForm):
             "email",
             "phone",
             "description",
+            "job_search_enabled",
+            "supports_job_search_terms",
         ]
         widgets = {
             "website": forms.URLInput(
@@ -86,6 +89,12 @@ class CompanyForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
 
+class SearchTermForm(forms.ModelForm):
+    class Meta:
+        model = SearchTerm
+        fields = ["term", "active"]
+
+
 class SkillForm(forms.ModelForm):
     class Meta:
         model = Skill
@@ -133,7 +142,7 @@ SkillFormSet = modelformset_factory(
 class PlatformForm(forms.ModelForm):
     class Meta:
         model = Platform
-        fields = ["name", "url", "max_skills"]
+        fields = ["name", "url", "max_skills", "job_search_enabled"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

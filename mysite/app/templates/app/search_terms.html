@@ -1,0 +1,105 @@
+{% extends "app/base.html" %}
+
+{% block title %}Search Terms{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <div class="utility-card-header">
+        <h1>Search Terms</h1>
+        <button type="button" class="copy-button" id="open-add-search-term-modal">Add Search Term</button>
+    </div>
+
+    <table class="project-results">
+        <thead>
+            <tr>
+                <th>Term</th>
+                <th>Active</th>
+                <th>Edit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for search_term in search_terms %}
+                <tr>
+                    <td>{{ search_term.term }}</td>
+                    <td>{{ search_term.active|yesno:"Yes,No" }}</td>
+                    <td><button type="button" class="copy-button open-edit-search-term-modal" data-target="edit-search-term-modal-{{ search_term.pk }}">Edit</button></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3">No search terms found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% for search_term in search_terms %}
+    <div id="edit-search-term-modal-{{ search_term.pk }}" class="search-term-modal{% if show_edit_search_term_id != search_term.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-search-term-modal-title-{{ search_term.pk }}">
+        <div class="search-term-modal-content">
+            <button type="button" class="search-term-modal-close close-edit-search-term-modal" aria-label="Close">&times;</button>
+            <h2 id="edit-search-term-modal-title-{{ search_term.pk }}">Edit Search Term</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="search-term-form-grid">
+                    {% for field in search_term.edit_form %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div>{{ field.errors }}{{ field }}</div>
+                    {% endfor %}
+                    <div class="search-term-edit-actions">
+                        <button type="submit" name="delete_search_term" value="{{ search_term.pk }}" class="search-term-delete-button" onclick="return confirm('Delete {{ search_term.term|escapejs }}? Search paths and historical observations will be kept.');">Delete</button>
+                        <button type="submit" name="save_search_term" value="{{ search_term.pk }}">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+
+<div id="add-search-term-modal" class="search-term-modal{% if not show_add_modal %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="add-search-term-modal-title">
+    <div class="search-term-modal-content">
+        <button type="button" id="close-add-search-term-modal" class="search-term-modal-close" aria-label="Close">&times;</button>
+        <h2 id="add-search-term-modal-title">Add Search Term</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="search-term-form-grid">
+                {% for field in new_search_term_form %}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div>{{ field.errors }}{{ field }}</div>
+                {% endfor %}
+                <button type="submit" name="add_search_term" value="1">Add Search Term</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const addModal = document.getElementById("add-search-term-modal");
+        const closeModal = modal => modal.classList.add("hidden");
+
+        document.getElementById("open-add-search-term-modal").addEventListener("click", () => addModal.classList.remove("hidden"));
+        document.getElementById("close-add-search-term-modal").addEventListener("click", () => closeModal(addModal));
+        document.querySelectorAll(".open-edit-search-term-modal").forEach(button => {
+            button.addEventListener("click", () => document.getElementById(button.dataset.target).classList.remove("hidden"));
+        });
+        document.querySelectorAll(".close-edit-search-term-modal").forEach(button => {
+            button.addEventListener("click", () => closeModal(button.closest(".search-term-modal")));
+        });
+        document.querySelectorAll(".search-term-modal").forEach(modal => {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) closeModal(modal);
+            });
+        });
+    });
+</script>
+
+<style>
+    .search-term-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.35); }
+    .search-term-modal.hidden { display: none; }
+    .search-term-modal-content { position: relative; width: min(32rem, 100%); padding: 1.5rem; border: 1px solid #8c8c8c; border-radius: 0.5rem; background: #fff; }
+    .search-term-modal-close { position: absolute; top: 0.5rem; right: 0.75rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; }
+    .search-term-form-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1rem; align-items: center; }
+    .search-term-form-grid button { grid-column: 2; justify-self: start; }
+    .search-term-edit-actions { grid-column: 2; display: flex; gap: 0.5rem; }
+    .search-term-edit-actions button { grid-column: auto; }
+    .search-term-delete-button { border-color: #b91c1c; background: #fee2e2; color: #991b1b; }
+</style>
+{% endblock %}

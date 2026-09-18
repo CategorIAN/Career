@@ -16,6 +16,8 @@
                 <th>LinkedIn</th>
                 <th>Email</th>
                 <th>Phone</th>
+                <th>Job Search</th>
+                <th>Search Terms</th>
                 <th>Edit</th>
             </tr>
         </thead>
@@ -36,10 +38,12 @@
                     </td>
                     <td>{{ company.email }}</td>
                     <td>{{ company.phone }}</td>
+                    <td>{{ company.job_search_enabled|yesno:"Yes,No" }}</td>
+                    <td>{{ company.supports_job_search_terms|yesno:"Yes,No" }}</td>
                     <td><button type="button" class="copy-button open-edit-company-modal" data-target="edit-company-modal-{{ company.pk }}">Edit</button></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5">No companies found.</td></tr>
+                <tr><td colspan="7">No companies found.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -64,6 +68,7 @@
             <h2 id="edit-company-modal-title-{{ company.pk }}">Edit Company</h2>
             <form method="post">
                 {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
                 <div class="company-form-grid">
                     {% for field in company.edit_form %}
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -85,6 +90,7 @@
         <h2 id="add-company-modal-title">Add New Company</h2>
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div class="company-form-grid">
                 {% for field in new_company_form %}
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>

@@ -36,6 +36,9 @@ from .models import (
     Residency,
     Role,
     RoleTask,
+    SearchObservation,
+    SearchPath,
+    SearchTerm,
     School,
     Skill,
     State,
@@ -657,6 +660,8 @@ class PlatformPageTests(TestCase):
         self.assertContains(response, "<title>Platforms</title>", html=False)
         self.assertContains(response, "<h1>Platforms</h1>", html=False)
         self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "Job Search Enabled")
+        self.assertContains(response, 'name="form-0-job_search_enabled"', html=False)
         self.assertContains(response, 'name="add_platform" value="1"', html=False)
         self.assertContains(response, f'name="delete_platform" value="{platform.pk}"', html=False)
         self.assertNotContains(response, 'name="form-0-DELETE"', html=False)
@@ -681,6 +686,7 @@ class PlatformPageTests(TestCase):
                 "form-0-name": "Alpha Platform Updated",
                 "form-0-url": "https://updated.example.com",
                 "form-0-max_skills": "12",
+                "form-0-job_search_enabled": "on",
                 "new-name": "Should Not Save",
                 "new-url": "https://ignored.example.com",
                 "new-max_skills": "3",
@@ -692,6 +698,7 @@ class PlatformPageTests(TestCase):
         self.assertEqual(existing_platform.name, "Alpha Platform Updated")
         self.assertEqual(existing_platform.url, "https://updated.example.com")
         self.assertEqual(existing_platform.max_skills, 12)
+        self.assertTrue(existing_platform.job_search_enabled)
         self.assertFalse(Platform.objects.filter(name="Should Not Save").exists())
 
     def test_platforms_add_button_creates_platform(self):
@@ -1860,6 +1867,9 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, company.linkedin_url)
         self.assertContains(response, company.email)
         self.assertContains(response, company.phone)
+        self.assertContains(response, "Job Search")
+        self.assertContains(response, "Search Terms")
+        self.assertContains(response, "Yes")
 
     def test_companies_page_creates_company_from_modal_form(self):
         response = self.client.post(
@@ -1912,12 +1922,16 @@ class CompanyPageTests(TestCase):
                 f"edit-company-{company.pk}-email": "",
                 f"edit-company-{company.pk}-phone": "",
                 f"edit-company-{company.pk}-description": "",
+                f"edit-company-{company.pk}-job_search_enabled": "",
+                f"edit-company-{company.pk}-supports_job_search_terms": "",
                 "save_company": company.pk,
             },
         )
         self.assertRedirects(save_response, reverse("companies"))
         company.refresh_from_db()
         self.assertEqual(company.name, "Analytical Engines Updated")
+        self.assertFalse(company.job_search_enabled)
+        self.assertFalse(company.supports_job_search_terms)
 
         delete_response = self.client.post(
             reverse("companies"),
@@ -1925,6 +1939,97 @@ class CompanyPageTests(TestCase):
         )
         self.assertRedirects(delete_response, reverse("companies"))
         self.assertFalse(Company.objects.filter(pk=company.pk).exists())
+
+    def test_companies_page_edit_returns_to_current_page(self):
+        Company.objects.bulk_create(
+            [Company(name=f"Company {index:02d}") for index in range(1, 12)]
+        )
+        company = Company.objects.get(name="Company 11")
+
+        response = self.client.post(
+            f"{reverse('companies')}?page=2",
+            {
+                "page": "2",
+                f"edit-company-{company.pk}-name": "Company Updated",
+                f"edit-company-{company.pk}-website": "",
+                f"edit-company-{company.pk}-linkedin_url": "",
+                f"edit-company-{company.pk}-email": "",
+                f"edit-company-{company.pk}-phone": "",
+                f"edit-company-{company.pk}-description": "",
+                "save_company": company.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('companies')}?page=2")
+        company.refresh_from_db()
+        self.assertEqual(company.name, "Company Updated")
+
+
+class SearchTermsPageTests(TestCase):
+    def test_search_terms_page_displays_terms_alphabetically(self):
+        SearchTerm.objects.create(term="Python", active=False)
+        SearchTerm.objects.create(term="Data Engineer")
+
+        response = self.client.get(reverse("search_terms"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Search Terms")
+        self.assertContains(response, 'id="open-add-search-term-modal"', html=False)
+        self.assertLess(
+            response.content.index(b"Data Engineer"),
+            response.content.index(b"Python"),
+        )
+        self.assertContains(response, "Yes")
+        self.assertContains(response, "No")
+
+    def test_search_terms_page_creates_and_edits_search_term(self):
+        create_response = self.client.post(
+            reverse("search_terms"),
+            {
+                "new-search-term-term": "Python",
+                "new-search-term-active": "on",
+                "add_search_term": "1",
+            },
+        )
+
+        self.assertRedirects(create_response, reverse("search_terms"))
+        search_term = SearchTerm.objects.get(term="Python")
+
+        edit_response = self.client.post(
+            reverse("search_terms"),
+            {
+                f"edit-search-term-{search_term.pk}-term": "Django",
+                "save_search_term": search_term.pk,
+            },
+        )
+
+        self.assertRedirects(edit_response, reverse("search_terms"))
+        search_term.refresh_from_db()
+        self.assertEqual(search_term.term, "Django")
+        self.assertFalse(search_term.active)
+
+    def test_deleting_search_term_preserves_paths_and_observations(self):
+        search_term = SearchTerm.objects.create(term="Python")
+        platform = Platform.objects.create(name="Example Platform")
+        search_path = SearchPath.objects.create(
+            platform=platform,
+            search_term=search_term,
+        )
+        observation = SearchObservation.objects.create(search_path=search_path)
+
+        page_response = self.client.get(reverse("search_terms"))
+        self.assertContains(page_response, "Search paths and historical observations will be kept.")
+
+        delete_response = self.client.post(
+            reverse("search_terms"),
+            {"delete_search_term": search_term.pk},
+        )
+
+        self.assertRedirects(delete_response, reverse("search_terms"))
+        self.assertFalse(SearchTerm.objects.filter(pk=search_term.pk).exists())
+        search_path.refresh_from_db()
+        self.assertIsNone(search_path.search_term)
+        self.assertTrue(SearchObservation.objects.filter(pk=observation.pk).exists())
 
 
 class RecruiterPageTests(TestCase):

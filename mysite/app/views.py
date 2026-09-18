@@ -35,6 +35,7 @@ from .forms import (
     ProfessionalForm,
     RecruiterConnectForm,
     RecruiterForm,
+    SearchTermForm,
     SkillForm,
     SkillFormSet,
 )
@@ -61,6 +62,7 @@ from .models import (
     FreelancerSkill,
     ProjectTask,
     RoleTask,
+    SearchTerm,
     Supervisor,
 )
 from .services.google_calendar import delete_meeting_event, sync_professional_connect
@@ -1346,17 +1348,21 @@ def companies_view(request):
     submitted_edit_form = None
     submitted_edit_company_id = None
     if request.method == "POST":
+        page_number = request.POST.get("page", "").strip()
+        redirect_url = reverse("companies")
+        if page_number:
+            redirect_url = f"{redirect_url}?page={page_number}"
         new_company_form = CompanyForm(request.POST, prefix="new-company")
         save_company_id = request.POST.get("save_company", "").strip()
         delete_company_id = request.POST.get("delete_company", "").strip()
         if "add_company" in request.POST:
             if new_company_form.is_valid():
                 new_company_form.save()
-                return redirect("companies")
+                return redirect(redirect_url)
             show_add_modal = True
         elif delete_company_id:
             Company.objects.filter(pk=delete_company_id).delete()
-            return redirect("companies")
+            return redirect(redirect_url)
         elif save_company_id:
             company = Company.objects.filter(pk=save_company_id).first()
             if company is not None:
@@ -1368,7 +1374,7 @@ def companies_view(request):
                 )
                 if submitted_edit_form.is_valid():
                     submitted_edit_form.save()
-                    return redirect("companies")
+                    return redirect(redirect_url)
                 show_edit_company_id = company.pk
     else:
         new_company_form = CompanyForm(prefix="new-company")
@@ -1392,6 +1398,63 @@ def companies_view(request):
             "new_company_form": new_company_form,
             "show_add_modal": show_add_modal,
             "show_edit_company_id": show_edit_company_id,
+        },
+    )
+
+
+def search_terms_view(request):
+    show_add_modal = False
+    show_edit_search_term_id = None
+    submitted_edit_form = None
+    submitted_edit_search_term_id = None
+
+    if request.method == "POST":
+        new_search_term_form = SearchTermForm(request.POST, prefix="new-search-term")
+        save_search_term_id = request.POST.get("save_search_term", "").strip()
+        delete_search_term_id = request.POST.get("delete_search_term", "").strip()
+        if "add_search_term" in request.POST:
+            if new_search_term_form.is_valid():
+                new_search_term_form.save()
+                return redirect("search_terms")
+            show_add_modal = True
+        elif delete_search_term_id:
+            SearchTerm.objects.filter(pk=delete_search_term_id).delete()
+            return redirect("search_terms")
+        elif save_search_term_id:
+            search_term = SearchTerm.objects.filter(pk=save_search_term_id).first()
+            if search_term is not None:
+                submitted_edit_search_term_id = search_term.pk
+                submitted_edit_form = SearchTermForm(
+                    request.POST,
+                    instance=search_term,
+                    prefix=f"edit-search-term-{search_term.pk}",
+                )
+                if submitted_edit_form.is_valid():
+                    submitted_edit_form.save()
+                    return redirect("search_terms")
+                show_edit_search_term_id = search_term.pk
+    else:
+        new_search_term_form = SearchTermForm(prefix="new-search-term")
+
+    search_terms = list(SearchTerm.objects.order_by("term", "pk"))
+    for search_term in search_terms:
+        search_term.edit_form = (
+            submitted_edit_form
+            if search_term.pk == submitted_edit_search_term_id
+            else SearchTermForm(
+                instance=search_term,
+                prefix=f"edit-search-term-{search_term.pk}",
+            )
+        )
+
+    return render(
+        request,
+        "app/search_terms.html",
+        {
+            "search_terms": search_terms,
+            "new_search_term_form": new_search_term_form,
+            "show_add_modal": show_add_modal,
+            "show_edit_search_term_id": show_edit_search_term_id,
         },
     )
 

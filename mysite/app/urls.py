@@ -8,6 +8,7 @@ urlpatterns = [
     path("professionals/", views.professional_formset_view, name="professionals"),
     path("recruiters/", views.recruiter_formset_view, name="recruiters"),
     path("companies/", views.companies_view, name="companies"),
+    path("search-terms/", views.search_terms_view, name="search_terms"),
     path("connections/", views.connections_view, name="connections"),
     path("connections/events/", views.connection_events_view, name="connection_events"),
     path(
