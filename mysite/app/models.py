@@ -1231,6 +1231,14 @@ class SearchPath(models.Model):
         return "company"
 
     @property
+    def effective_url(self):
+        if self.url:
+            return self.url
+        if self.platform_id is not None:
+            return self.platform.url
+        return self.company.website
+
+    @property
     def hide(self):
         # Inactive SearchPaths are always hidden.
         if not self.active:
@@ -1277,8 +1285,10 @@ class JobPosting(models.Model):
 class SearchObservation(models.Model):
     search_path = models.ForeignKey(
         SearchPath,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="observations",
+        null=True,
+        blank=True,
     )
 
     job_posting = models.ForeignKey(

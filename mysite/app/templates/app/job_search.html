@@ -13,6 +13,7 @@
                 <th>Success Count</th>
                 <th>Observation Count</th>
                 <th>Success Probability</th>
+                <th>Search</th>
                 <th>Edit</th>
             </tr>
         </thead>
@@ -20,8 +21,8 @@
             {% for form in formset %}
                 <tr>
                     <td>
-                        {% if form.instance.url %}
-                            <a href="{{ form.instance.url }}" target="_blank" rel="noopener noreferrer">{{ form.instance }}</a>
+                        {% if form.instance.effective_url %}
+                            <a href="{{ form.instance.effective_url }}" target="_blank" rel="noopener noreferrer">{{ form.instance }}</a>
                         {% else %}
                             {{ form.instance }}
                         {% endif %}
@@ -29,10 +30,18 @@
                     <td>{{ form.instance.page_success_count }}</td>
                     <td>{{ form.instance.page_observation_count }}</td>
                     <td>{{ form.instance.page_success_probability|floatformat:2 }}</td>
+                    <td>
+                        <form method="post" class="start-search-observation-form" data-effective-url="{{ form.instance.effective_url }}">
+                            {% csrf_token %}
+                            <input type="hidden" name="page" value="{{ page_obj.number }}">
+                            <input type="hidden" name="search" value="{{ search_text }}">
+                            <button type="submit" name="start_search_observation" value="{{ form.instance.pk }}">Search</button>
+                        </form>
+                    </td>
                     <td><button type="button" class="copy-button open-edit-search-path-modal" data-target="edit-search-path-modal-{{ form.instance.pk }}">Edit</button></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5">No job search paths available.</td></tr>
+                <tr><td colspan="6">No job search paths available.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -40,14 +49,71 @@
     {% if page_obj.paginator.num_pages > 1 %}
         <nav class="pagination job-search-pagination" aria-label="Job Search pagination">
             {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous job search path">&larr;</a>
+                <a href="?search={{ search_text|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="Previous job search path">&larr;</a>
             {% endif %}
             <span>Job Search {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next job search path">&rarr;</a>
+                <a href="?search={{ search_text|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="Next job search path">&rarr;</a>
             {% endif %}
         </nav>
     {% endif %}
+
+    <form method="get" style="margin-top: 1rem;">
+        <label for="search-path-search">Search SearchPath</label>
+        <input
+            id="search-path-search"
+            type="text"
+            name="search"
+            value="{{ search_text }}"
+            list="search-path-search-options"
+            autocomplete="off"
+            style="width: 20rem;"
+        >
+        <datalist id="search-path-search-options">
+            {% for search_path in search_path_options %}
+                <option value="{{ search_path }}"></option>
+            {% endfor %}
+        </datalist>
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'job_search' %}'">Clear</button>
+    </form>
+
+    <section style="margin-top: 1.5rem;">
+        <h2>Pending Search Observations</h2>
+        <table class="project-results">
+            <thead>
+                <tr>
+                    <th>Job Posting</th>
+                    <th>Created</th>
+                    <th>Complete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for observation in pending_search_observations %}
+                    <tr>
+                        <td>
+                            {% if observation.job_posting %}
+                                <button type="button" class="copy-button open-job-posting-modal" data-target="edit-job-posting-modal-{{ observation.pk }}">Edit Posting</button>
+                            {% else %}
+                                <button type="button" class="copy-button open-job-posting-modal" data-target="add-job-posting-modal-{{ observation.pk }}">Add Posting</button>
+                            {% endif %}
+                        </td>
+                        <td>{{ observation.created|date:"Y-m-d g:i A" }}</td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                                <input type="hidden" name="search" value="{{ search_text }}">
+                                <button type="submit" name="complete_search_observation" value="{{ observation.pk }}">Mark Complete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3">No pending search observations.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
 </section>
 
 {% for form in formset %}
@@ -59,6 +125,7 @@
                 {% csrf_token %}
                 {{ formset.management_form }}
                 <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <input type="hidden" name="search" value="{{ search_text }}">
                 {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
                 <div class="search-path-form-grid">
                     {% for field in form.visible_fields %}
@@ -72,9 +139,68 @@
     </div>
 {% endfor %}
 
+{% for observation in pending_search_observations %}
+    {% if observation.job_posting %}
+        <div id="edit-job-posting-modal-{{ observation.pk }}" class="search-path-modal job-posting-modal{% if show_edit_job_posting_observation_id != observation.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-job-posting-modal-title-{{ observation.pk }}">
+            <div class="search-path-modal-content">
+                <button type="button" class="search-path-modal-close job-posting-modal-close" aria-label="Close">&times;</button>
+                <h2 id="edit-job-posting-modal-title-{{ observation.pk }}">Edit Job Posting</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ page_obj.number }}">
+                    <input type="hidden" name="search" value="{{ search_text }}">
+                    <div class="search-path-form-grid">
+                        {% for field in observation.job_posting_form %}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div>{{ field.errors }}{{ field }}</div>
+                        {% endfor %}
+                        <button type="submit" name="save_job_posting" value="{{ observation.pk }}">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div id="add-job-posting-modal-{{ observation.pk }}" class="search-path-modal job-posting-modal{% if show_add_job_posting_observation_id != observation.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="add-job-posting-modal-title-{{ observation.pk }}">
+            <div class="search-path-modal-content">
+                <button type="button" class="search-path-modal-close job-posting-modal-close" aria-label="Close">&times;</button>
+                <h2 id="add-job-posting-modal-title-{{ observation.pk }}">Add Job Posting</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ page_obj.number }}">
+                    <input type="hidden" name="search" value="{{ search_text }}">
+                    <div class="search-path-form-grid">
+                        {% for field in observation.job_posting_form %}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div>{{ field.errors }}{{ field }}</div>
+                        {% endfor %}
+                        <button type="submit" name="add_job_posting" value="{{ observation.pk }}">Add Posting</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}
+
 <script>
     document.addEventListener("DOMContentLoaded", () => {
+        window.setTimeout(() => {
+            document.querySelectorAll(".autofill-blocked").forEach(input => {
+                input.removeAttribute("readonly");
+            });
+        }, 100);
+        document.querySelectorAll(".start-search-observation-form").forEach(form => {
+            form.addEventListener("submit", () => {
+                if (form.dataset.effectiveUrl) {
+                    window.open(form.dataset.effectiveUrl, "_blank", "noopener,noreferrer");
+                }
+            });
+        });
         document.querySelectorAll(".open-edit-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => {
+                document.getElementById(button.dataset.target).classList.remove("hidden");
+            });
+        });
+        document.querySelectorAll(".open-job-posting-modal").forEach(button => {
             button.addEventListener("click", () => {
                 document.getElementById(button.dataset.target).classList.remove("hidden");
             });

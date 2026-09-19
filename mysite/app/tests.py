@@ -2100,6 +2100,257 @@ class CreateSearchPathsCommandTests(TestCase):
 
 
 class JobSearchPageTests(TestCase):
+    def test_job_search_shows_pending_observations_for_current_search_path(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        pending_observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            complete=False,
+        )
+
+        response = self.client.get(reverse("job_search"))
+
+        self.assertContains(response, "Pending Search Observations")
+        self.assertContains(response, "Add Posting")
+        self.assertContains(
+            response,
+            f'name="complete_search_observation" value="{pending_observation.pk}"',
+            html=False,
+        )
+        self.assertEqual(
+            list(response.context["pending_search_observations"]),
+            [pending_observation],
+        )
+
+    def test_job_search_adds_job_posting_to_pending_observation(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            complete=False,
+        )
+
+        page_response = self.client.get(reverse("job_search"))
+        self.assertContains(
+            page_response,
+            f'name="add-job-posting-{observation.pk}-title" autocomplete="new-password" class="autofill-blocked" data-form-type="other"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            f'name="add-job-posting-{observation.pk}-company_name" autocomplete="new-password" class="autofill-blocked" data-form-type="other"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                f"add-job-posting-{observation.pk}-title": "Data Engineer",
+                f"add-job-posting-{observation.pk}-company_name": "Example Co",
+                f"add-job-posting-{observation.pk}-url": "https://jobs.example.com/1",
+                f"add-job-posting-{observation.pk}-description": "Build data systems.",
+                f"add-job-posting-{observation.pk}-apply_to": "true",
+                "add_job_posting": observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        observation.refresh_from_db()
+        self.assertEqual(observation.job_posting.title, "Data Engineer")
+        self.assertTrue(observation.job_posting.apply_to)
+
+    def test_job_search_edits_job_posting_for_pending_observation(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        posting = JobPosting.objects.create(
+            title="Old Title",
+            company_name="Example Co",
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=posting,
+            complete=False,
+        )
+
+        page_response = self.client.get(reverse("job_search"))
+        self.assertContains(page_response, "Edit Posting")
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                f"edit-job-posting-{observation.pk}-title": "Updated Title",
+                f"edit-job-posting-{observation.pk}-company_name": "Updated Co",
+                f"edit-job-posting-{observation.pk}-url": "",
+                f"edit-job-posting-{observation.pk}-description": "Updated description.",
+                f"edit-job-posting-{observation.pk}-apply_to": "false",
+                "save_job_posting": observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        posting.refresh_from_db()
+        self.assertEqual(posting.title, "Updated Title")
+        self.assertFalse(posting.apply_to)
+
+    def test_job_search_marks_current_pending_observation_complete(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        pending_observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            complete=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "complete_search_observation": pending_observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        pending_observation.refresh_from_db()
+        self.assertTrue(pending_observation.complete)
+
+    def test_job_search_search_button_creates_pending_observation(self):
+        search_path = SearchPath.objects.create(
+            platform=Platform.objects.create(
+                name="Search Platform",
+                url="https://platform.example.com",
+            )
+        )
+
+        page_response = self.client.get(reverse("job_search"))
+        self.assertContains(page_response, "<th>Search</th>", html=False)
+        self.assertContains(
+            page_response,
+            f'name="start_search_observation" value="{search_path.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            f'data-effective-url="{search_path.effective_url}"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "start_search_observation": search_path.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        self.assertTrue(
+            SearchObservation.objects.filter(
+                search_path=search_path,
+                complete=False,
+            ).exists()
+        )
+
+    def test_job_search_sorts_pending_paths_before_lower_alpha_paths(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        nonpending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Nonpending Platform")
+        )
+        latest_company_path = SearchPath.objects.create(
+            company=Company.objects.create(name="Latest Company")
+        )
+        successful_posting = JobPosting.objects.create(
+            title="Success",
+            company_name="Example",
+            apply_to=True,
+        )
+        unsuccessful_posting = JobPosting.objects.create(
+            title="Unsuccessful",
+            company_name="Example",
+            apply_to=False,
+        )
+        SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=unsuccessful_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(search_path=pending_path, complete=False)
+        SearchObservation.objects.create(
+            search_path=nonpending_path,
+            job_posting=successful_posting,
+            complete=True,
+        )
+        latest_observation = SearchObservation.objects.create(
+            search_path=latest_company_path,
+            complete=True,
+        )
+        SearchObservation.objects.filter(pk=latest_observation.pk).update(
+            created=timezone.now() + timedelta(days=1)
+        )
+
+        response = self.client.get(reverse("job_search"))
+
+        self.assertEqual(response.context["formset"].forms[0].instance.pk, pending_path.pk)
+        self.assertTrue(response.context["formset"].forms[0].instance.pending)
+        self.assertGreater(pending_path.alpha, nonpending_path.alpha)
+
+    def test_job_search_filters_search_paths_by_text(self):
+        matching_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Alpha Platform")
+        )
+        SearchPath.objects.create(
+            platform=Platform.objects.create(name="Beta Platform")
+        )
+
+        response = self.client.get(reverse("job_search"), {"search": "alpha"})
+
+        self.assertContains(response, "Search SearchPath")
+        self.assertContains(response, 'name="search" value="alpha"', html=False)
+        self.assertContains(response, 'list="search-path-search-options"', html=False)
+        self.assertContains(
+            response,
+            f'<option value="{matching_path}"></option>',
+            html=False,
+        )
+        self.assertContains(response, str(matching_path))
+        self.assertEqual(response.context["formset"].forms[0].instance.pk, matching_path.pk)
+        self.assertContains(
+            response,
+            f"window.location.href='{reverse('job_search')}'",
+            html=False,
+        )
+
+    def test_search_path_effective_url_prefers_its_url_then_its_source_url(self):
+        platform = Platform.objects.create(
+            name="Example Platform",
+            url="https://platform.example.com",
+        )
+        search_path = SearchPath.objects.create(platform=platform)
+
+        self.assertEqual(search_path.effective_url, platform.url)
+
+        search_path.url = "https://search.example.com"
+        self.assertEqual(search_path.effective_url, search_path.url)
+
+    def test_job_search_sorts_equal_alpha_paths_by_name(self):
+        later_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Zebra Platform")
+        )
+        first_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Alpha Platform")
+        )
+
+        response = self.client.get(reverse("job_search"))
+
+        self.assertContains(response, str(first_path))
+        self.assertEqual(response.context["formset"].forms[0].instance.pk, first_path.pk)
+
     def test_job_search_uses_constant_queries_for_many_search_paths(self):
         platforms = [Platform(name=f"Platform {index}") for index in range(12)]
         Platform.objects.bulk_create(platforms)

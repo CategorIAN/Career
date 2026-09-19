@@ -5,7 +5,18 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, Count, F, IntegerField, Prefetch, Q, Value, When
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    Value,
+    When,
+)
 from django.conf import settings
 from django.urls import reverse
 from django.utils.dateparse import parse_date, parse_datetime
@@ -27,6 +38,7 @@ from .forms import (
     FeatureFormSet,
     FeatureLinkForm,
     FeatureLinkFormSet,
+    JobPostingForm,
     PlatformForm,
     PlatformFeatureFormSet,
     PlatformFormSet,
@@ -46,6 +58,7 @@ from .models import (
     Direction,
     Feature,
     FeatureLink,
+    JobPosting,
     Platform,
     PlatformFeature,
     PlatformSkill,
@@ -1464,6 +1477,11 @@ def search_terms_view(request):
 
 def job_search_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
+    search_text = (
+        request.POST.get("search", "").strip()
+        if request.method == "POST"
+        else request.GET.get("search", "").strip()
+    )
     last_observation_source = (
         SearchObservation.objects.filter(complete=True)
         .order_by("-created")
@@ -1474,6 +1492,12 @@ def job_search_view(request):
         SearchPath.objects.filter(active=True)
         .select_related("company", "platform", "search_term")
         .annotate(
+            pending=Exists(
+                SearchObservation.objects.filter(
+                    search_path_id=OuterRef("pk"),
+                    complete=False,
+                )
+            ),
             page_observation_count=Count(
                 "observations",
                 filter=Q(observations__complete=True),
@@ -1503,7 +1527,21 @@ def job_search_view(request):
         search_path.page_alpha = (
             search_path.page_observation_count / search_path.page_success_probability
         )
-    visible_search_paths.sort(key=lambda search_path: search_path.page_alpha)
+    visible_search_paths.sort(
+        key=lambda search_path: (
+            not search_path.pending,
+            search_path.page_alpha,
+            str(search_path).casefold(),
+        )
+    )
+    search_path_options = visible_search_paths
+    if search_text:
+        normalized_search_text = search_text.casefold()
+        visible_search_paths = [
+            search_path
+            for search_path in visible_search_paths
+            if normalized_search_text in str(search_path).casefold()
+        ]
 
     paginator = Paginator(visible_search_paths, 1)
     page_obj = paginator.get_page(page_number)
@@ -1512,7 +1550,15 @@ def job_search_view(request):
         "company",
         "platform",
         "search_term",
+    ).annotate(
+        pending=Exists(
+            SearchObservation.objects.filter(
+                search_path_id=OuterRef("pk"),
+                complete=False,
+            )
+        )
     )
+    current_search_path_id = page_search_path_ids[0] if page_search_path_ids else None
     page_statistics = {
         search_path.pk: (
             search_path.page_observation_count,
@@ -1523,13 +1569,92 @@ def job_search_view(request):
         for search_path in page_obj.object_list
     }
     show_edit_search_path_id = None
+    show_add_job_posting_observation_id = None
+    show_edit_job_posting_observation_id = None
+    submitted_job_posting_form = None
+    submitted_job_posting_observation_id = None
 
     if request.method == "POST":
-        formset = SearchPathFormSet(request.POST, queryset=page_queryset)
-        if "save_search_path" in request.POST and formset.is_valid():
-            formset.save()
-            return redirect(f"{reverse('job_search')}?page={page_obj.number}")
-        show_edit_search_path_id = request.POST.get("edit_search_path", "").strip()
+        start_search_observation_id = request.POST.get(
+            "start_search_observation",
+            "",
+        ).strip()
+        complete_search_observation_id = request.POST.get(
+            "complete_search_observation",
+            "",
+        ).strip()
+        add_job_posting_observation_id = request.POST.get(
+            "add_job_posting",
+            "",
+        ).strip()
+        save_job_posting_observation_id = request.POST.get(
+            "save_job_posting",
+            "",
+        ).strip()
+        redirect_params = {"page": page_obj.number}
+        if search_text:
+            redirect_params["search"] = search_text
+        redirect_url = f"{reverse('job_search')}?{urlencode(redirect_params)}"
+        if (
+            current_search_path_id is not None
+            and start_search_observation_id == str(current_search_path_id)
+        ):
+            SearchObservation.objects.create(search_path_id=current_search_path_id)
+            return redirect(redirect_url)
+        if complete_search_observation_id and current_search_path_id is not None:
+            SearchObservation.objects.filter(
+                pk=complete_search_observation_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+            ).update(complete=True)
+            return redirect(redirect_url)
+
+        if add_job_posting_observation_id and current_search_path_id is not None:
+            observation = SearchObservation.objects.filter(
+                pk=add_job_posting_observation_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+                job_posting__isnull=True,
+            ).first()
+            if observation is not None:
+                submitted_job_posting_observation_id = observation.pk
+                submitted_job_posting_form = JobPostingForm(
+                    request.POST,
+                    prefix=f"add-job-posting-{observation.pk}",
+                )
+                if submitted_job_posting_form.is_valid():
+                    observation.job_posting = submitted_job_posting_form.save()
+                    observation.save(update_fields=["job_posting"])
+                    return redirect(redirect_url)
+                show_add_job_posting_observation_id = observation.pk
+
+        elif save_job_posting_observation_id and current_search_path_id is not None:
+            observation = SearchObservation.objects.select_related("job_posting").filter(
+                pk=save_job_posting_observation_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+                job_posting__isnull=False,
+            ).first()
+            if observation is not None:
+                submitted_job_posting_observation_id = observation.pk
+                submitted_job_posting_form = JobPostingForm(
+                    request.POST,
+                    instance=observation.job_posting,
+                    prefix=f"edit-job-posting-{observation.pk}",
+                )
+                if submitted_job_posting_form.is_valid():
+                    submitted_job_posting_form.save()
+                    return redirect(redirect_url)
+                show_edit_job_posting_observation_id = observation.pk
+
+        if add_job_posting_observation_id or save_job_posting_observation_id:
+            formset = SearchPathFormSet(queryset=page_queryset)
+        else:
+            formset = SearchPathFormSet(request.POST, queryset=page_queryset)
+            if "save_search_path" in request.POST and formset.is_valid():
+                formset.save()
+                return redirect(redirect_url)
+            show_edit_search_path_id = request.POST.get("edit_search_path", "").strip()
     else:
         formset = SearchPathFormSet(queryset=page_queryset)
 
@@ -1541,13 +1666,42 @@ def job_search_view(request):
             form.instance.page_alpha,
         ) = page_statistics[form.instance.pk]
 
+    current_search_path = formset.forms[0].instance if formset.forms else None
+    pending_search_observations = []
+    if current_search_path is not None and current_search_path.pending:
+        pending_search_observations = list(
+            SearchObservation.objects.filter(
+                search_path=current_search_path,
+                complete=False,
+            )
+            .select_related("job_posting")
+            .order_by("-created")
+        )
+        for observation in pending_search_observations:
+            if observation.pk == submitted_job_posting_observation_id:
+                observation.job_posting_form = submitted_job_posting_form
+            elif observation.job_posting_id is None:
+                observation.job_posting_form = JobPostingForm(
+                    prefix=f"add-job-posting-{observation.pk}",
+                )
+            else:
+                observation.job_posting_form = JobPostingForm(
+                    instance=observation.job_posting,
+                    prefix=f"edit-job-posting-{observation.pk}",
+                )
+
     return render(
         request,
         "app/job_search.html",
         {
             "formset": formset,
             "page_obj": page_obj,
+            "search_text": search_text,
+            "search_path_options": search_path_options,
+            "pending_search_observations": pending_search_observations,
             "show_edit_search_path_id": show_edit_search_path_id,
+            "show_add_job_posting_observation_id": show_add_job_posting_observation_id,
+            "show_edit_job_posting_observation_id": show_edit_job_posting_observation_id,
         },
     )
 

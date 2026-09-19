@@ -11,6 +11,7 @@ from .models import (
     Company,
     Feature,
     FeatureLink,
+    JobPosting,
     Platform,
     PlatformFeature,
     PlatformSkill,
@@ -100,6 +101,36 @@ class SearchPathForm(forms.ModelForm):
     class Meta:
         model = SearchPath
         fields = ["url", "active"]
+
+
+class JobPostingForm(forms.ModelForm):
+    class Meta:
+        model = JobPosting
+        fields = ["title", "company_name", "url", "description", "apply_to"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                    "readonly": "readonly",
+                }
+            ),
+            "company_name": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                    "readonly": "readonly",
+                }
+            ),
+        }
 
 
 class SkillForm(forms.ModelForm):
