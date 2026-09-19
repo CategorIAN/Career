@@ -26,9 +26,9 @@
                             {{ form.instance }}
                         {% endif %}
                     </td>
-                    <td>{{ form.instance.success_count }}</td>
-                    <td>{{ form.instance.observation_count }}</td>
-                    <td>{{ form.instance.success_probability|floatformat:2 }}</td>
+                    <td>{{ form.instance.page_success_count }}</td>
+                    <td>{{ form.instance.page_observation_count }}</td>
+                    <td>{{ form.instance.page_success_probability|floatformat:2 }}</td>
                     <td><button type="button" class="copy-button open-edit-search-path-modal" data-target="edit-search-path-modal-{{ form.instance.pk }}">Edit</button></td>
                 </tr>
             {% empty %}

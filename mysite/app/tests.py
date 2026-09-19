@@ -2100,6 +2100,18 @@ class CreateSearchPathsCommandTests(TestCase):
 
 
 class JobSearchPageTests(TestCase):
+    def test_job_search_uses_constant_queries_for_many_search_paths(self):
+        platforms = [Platform(name=f"Platform {index}") for index in range(12)]
+        Platform.objects.bulk_create(platforms)
+        SearchPath.objects.bulk_create(
+            [SearchPath(platform=platform) for platform in platforms]
+        )
+
+        with self.assertNumQueries(3):
+            response = self.client.get(reverse("job_search"))
+
+        self.assertEqual(response.status_code, 200)
+
     def test_job_search_filters_hidden_paths_and_sorts_visible_paths_by_alpha(self):
         low_platform = Platform.objects.create(name="Low Alpha Platform")
         high_platform = Platform.objects.create(name="High Alpha Platform")

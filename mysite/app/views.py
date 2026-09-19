@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, F, IntegerField, Prefetch, Q, Value, When
+from django.db.models import Case, Count, F, IntegerField, Prefetch, Q, Value, When
 from django.conf import settings
 from django.urls import reverse
 from django.utils.dateparse import parse_date, parse_datetime
@@ -64,6 +64,7 @@ from .models import (
     ProjectTask,
     RoleTask,
     SearchPath,
+    SearchObservation,
     SearchTerm,
     Supervisor,
 )
@@ -1463,17 +1464,64 @@ def search_terms_view(request):
 
 def job_search_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    search_paths = list(
-        SearchPath.objects.select_related("company", "platform", "search_term")
+    last_observation_source = (
+        SearchObservation.objects.filter(complete=True)
+        .order_by("-created")
+        .values_list("search_path__platform_id", "search_path__company_id")
+        .first()
     )
-    visible_search_paths = sorted(
-        (search_path for search_path in search_paths if not search_path.hide),
-        key=lambda search_path: search_path.alpha,
+    search_paths_queryset = (
+        SearchPath.objects.filter(active=True)
+        .select_related("company", "platform", "search_term")
+        .annotate(
+            page_observation_count=Count(
+                "observations",
+                filter=Q(observations__complete=True),
+            ),
+            page_success_count=Count(
+                "observations",
+                filter=Q(
+                    observations__complete=True,
+                    observations__job_posting__apply_to=True,
+                ),
+            ),
+        )
     )
+
+    if last_observation_source is not None:
+        last_platform_id, last_company_id = last_observation_source
+        if last_platform_id is not None:
+            search_paths_queryset = search_paths_queryset.filter(platform__isnull=True)
+        elif last_company_id is not None:
+            search_paths_queryset = search_paths_queryset.filter(company__isnull=True)
+
+    visible_search_paths = list(search_paths_queryset)
+    for search_path in visible_search_paths:
+        search_path.page_success_probability = (
+            search_path.page_success_count + 1
+        ) / (search_path.page_observation_count + 2)
+        search_path.page_alpha = (
+            search_path.page_observation_count / search_path.page_success_probability
+        )
+    visible_search_paths.sort(key=lambda search_path: search_path.page_alpha)
+
     paginator = Paginator(visible_search_paths, 1)
     page_obj = paginator.get_page(page_number)
     page_search_path_ids = [search_path.pk for search_path in page_obj.object_list]
-    page_queryset = SearchPath.objects.filter(pk__in=page_search_path_ids)
+    page_queryset = SearchPath.objects.filter(pk__in=page_search_path_ids).select_related(
+        "company",
+        "platform",
+        "search_term",
+    )
+    page_statistics = {
+        search_path.pk: (
+            search_path.page_observation_count,
+            search_path.page_success_count,
+            search_path.page_success_probability,
+            search_path.page_alpha,
+        )
+        for search_path in page_obj.object_list
+    }
     show_edit_search_path_id = None
 
     if request.method == "POST":
@@ -1484,6 +1532,14 @@ def job_search_view(request):
         show_edit_search_path_id = request.POST.get("edit_search_path", "").strip()
     else:
         formset = SearchPathFormSet(queryset=page_queryset)
+
+    for form in formset:
+        (
+            form.instance.page_observation_count,
+            form.instance.page_success_count,
+            form.instance.page_success_probability,
+            form.instance.page_alpha,
+        ) = page_statistics[form.instance.pk]
 
     return render(
         request,
