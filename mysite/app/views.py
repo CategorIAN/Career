@@ -35,6 +35,7 @@ from .forms import (
     ProfessionalForm,
     RecruiterConnectForm,
     RecruiterForm,
+    SearchPathFormSet,
     SearchTermForm,
     SkillForm,
     SkillFormSet,
@@ -62,6 +63,7 @@ from .models import (
     FreelancerSkill,
     ProjectTask,
     RoleTask,
+    SearchPath,
     SearchTerm,
     Supervisor,
 )
@@ -1459,6 +1461,41 @@ def search_terms_view(request):
     )
 
 
+def job_search_view(request):
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    search_paths = list(
+        SearchPath.objects.select_related("company", "platform", "search_term")
+    )
+    visible_search_paths = sorted(
+        (search_path for search_path in search_paths if not search_path.hide),
+        key=lambda search_path: search_path.alpha,
+    )
+    paginator = Paginator(visible_search_paths, 1)
+    page_obj = paginator.get_page(page_number)
+    page_search_path_ids = [search_path.pk for search_path in page_obj.object_list]
+    page_queryset = SearchPath.objects.filter(pk__in=page_search_path_ids)
+    show_edit_search_path_id = None
+
+    if request.method == "POST":
+        formset = SearchPathFormSet(request.POST, queryset=page_queryset)
+        if "save_search_path" in request.POST and formset.is_valid():
+            formset.save()
+            return redirect(f"{reverse('job_search')}?page={page_obj.number}")
+        show_edit_search_path_id = request.POST.get("edit_search_path", "").strip()
+    else:
+        formset = SearchPathFormSet(queryset=page_queryset)
+
+    return render(
+        request,
+        "app/job_search.html",
+        {
+            "formset": formset,
+            "page_obj": page_obj,
+            "show_edit_search_path_id": show_edit_search_path_id,
+        },
+    )
+
+
 def _feature_wait_parts(wait_value):
     if not wait_value:
         return 0, 0, 0
@@ -1712,7 +1749,7 @@ def _build_search_redirect_url(query, page_number=None):
     query_params = {"query": query}
     if page_number:
         query_params["page"] = page_number
-    return f"{reverse('search')}?{urlencode(query_params)}"
+    return f"{reverse('freelancer_search')}?{urlencode(query_params)}"
 
 
 def _timestamp_to_datetime(timestamp):

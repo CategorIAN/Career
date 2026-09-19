@@ -1224,6 +1224,31 @@ class SearchPath(models.Model):
     def alpha(self):
         return self.observation_count / self.success_probability
 
+    @property
+    def source_type(self):
+        if self.platform_id is not None:
+            return "platform"
+        return "company"
+
+    @property
+    def hide(self):
+        # Inactive SearchPaths are always hidden.
+        if not self.active:
+            return True
+
+        last_observation = (
+            SearchObservation.objects
+            .filter(complete=True)
+            .order_by("-created")
+            .first()
+        )
+
+        # Nothing has been searched yet.
+        if last_observation is None:
+            return False
+
+        return self.source_type == last_observation.search_path.source_type
+
     def __str__(self):
         source = self.platform or self.company
         return f'{source} — {self.search_term}'

@@ -9,6 +9,7 @@ urlpatterns = [
     path("recruiters/", views.recruiter_formset_view, name="recruiters"),
     path("companies/", views.companies_view, name="companies"),
     path("search-terms/", views.search_terms_view, name="search_terms"),
+    path("job-search/", views.job_search_view, name="job_search"),
     path("connections/", views.connections_view, name="connections"),
     path("connections/events/", views.connection_events_view, name="connection_events"),
     path(
@@ -42,7 +43,7 @@ urlpatterns = [
         name="delete_direction",
     ),
     path("features/", views.features_view, name="features"),
-    path("search", views.search_view, name="search"),
+    path("freelancer_search", views.search_view, name="freelancer_search"),
     path("search/save", views.save_freelancer_project_view, name="save_freelancer_project"),
     path("resume/", views.resume_view, name="resume"),
     path("references/", views.references_view, name="references"),

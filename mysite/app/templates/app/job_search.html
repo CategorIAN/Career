@@ -1,0 +1,104 @@
+{% extends "app/base.html" %}
+
+{% block title %}Job Search{% endblock %}
+
+{% block content %}
+<section class="utility-page">
+    <h1>Job Search</h1>
+
+    <table class="project-results">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Success Count</th>
+                <th>Observation Count</th>
+                <th>Success Probability</th>
+                <th>Edit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for form in formset %}
+                <tr>
+                    <td>
+                        {% if form.instance.url %}
+                            <a href="{{ form.instance.url }}" target="_blank" rel="noopener noreferrer">{{ form.instance }}</a>
+                        {% else %}
+                            {{ form.instance }}
+                        {% endif %}
+                    </td>
+                    <td>{{ form.instance.success_count }}</td>
+                    <td>{{ form.instance.observation_count }}</td>
+                    <td>{{ form.instance.success_probability|floatformat:2 }}</td>
+                    <td><button type="button" class="copy-button open-edit-search-path-modal" data-target="edit-search-path-modal-{{ form.instance.pk }}">Edit</button></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">No job search paths available.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="pagination job-search-pagination" aria-label="Job Search pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous job search path">&larr;</a>
+            {% endif %}
+            <span>Job Search {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next job search path">&rarr;</a>
+            {% endif %}
+        </nav>
+    {% endif %}
+</section>
+
+{% for form in formset %}
+    <div id="edit-search-path-modal-{{ form.instance.pk }}" class="search-path-modal{% if show_edit_search_path_id != form.instance.pk|stringformat:'s' %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-search-path-modal-title-{{ form.instance.pk }}">
+        <div class="search-path-modal-content">
+            <button type="button" class="search-path-modal-close" aria-label="Close">&times;</button>
+            <h2 id="edit-search-path-modal-title-{{ form.instance.pk }}">Edit Search Path</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ formset.management_form }}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="search-path-form-grid">
+                    {% for field in form.visible_fields %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div>{{ field.errors }}{{ field }}</div>
+                    {% endfor %}
+                    <button type="submit" name="save_search_path" value="1">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".open-edit-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => {
+                document.getElementById(button.dataset.target).classList.remove("hidden");
+            });
+        });
+        document.querySelectorAll(".search-path-modal-close").forEach(button => {
+            button.addEventListener("click", () => {
+                button.closest(".search-path-modal").classList.add("hidden");
+            });
+        });
+        document.querySelectorAll(".search-path-modal").forEach(modal => {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) modal.classList.add("hidden");
+            });
+        });
+    });
+</script>
+
+<style>
+    .job-search-pagination { justify-content: center; }
+    .search-path-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.35); }
+    .search-path-modal.hidden { display: none; }
+    .search-path-modal-content { position: relative; width: min(32rem, 100%); padding: 1.5rem; border: 1px solid #8c8c8c; border-radius: 0.5rem; background: #fff; }
+    .search-path-modal-close { position: absolute; top: 0.5rem; right: 0.75rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; }
+    .search-path-form-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1rem; align-items: center; }
+    .search-path-form-grid button { grid-column: 2; justify-self: start; }
+</style>
+{% endblock %}

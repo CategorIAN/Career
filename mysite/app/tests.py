@@ -27,6 +27,7 @@ from .models import (
     FeatureLink,
     FreelancerProject,
     FreelancerSkill,
+    JobPosting,
     Platform,
     PlatformSkill,
     Professional,
@@ -96,8 +97,11 @@ def make_project(
 class FreelancerSearchViewTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.search_url = reverse("search")
+        self.search_url = reverse("freelancer_search")
         self.save_url = reverse("save_freelancer_project")
+
+    def test_freelancer_search_uses_renamed_path(self):
+        self.assertEqual(self.search_url, "/freelancer_search")
 
     @patch("app.views.search_projects")
     def test_single_api_call_then_local_pagination_uses_cache(self, mock_search_projects):
@@ -2093,6 +2097,84 @@ class CreateSearchPathsCommandTests(TestCase):
 
         self.assertIn("SearchPaths created: 0", repeated_output.getvalue())
         self.assertIn("SearchPaths already existed: 6", repeated_output.getvalue())
+
+
+class JobSearchPageTests(TestCase):
+    def test_job_search_filters_hidden_paths_and_sorts_visible_paths_by_alpha(self):
+        low_platform = Platform.objects.create(name="Low Alpha Platform")
+        high_platform = Platform.objects.create(name="High Alpha Platform")
+        company = Company.objects.create(name="Most Recently Searched Company")
+        low_path = SearchPath.objects.create(
+            platform=low_platform,
+            url="https://low-alpha.example.com",
+        )
+        high_path = SearchPath.objects.create(platform=high_platform)
+        hidden_path = SearchPath.objects.create(company=company)
+        success_posting = JobPosting.objects.create(
+            title="Success",
+            company_name="Example",
+            apply_to=True,
+        )
+        unsuccessful_posting = JobPosting.objects.create(
+            title="Unsuccessful",
+            company_name="Example",
+            apply_to=False,
+        )
+        SearchObservation.objects.create(
+            search_path=low_path,
+            job_posting=success_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=high_path,
+            job_posting=unsuccessful_posting,
+            complete=True,
+        )
+        latest_observation = SearchObservation.objects.create(
+            search_path=hidden_path,
+            complete=True,
+        )
+        SearchObservation.objects.filter(pk=latest_observation.pk).update(
+            created=timezone.now() + timedelta(days=1)
+        )
+
+        first_page = self.client.get(reverse("job_search"))
+        second_page = self.client.get(reverse("job_search"), {"page": 2})
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertContains(first_page, "Job Search")
+        self.assertContains(first_page, "Success Count")
+        self.assertContains(first_page, "Observation Count")
+        self.assertContains(first_page, "Success Probability")
+        self.assertContains(first_page, str(low_path))
+        self.assertContains(first_page, f'href="{low_path.url}"', html=False)
+        self.assertContains(first_page, "Job Search 1 of 2")
+        self.assertNotContains(first_page, str(hidden_path))
+        self.assertContains(second_page, str(high_path))
+        self.assertContains(second_page, "Job Search 2 of 2")
+
+    def test_job_search_saves_the_current_search_path_formset(self):
+        platform = Platform.objects.create(name="Example Platform")
+        search_path = SearchPath.objects.create(platform=platform)
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "1",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": search_path.pk,
+                "form-0-url": "https://jobs.example.com",
+                "form-0-active": "on",
+                "page": "1",
+                "save_search_path": "1",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        search_path.refresh_from_db()
+        self.assertEqual(search_path.url, "https://jobs.example.com")
 
 
 class RecruiterPageTests(TestCase):

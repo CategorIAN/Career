@@ -16,6 +16,7 @@ from .models import (
     PlatformSkill,
     Professional,
     Recruiter,
+    SearchPath,
     SearchTerm,
     Connect,
     Skill,
@@ -93,6 +94,12 @@ class SearchTermForm(forms.ModelForm):
     class Meta:
         model = SearchTerm
         fields = ["term", "active"]
+
+
+class SearchPathForm(forms.ModelForm):
+    class Meta:
+        model = SearchPath
+        fields = ["url", "active"]
 
 
 class SkillForm(forms.ModelForm):
@@ -469,6 +476,14 @@ class RecruiterConnectForm(ProfessionalConnectForm):
 ProfessionalFormSet = modelformset_factory(
     Professional,
     form=ProfessionalForm,
+    extra=0,
+    can_delete=False,
+)
+
+
+SearchPathFormSet = modelformset_factory(
+    SearchPath,
+    form=SearchPathForm,
     extra=0,
     can_delete=False,
 )
