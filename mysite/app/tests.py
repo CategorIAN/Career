@@ -2197,6 +2197,69 @@ class JobSearchPageTests(TestCase):
         self.assertEqual(posting.title, "Updated Title")
         self.assertFalse(posting.apply_to)
 
+    def test_job_search_includes_description_preview_for_job_postings(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            description="# Role\n\nBuild **data** systems.",
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=posting,
+            complete=False,
+        )
+
+        response = self.client.get(reverse("job_search"))
+
+        self.assertContains(response, "job-posting-description-preview")
+        self.assertContains(
+            response,
+            'class="job-posting-description-toggle"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'data-description="# Role',
+            html=False,
+        )
+
+    def test_job_search_deletes_job_posting_for_pending_observation(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=posting,
+            complete=False,
+        )
+
+        page_response = self.client.get(reverse("job_search"))
+        self.assertContains(
+            page_response,
+            f'name="delete_job_posting" value="{observation.pk}"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "delete_job_posting": observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        self.assertFalse(JobPosting.objects.filter(pk=posting.pk).exists())
+        observation.refresh_from_db()
+        self.assertIsNone(observation.job_posting)
+
     def test_job_search_marks_current_pending_observation_complete(self):
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
@@ -2217,6 +2280,35 @@ class JobSearchPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('job_search')}?page=1")
         pending_observation.refresh_from_db()
         self.assertTrue(pending_observation.complete)
+
+    def test_job_search_deletes_current_pending_observation(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        pending_observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            complete=False,
+        )
+
+        page_response = self.client.get(reverse("job_search"))
+        self.assertContains(
+            page_response,
+            f'name="delete_search_observation" value="{pending_observation.pk}"',
+            html=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "delete_search_observation": pending_observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        self.assertFalse(
+            SearchObservation.objects.filter(pk=pending_observation.pk).exists()
+        )
 
     def test_job_search_search_button_creates_pending_observation(self):
         search_path = SearchPath.objects.create(

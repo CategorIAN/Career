@@ -1583,12 +1583,20 @@ def job_search_view(request):
             "complete_search_observation",
             "",
         ).strip()
+        delete_search_observation_id = request.POST.get(
+            "delete_search_observation",
+            "",
+        ).strip()
         add_job_posting_observation_id = request.POST.get(
             "add_job_posting",
             "",
         ).strip()
         save_job_posting_observation_id = request.POST.get(
             "save_job_posting",
+            "",
+        ).strip()
+        delete_job_posting_observation_id = request.POST.get(
+            "delete_job_posting",
             "",
         ).strip()
         redirect_params = {"page": page_obj.number}
@@ -1607,6 +1615,13 @@ def job_search_view(request):
                 search_path_id=current_search_path_id,
                 complete=False,
             ).update(complete=True)
+            return redirect(redirect_url)
+        if delete_search_observation_id and current_search_path_id is not None:
+            SearchObservation.objects.filter(
+                pk=delete_search_observation_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+            ).delete()
             return redirect(redirect_url)
 
         if add_job_posting_observation_id and current_search_path_id is not None:
@@ -1647,7 +1662,22 @@ def job_search_view(request):
                     return redirect(redirect_url)
                 show_edit_job_posting_observation_id = observation.pk
 
-        if add_job_posting_observation_id or save_job_posting_observation_id:
+        elif delete_job_posting_observation_id and current_search_path_id is not None:
+            observation = SearchObservation.objects.select_related("job_posting").filter(
+                pk=delete_job_posting_observation_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+                job_posting__isnull=False,
+            ).first()
+            if observation is not None:
+                observation.job_posting.delete()
+                return redirect(redirect_url)
+
+        if (
+            add_job_posting_observation_id
+            or save_job_posting_observation_id
+            or delete_job_posting_observation_id
+        ):
             formset = SearchPathFormSet(queryset=page_queryset)
         else:
             formset = SearchPathFormSet(request.POST, queryset=page_queryset)
