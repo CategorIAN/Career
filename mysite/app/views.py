@@ -83,6 +83,7 @@ from .models import (
 )
 from .services.google_calendar import delete_meeting_event, sync_professional_connect
 from .services.job_evaluation import JobEvaluationError, evaluate_job_posting
+from .services.search_paths import create_company_search_paths
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -1111,6 +1112,7 @@ def professional_formset_view(request):
             ).first()
             if professional is not None and new_company_form.is_valid():
                 company = new_company_form.save()
+                create_company_search_paths(company)
                 professional.companies.add(company)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_company_modal = True
@@ -1374,7 +1376,8 @@ def companies_view(request):
         delete_company_id = request.POST.get("delete_company", "").strip()
         if "add_company" in request.POST:
             if new_company_form.is_valid():
-                new_company_form.save()
+                company = new_company_form.save()
+                create_company_search_paths(company)
                 return redirect(redirect_url)
             show_add_modal = True
         elif delete_company_id:
@@ -3116,6 +3119,7 @@ def recruiter_formset_view(request):
             ).first()
             if recruiter is not None and new_company_form.is_valid():
                 company = new_company_form.save()
+                create_company_search_paths(company)
                 recruiter.companies.add(company)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_company_modal = True

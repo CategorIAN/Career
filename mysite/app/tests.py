@@ -64,6 +64,7 @@ from .services.job_evaluation import (
     JobEvaluationRefusalError,
     evaluate_job_posting,
 )
+from .services.search_paths import create_company_search_paths
 
 
 def make_project(
@@ -1173,6 +1174,7 @@ class ProfessionalPageTests(TestCase):
 
     def test_professionals_page_creates_and_links_new_company(self):
         professional = Professional.objects.create(name="Ada Lovelace")
+        active_search_term = SearchTerm.objects.create(term="Python")
 
         page_response = self.client.get(reverse("professionals"))
         self.assertNotContains(page_response, 'name="new-company-address"', html=False)
@@ -1202,6 +1204,8 @@ class ProfessionalPageTests(TestCase):
                 "new-company-email": "hello@analytical-engines.example.com",
                 "new-company-phone": "555-0100",
                 "new-company-description": "Computing machinery.",
+                "new-company-job_search_enabled": "on",
+                "new-company-supports_job_search_terms": "on",
                 "add_new_company": str(professional.pk),
             },
         )
@@ -1209,6 +1213,9 @@ class ProfessionalPageTests(TestCase):
         company = Company.objects.get(name="Analytical Engines")
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(list(professional.companies.all()), [company])
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
+        )
 
     def test_professionals_page_displays_current_professionals_referrals(self):
         professional = Professional.objects.create(name="Ada Lovelace")
@@ -2062,6 +2069,7 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, "Yes")
 
     def test_companies_page_creates_company_from_modal_form(self):
+        active_search_term = SearchTerm.objects.create(term="Python")
         response = self.client.post(
             reverse("companies"),
             {
@@ -2071,12 +2079,17 @@ class CompanyPageTests(TestCase):
                 "new-company-email": "contact@new-company.example.com",
                 "new-company-phone": "555-0101",
                 "new-company-description": "A new company.",
+                "new-company-job_search_enabled": "on",
+                "new-company-supports_job_search_terms": "on",
                 "add_company": "1",
             },
         )
 
         self.assertRedirects(response, reverse("companies"))
-        self.assertTrue(Company.objects.filter(name="New Company").exists())
+        company = Company.objects.get(name="New Company")
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
+        )
 
     def test_companies_page_edits_and_deletes_company_from_edit_modal(self):
         company = Company.objects.create(
@@ -2281,6 +2294,54 @@ class CreateSearchPathsCommandTests(TestCase):
 
         self.assertIn("SearchPaths created: 0", repeated_output.getvalue())
         self.assertIn("SearchPaths already existed: 6", repeated_output.getvalue())
+
+
+class CompanySearchPathServiceTests(TestCase):
+    def test_creates_all_active_company_paths_idempotently(self):
+        active_first = SearchTerm.objects.create(term="Django")
+        active_second = SearchTerm.objects.create(term="Python")
+        inactive = SearchTerm.objects.create(term="Inactive", active=False)
+        company = Company.objects.create(name="Enabled Company")
+
+        result = create_company_search_paths(company)
+
+        self.assertEqual(result.created, 3)
+        self.assertEqual(result.existing, 0)
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term__isnull=True).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term=active_first).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term=active_second).exists()
+        )
+        self.assertFalse(SearchPath.objects.filter(company=company, search_term=inactive).exists())
+
+        repeated_result = create_company_search_paths(company)
+
+        self.assertEqual(repeated_result.created, 0)
+        self.assertEqual(repeated_result.existing, 3)
+        self.assertEqual(SearchPath.objects.filter(company=company).count(), 3)
+
+    def test_creates_only_blank_path_without_terms_and_skips_disabled_companies(self):
+        SearchTerm.objects.create(term="Python")
+        company_without_terms = Company.objects.create(
+            name="Company Without Terms",
+            supports_job_search_terms=False,
+        )
+        disabled_company = Company.objects.create(
+            name="Disabled Company",
+            job_search_enabled=False,
+        )
+
+        create_company_search_paths(company_without_terms)
+        disabled_result = create_company_search_paths(disabled_company)
+
+        self.assertEqual(SearchPath.objects.filter(company=company_without_terms).count(), 1)
+        self.assertFalse(SearchPath.objects.filter(company=disabled_company).exists())
+        self.assertEqual(disabled_result.created, 0)
+        self.assertEqual(disabled_result.existing, 0)
 
 
 class JobSearchPageTests(TestCase):
@@ -2847,6 +2908,31 @@ class RecruiterPageTests(TestCase):
         self.assertRedirects(
             response,
             f"{reverse('recruiters')}?page=1&recruiter_id={recruiter.pk}",
+        )
+
+    def test_recruiters_page_creates_company_search_paths(self):
+        recruiter = Recruiter.objects.create(name="Ada Recruiter")
+        active_search_term = SearchTerm.objects.create(term="Python")
+
+        response = self.client.post(
+            reverse("recruiters"),
+            {
+                "page": "1",
+                "new-company-name": "Recruiting Company",
+                "new-company-job_search_enabled": "on",
+                "new-company-supports_job_search_terms": "on",
+                "add_new_company": recruiter.pk,
+            },
+        )
+
+        company = Company.objects.get(name="Recruiting Company")
+        self.assertRedirects(response, f"{reverse('recruiters')}?page=1")
+        self.assertEqual(list(recruiter.companies.all()), [company])
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term__isnull=True).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
         )
 
     @patch("app.views.sync_professional_connect")

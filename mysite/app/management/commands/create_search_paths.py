@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from app.models import Company, Platform, SearchPath, SearchTerm
+from app.services.search_paths import create_company_search_paths
 
 
 class Command(BaseCommand):
@@ -20,14 +21,12 @@ class Command(BaseCommand):
                 existing_count += 1
 
         for company in Company.objects.filter(job_search_enabled=True):
-            create_path(company=company, platform=None, search_term=None)
-            if company.supports_job_search_terms:
-                for search_term in active_search_terms:
-                    create_path(
-                        company=company,
-                        platform=None,
-                        search_term=search_term,
-                    )
+            result = create_company_search_paths(
+                company,
+                active_search_terms=active_search_terms,
+            )
+            created_count += result.created
+            existing_count += result.existing
 
         for platform in Platform.objects.filter(job_search_enabled=True):
             for search_term in active_search_terms:
