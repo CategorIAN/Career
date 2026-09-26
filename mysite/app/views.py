@@ -82,6 +82,7 @@ from .models import (
     Supervisor,
 )
 from .services.google_calendar import delete_meeting_event, sync_professional_connect
+from .services.job_evaluation import JobEvaluationError, evaluate_job_posting
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -1512,36 +1513,47 @@ def job_search_view(request):
         )
     )
 
-    if last_observation_source is not None:
-        last_platform_id, last_company_id = last_observation_source
-        if last_platform_id is not None:
-            search_paths_queryset = search_paths_queryset.filter(platform__isnull=True)
-        elif last_company_id is not None:
-            search_paths_queryset = search_paths_queryset.filter(company__isnull=True)
-
-    visible_search_paths = list(search_paths_queryset)
-    for search_path in visible_search_paths:
+    all_search_paths = list(search_paths_queryset)
+    for search_path in all_search_paths:
         search_path.page_success_probability = (
             search_path.page_success_count + 1
         ) / (search_path.page_observation_count + 2)
         search_path.page_alpha = (
             search_path.page_observation_count / search_path.page_success_probability
         )
-    visible_search_paths.sort(
+    all_search_paths.sort(
         key=lambda search_path: (
             not search_path.pending,
             search_path.page_alpha,
             str(search_path).casefold(),
         )
     )
-    search_path_options = visible_search_paths
+    search_path_options = all_search_paths
     if search_text:
         normalized_search_text = search_text.casefold()
         visible_search_paths = [
             search_path
-            for search_path in visible_search_paths
+            for search_path in all_search_paths
             if normalized_search_text in str(search_path).casefold()
         ]
+    elif last_observation_source is not None:
+        last_platform_id, last_company_id = last_observation_source
+        if last_platform_id is not None:
+            visible_search_paths = [
+                search_path
+                for search_path in all_search_paths
+                if search_path.platform_id is None
+            ]
+        elif last_company_id is not None:
+            visible_search_paths = [
+                search_path
+                for search_path in all_search_paths
+                if search_path.company_id is None
+            ]
+        else:
+            visible_search_paths = all_search_paths
+    else:
+        visible_search_paths = all_search_paths
 
     paginator = Paginator(visible_search_paths, 1)
     page_obj = paginator.get_page(page_number)
@@ -1597,6 +1609,14 @@ def job_search_view(request):
         ).strip()
         delete_job_posting_observation_id = request.POST.get(
             "delete_job_posting",
+            "",
+        ).strip()
+        update_job_posting_apply_to_id = request.POST.get(
+            "update_job_posting_apply_to",
+            "",
+        ).strip()
+        evaluate_job_posting_id = request.POST.get(
+            "evaluate_job_posting",
             "",
         ).strip()
         redirect_params = {"page": page_obj.number}
@@ -1673,10 +1693,59 @@ def job_search_view(request):
                 observation.job_posting.delete()
                 return redirect(redirect_url)
 
+        elif (
+            update_job_posting_apply_to_id
+            and not evaluate_job_posting_id
+            and current_search_path_id is not None
+        ):
+            observation = SearchObservation.objects.select_related("job_posting").filter(
+                pk=update_job_posting_apply_to_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+                job_posting__isnull=False,
+            ).first()
+            apply_to_value = request.POST.get("apply_to")
+            if observation is not None and apply_to_value in {"true", "false", "unknown"}:
+                observation.job_posting.apply_to = {
+                    "true": True,
+                    "false": False,
+                    "unknown": None,
+                }[apply_to_value]
+                observation.job_posting.save(update_fields=["apply_to"])
+            return redirect(redirect_url)
+
+        elif evaluate_job_posting_id and current_search_path_id is not None:
+            observation = SearchObservation.objects.select_related("job_posting").filter(
+                pk=evaluate_job_posting_id,
+                search_path_id=current_search_path_id,
+                complete=False,
+                job_posting__isnull=False,
+            ).first()
+            if observation is not None:
+                try:
+                    evaluation = evaluate_job_posting(observation.job_posting)
+                except JobEvaluationError as error:
+                    messages.error(request, f"AI evaluation failed: {error}")
+                else:
+                    observation.job_posting.ai_recommend_apply = evaluation.apply
+                    observation.job_posting.apply_to = evaluation.apply
+                    observation.job_posting.ai_explanation = evaluation.explanation
+                    observation.job_posting.save(
+                        update_fields=[
+                            "ai_recommend_apply",
+                            "apply_to",
+                            "ai_explanation",
+                        ]
+                    )
+                    messages.success(request, "AI evaluation completed.")
+            return redirect(redirect_url)
+
         if (
             add_job_posting_observation_id
             or save_job_posting_observation_id
             or delete_job_posting_observation_id
+            or update_job_posting_apply_to_id
+            or evaluate_job_posting_id
         ):
             formset = SearchPathFormSet(queryset=page_queryset)
         else:

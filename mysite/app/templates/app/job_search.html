@@ -84,6 +84,8 @@
             <thead>
                 <tr>
                         <th>Job Posting</th>
+                        <th>Edit</th>
+                        <th>Show</th>
                         <th>Created</th>
                         <th>Complete</th>
                         <th>Delete</th>
@@ -94,19 +96,36 @@
                     <tr>
                         <td>
                             {% if observation.job_posting %}
-                                <button type="button" class="copy-button open-job-posting-modal" data-target="edit-job-posting-modal-{{ observation.pk }}">Edit Posting</button>
-                                <label>
-                                    <input
-                                        type="checkbox"
-                                        class="job-posting-description-toggle"
-                                        data-description="{{ observation.job_posting.description|escape }}"
-                                        data-title="{{ observation.job_posting }}"
-                                        aria-controls="job-posting-description-preview"
-                                    >
-                                    Show description
-                                </label>
+                                {% if observation.job_posting.url %}
+                                    <a href="{{ observation.job_posting.url }}" target="_blank" rel="noopener noreferrer">{{ observation.job_posting }}</a>
+                                {% else %}
+                                    {{ observation.job_posting }}
+                                {% endif %}
+                            {% else %}
+                                No job posting
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if observation.job_posting %}
+                                <button type="button" class="copy-button open-job-posting-modal" data-target="edit-job-posting-modal-{{ observation.pk }}">Edit</button>
                             {% else %}
                                 <button type="button" class="copy-button open-job-posting-modal" data-target="add-job-posting-modal-{{ observation.pk }}">Add Posting</button>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if observation.job_posting %}
+                                <input
+                                    type="checkbox"
+                                    class="job-posting-description-toggle"
+                                    data-description="{{ observation.job_posting.description|escape }}"
+                                    data-title="{{ observation.job_posting }}"
+                                    data-apply-to="{{ observation.job_posting.apply_to|yesno:'true,false,unknown' }}"
+                                    data-ai-recommend-apply="{{ observation.job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
+                                    data-ai-explanation="{{ observation.job_posting.ai_explanation|escape }}"
+                                    data-observation-id="{{ observation.pk }}"
+                                    aria-label="Show description for {{ observation.job_posting }}"
+                                    aria-controls="job-posting-description-preview"
+                                >
                             {% endif %}
                         </td>
                         <td>{{ observation.created|date:"Y-m-d g:i A" }}</td>
@@ -128,14 +147,39 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="4">No pending search observations.</td></tr>
+                    <tr><td colspan="6">No pending search observations.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         <section id="job-posting-description-preview" class="job-posting-description-preview" hidden aria-live="polite">
+            <form id="job-posting-apply-to-form" class="job-posting-apply-to-form" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <input type="hidden" name="search" value="{{ search_text }}">
+                <input id="job-posting-apply-to-observation" type="hidden" name="update_job_posting_apply_to">
+                <label for="job-posting-apply-to">Apply to</label>
+                <select id="job-posting-apply-to" name="apply_to">
+                    <option value="unknown">Unknown</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+                <label for="job-posting-ai-recommend-apply">AI Recommend Apply</label>
+                <select id="job-posting-ai-recommend-apply" disabled>
+                    <option value="unknown">Unknown</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+                <button id="job-posting-ai-evaluate-button" type="submit" name="evaluate_job_posting">AI Evaluate</button>
+                <button id="job-posting-ai-explanation-button" type="button">AI Explanation</button>
+            </form>
             <h3 id="job-posting-description-title"></h3>
             <div id="job-posting-description-content"></div>
         </section>
+        <aside id="job-posting-ai-explanation-panel" class="job-posting-ai-explanation-panel" aria-hidden="true">
+            <button id="job-posting-ai-explanation-close" type="button" aria-label="Close AI explanation">&times;</button>
+            <h2>AI Explanation</h2>
+            <p id="job-posting-ai-explanation-content"></p>
+        </aside>
     </section>
 </section>
 
@@ -232,6 +276,14 @@
         const descriptionPreview = document.getElementById("job-posting-description-preview");
         const descriptionTitle = document.getElementById("job-posting-description-title");
         const descriptionContent = document.getElementById("job-posting-description-content");
+        const applyToForm = document.getElementById("job-posting-apply-to-form");
+        const applyToSelect = document.getElementById("job-posting-apply-to");
+        const applyToObservation = document.getElementById("job-posting-apply-to-observation");
+        const aiEvaluateButton = document.getElementById("job-posting-ai-evaluate-button");
+        const aiRecommendApply = document.getElementById("job-posting-ai-recommend-apply");
+        const aiExplanationButton = document.getElementById("job-posting-ai-explanation-button");
+        const aiExplanationPanel = document.getElementById("job-posting-ai-explanation-panel");
+        const aiExplanationContent = document.getElementById("job-posting-ai-explanation-content");
         const escapeHtml = value => value
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
@@ -262,8 +314,24 @@
                 }
                 descriptionTitle.textContent = toggle.dataset.title;
                 descriptionContent.innerHTML = renderMarkdown(toggle.dataset.description || "");
+                applyToSelect.value = toggle.dataset.applyTo;
+                applyToObservation.value = toggle.dataset.observationId;
+                aiEvaluateButton.value = toggle.dataset.observationId;
+                aiRecommendApply.value = toggle.dataset.aiRecommendApply;
+                aiExplanationContent.textContent = (
+                    toggle.dataset.aiExplanation || "No AI explanation is available."
+                );
                 descriptionPreview.hidden = false;
             });
+        });
+        applyToSelect.addEventListener("change", () => applyToForm.submit());
+        aiExplanationButton.addEventListener("click", () => {
+            aiExplanationPanel.classList.add("open");
+            aiExplanationPanel.setAttribute("aria-hidden", "false");
+        });
+        document.getElementById("job-posting-ai-explanation-close").addEventListener("click", () => {
+            aiExplanationPanel.classList.remove("open");
+            aiExplanationPanel.setAttribute("aria-hidden", "true");
         });
         document.querySelectorAll(".search-path-modal-close").forEach(button => {
             button.addEventListener("click", () => {
@@ -288,5 +356,11 @@
     .search-path-form-grid button { grid-column: 2; justify-self: start; }
     .job-posting-description-preview { margin-top: 1rem; padding: 1rem; border: 1px solid #8c8c8c; border-radius: 0.5rem; }
     .job-posting-description-preview h3 { margin-top: 0; }
+    .job-posting-apply-to-form { float: right; display: grid; gap: 0.5rem; padding: 0.75rem; background: #eee; border-radius: 0.25rem; }
+    .job-posting-ai-explanation-panel { position: fixed; top: 0; right: 0; z-index: 30; width: min(28rem, 90vw); height: 100vh; box-sizing: border-box; padding: 1.5rem; overflow-y: auto; background: #fff; border-left: 1px solid #8c8c8c; box-shadow: -0.5rem 0 1rem rgba(0, 0, 0, 0.2); transform: translateX(100%); transition: transform 0.2s ease; }
+    .job-posting-ai-explanation-panel.open { transform: translateX(0); }
+    .job-posting-ai-explanation-panel h2 { margin-top: 0; }
+    .job-posting-ai-explanation-panel p { white-space: pre-wrap; }
+    #job-posting-ai-explanation-close { position: absolute; top: 0.5rem; right: 0.75rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; }
 </style>
 {% endblock %}

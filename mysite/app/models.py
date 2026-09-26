@@ -1271,6 +1271,15 @@ class JobPosting(models.Model):
     url = models.URLField(blank=True)
     description = models.TextField(blank=True)
 
+    ai_recommend_apply = models.BooleanField(
+        null=True,
+        blank=True,
+    )
+
+    ai_explanation = models.TextField(
+        blank=True,
+    )
+
     apply_to = models.BooleanField(
         null=True,
         blank=True,

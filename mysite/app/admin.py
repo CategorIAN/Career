@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
                      Project, ProjectTask, Skill, Course, Supervisor, Reference,
-                     Residency, ProfileSetting)
+                     Residency, ProfileSetting, SearchObservation, SearchPath,
+                     JobPosting)
 
 
 class RoleTaskInline(admin.TabularInline):
@@ -200,6 +201,124 @@ class ProfileSettingAdmin(admin.ModelAdmin):
     @admin.display(description="Value")
     def short_value(self, obj):
         return obj.value[:80] + "..." if len(obj.value) > 80 else obj.value
+
+
+@admin.register(SearchObservation)
+class SearchObservationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "search_path",
+        "job_posting",
+        "complete",
+        "success",
+        "created",
+    )
+
+    list_filter = (
+        "complete",
+        "created",
+    )
+
+    search_fields = (
+        "search_path__search_term__term",
+        "search_path__company__name",
+        "search_path__platform__name",
+        "job_posting__title",
+        "job_posting__company_name",
+    )
+
+    readonly_fields = (
+        "created",
+        "success",
+    )
+
+    list_select_related = (
+        "search_path",
+        "search_path__company",
+        "search_path__platform",
+        "search_path__search_term",
+        "job_posting",
+    )
+
+    ordering = ("-created",)
+
+
+@admin.register(SearchPath)
+class SearchPathAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "source",
+        "search_term",
+        "source_type",
+        "active",
+        "observation_count",
+        "success_count",
+        "success_probability_display",
+        "alpha_display",
+    )
+
+    list_filter = (
+        "active",
+        "platform",
+        "company",
+        "search_term",
+    )
+
+    search_fields = (
+        "platform__name",
+        "company__name",
+        "search_term__term",
+    )
+
+    list_select_related = (
+        "platform",
+        "company",
+        "search_term",
+    )
+
+    ordering = ("id",)
+
+    @admin.display(description="Source")
+    def source(self, obj):
+        return obj.platform or obj.company
+
+    @admin.display(description="Success Probability")
+    def success_probability_display(self, obj):
+        return f"{obj.success_probability:.1%}"
+
+    @admin.display(description="Alpha")
+    def alpha_display(self, obj):
+        return f"{obj.alpha:.2f}"
+
+
+@admin.register(JobPosting)
+class JobPostingAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "company_name",
+        "ai_recommend_apply",
+        "apply_to",
+        "created",
+    )
+
+    list_filter = (
+        "ai_recommend_apply",
+        "apply_to",
+        "created",
+    )
+
+    search_fields = (
+        "title",
+        "company_name",
+        "description",
+    )
+
+    readonly_fields = (
+        "created",
+    )
+
+    ordering = ("-created",)
 
 
 

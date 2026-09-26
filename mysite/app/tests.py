@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 import json
 from io import StringIO
+from types import SimpleNamespace
 
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -9,7 +10,8 @@ from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.test import Client, TestCase
+from django.core.management.base import CommandError
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -55,6 +57,13 @@ from .views import (
     _normalize_search_query,
 )
 from .services.google_calendar import sync_meeting_event, sync_professional_connect
+from .services.candidate_background import build_candidate_background
+from .services.job_evaluation import (
+    JobEvaluation,
+    JobEvaluationParseError,
+    JobEvaluationRefusalError,
+    evaluate_job_posting,
+)
 
 
 def make_project(
@@ -328,6 +337,181 @@ class FreelancerSearchViewTests(TestCase):
         self.assertFalse(projects_by_id[402]["is_saved"])
         self.assertContains(response, "Saved")
         self.assertContains(response, 'name="project_id" value="402"', html=False)
+
+
+class CandidateBackgroundServiceTests(TestCase):
+    def test_builds_detailed_background_from_public_resume_data(self):
+        school = School.objects.create(name="State University")
+        education = Education.objects.create(
+            school=school,
+            degree="Master of Science",
+            field_of_study="Data Science",
+            start_date="2023-08-01",
+            end_date="2025-05-01",
+            description="Advanced analytics and machine learning.",
+        )
+        python = Skill.objects.create(name="Python", type="Language", rating=5)
+        sql = Skill.objects.create(name="SQL", type="Technology", rating=4)
+        course = Course.objects.create(
+            education=education,
+            code="DS 610",
+            title="Advanced Analytics",
+            description="Applied predictive modeling.",
+            resume_ready=False,
+        )
+        course.skills.set([python])
+
+        company = Company.objects.create(name="Example Co")
+        role = Role.objects.create(
+            company=company,
+            title="Data Analyst",
+            start_date="2024-01-01",
+            end_date="2025-01-01",
+            description="Built institutional reporting.",
+            is_public=True,
+        )
+        role.skills.set([python, sql])
+        RoleTask.objects.create(
+            role=role,
+            description="Built automated SQL reports.",
+            resume_ready=False,
+        )
+        private_role = Role.objects.create(
+            company=company,
+            title="Private Role",
+            start_date="2025-01-01",
+            is_public=False,
+        )
+        RoleTask.objects.create(role=private_role, description="Do not include this.")
+
+        project = Project.objects.create(
+            title="Career Portal",
+            short_description="Job search application.",
+            description="Django application for managing a job search.",
+            start_date="2025-01-01",
+            resume_ready=False,
+            is_public=True,
+        )
+        project.skills.set([python, sql])
+        ProjectTask.objects.create(
+            project=project,
+            description="Implemented job-search workflows.",
+            resume_ready=False,
+        )
+        Project.objects.create(title="Private Project", is_public=False)
+
+        with self.assertNumQueries(10):
+            background = build_candidate_background()
+
+        self.assertIn("Candidate Background", background)
+        self.assertIn("EDUCATION", background)
+        self.assertIn("Master of Science, Data Science — State University", background)
+        self.assertIn("DS 610: Advanced Analytics", background)
+        self.assertIn("Applied predictive modeling.", background)
+        self.assertIn("PROFESSIONAL EXPERIENCE", background)
+        self.assertIn("Data Analyst — Example Co", background)
+        self.assertIn("Built automated SQL reports.", background)
+        self.assertIn("PROJECTS", background)
+        self.assertIn("Career Portal", background)
+        self.assertIn("Implemented job-search workflows.", background)
+        self.assertIn("TECHNICAL SKILLS", background)
+        self.assertIn("Python (Language; rating 5/5)", background)
+        self.assertNotIn("Private Role", background)
+        self.assertNotIn("Private Project", background)
+
+
+class JobEvaluationServiceTests(TestCase):
+    @override_settings(
+        OPENAI_API_KEY="test-api-key",
+        OPENAI_JOB_EVALUATION_MODEL="test-model",
+    )
+    @patch(
+        "app.services.job_evaluation.build_candidate_background",
+        return_value="Candidate Background\n- Python",
+    )
+    @patch("app.services.job_evaluation.OpenAI")
+    def test_evaluates_posting_with_structured_output(
+        self,
+        mock_openai,
+        mock_build_background,
+    ):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            url="https://jobs.example.com/1",
+            description="Build Python data pipelines.",
+        )
+        response = SimpleNamespace(
+            output_parsed=JobEvaluation(
+                apply=True,
+                explanation="Python experience matches the role.",
+            ),
+            output=[],
+            status="completed",
+        )
+        mock_openai.return_value.responses.parse.return_value = response
+
+        evaluation = evaluate_job_posting(job_posting)
+
+        self.assertTrue(evaluation.apply)
+        self.assertEqual(evaluation.explanation, "Python experience matches the role.")
+        mock_build_background.assert_called_once_with()
+        parse_kwargs = mock_openai.return_value.responses.parse.call_args.kwargs
+        self.assertEqual(parse_kwargs["model"], "test-model")
+        self.assertIs(parse_kwargs["text_format"], JobEvaluation)
+        self.assertIn("Data Engineer", parse_kwargs["input"][1]["content"])
+        self.assertIn("Candidate Background", parse_kwargs["input"][1]["content"])
+        job_posting.refresh_from_db()
+        self.assertIsNone(job_posting.apply_to)
+
+    @override_settings(OPENAI_API_KEY="test-api-key")
+    @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
+    @patch("app.services.job_evaluation.OpenAI")
+    def test_rejects_refused_or_unparsed_evaluation(self, mock_openai, mock_background):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+        )
+        mock_openai.return_value.responses.parse.return_value = SimpleNamespace(
+            output_parsed=None,
+            output=[SimpleNamespace(content=[SimpleNamespace(refusal="Cannot comply")])],
+            status="completed",
+        )
+
+        with self.assertRaisesMessage(JobEvaluationRefusalError, "Cannot comply"):
+            evaluate_job_posting(job_posting)
+
+        mock_openai.return_value.responses.parse.return_value = SimpleNamespace(
+            output_parsed=None,
+            output=[],
+            status="completed",
+        )
+        with self.assertRaises(JobEvaluationParseError):
+            evaluate_job_posting(job_posting)
+
+    @patch("app.management.commands.evaluate_job.evaluate_job_posting")
+    def test_evaluate_job_command_prints_evaluation_without_saving(self, mock_evaluate):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+        )
+        mock_evaluate.return_value = JobEvaluation(
+            apply=False,
+            explanation="The role requires more senior experience.",
+        )
+        output = StringIO()
+
+        call_command("evaluate_job", job_posting.pk, stdout=output)
+
+        self.assertIn("Job Posting: Data Engineer — Example Co", output.getvalue())
+        self.assertIn("Apply: No", output.getvalue())
+        self.assertIn("more senior experience", output.getvalue())
+        job_posting.refresh_from_db()
+        self.assertIsNone(job_posting.apply_to)
+
+    def test_evaluate_job_command_rejects_unknown_posting_id(self):
+        with self.assertRaisesMessage(CommandError, "Job posting with ID 999 does not exist"):
+            call_command("evaluate_job", 999)
 
 
 class ApplicationReferencePageTests(TestCase):
@@ -2177,7 +2361,7 @@ class JobSearchPageTests(TestCase):
         )
 
         page_response = self.client.get(reverse("job_search"))
-        self.assertContains(page_response, "Edit Posting")
+        self.assertContains(page_response, ">Edit<", html=False)
 
         response = self.client.post(
             reverse("job_search"),
@@ -2215,6 +2399,9 @@ class JobSearchPageTests(TestCase):
         response = self.client.get(reverse("job_search"))
 
         self.assertContains(response, "job-posting-description-preview")
+        self.assertContains(response, "AI Recommend Apply")
+        self.assertContains(response, "AI Evaluate")
+        self.assertContains(response, "AI Explanation")
         self.assertContains(
             response,
             'class="job-posting-description-toggle"',
@@ -2224,6 +2411,74 @@ class JobSearchPageTests(TestCase):
             response,
             'data-description="# Role',
             html=False,
+        )
+
+    def test_job_search_updates_job_posting_apply_to_from_preview(self):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            apply_to=None,
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=posting,
+            complete=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "update_job_posting_apply_to": observation.pk,
+                "apply_to": "true",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        posting.refresh_from_db()
+        self.assertTrue(posting.apply_to)
+
+    @patch("app.views.evaluate_job_posting")
+    def test_job_search_ai_evaluation_updates_posting_recommendation(self, mock_evaluate):
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            ai_recommend_apply=None,
+            apply_to=None,
+        )
+        observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=posting,
+            complete=False,
+        )
+        mock_evaluate.return_value = JobEvaluation(
+            apply=True,
+            explanation="The candidate's Python and SQL background matches the role.",
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "update_job_posting_apply_to": observation.pk,
+                "evaluate_job_posting": observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        mock_evaluate.assert_called_once_with(posting)
+        posting.refresh_from_db()
+        self.assertTrue(posting.ai_recommend_apply)
+        self.assertTrue(posting.apply_to)
+        self.assertEqual(
+            posting.ai_explanation,
+            "The candidate's Python and SQL background matches the role.",
         )
 
     def test_job_search_deletes_job_posting_for_pending_observation(self):
@@ -2504,9 +2759,48 @@ class JobSearchPageTests(TestCase):
         self.assertContains(first_page, str(low_path))
         self.assertContains(first_page, f'href="{low_path.url}"', html=False)
         self.assertContains(first_page, "Job Search 1 of 2")
-        self.assertNotContains(first_page, str(hidden_path))
+        self.assertEqual(first_page.context["formset"].forms[0].instance.pk, low_path.pk)
         self.assertContains(second_page, str(high_path))
         self.assertContains(second_page, "Job Search 2 of 2")
+
+    def test_job_search_can_select_hidden_path_from_search_options(self):
+        platform_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Visible Platform")
+        )
+        hidden_path = SearchPath.objects.create(
+            company=Company.objects.create(name="Hidden Company")
+        )
+        latest_observation = SearchObservation.objects.create(
+            search_path=hidden_path,
+            complete=True,
+        )
+        SearchObservation.objects.filter(pk=latest_observation.pk).update(
+            created=timezone.now() + timedelta(days=1)
+        )
+
+        default_response = self.client.get(reverse("job_search"))
+        search_response = self.client.get(
+            reverse("job_search"),
+            {"search": "hidden company"},
+        )
+
+        self.assertContains(
+            default_response,
+            f'<option value="{hidden_path}"></option>',
+            html=False,
+        )
+        self.assertEqual(
+            default_response.context["formset"].forms[0].instance.pk,
+            platform_path.pk,
+        )
+        self.assertEqual(
+            search_response.context["formset"].forms[0].instance.pk,
+            hidden_path.pk,
+        )
+        self.assertNotEqual(
+            search_response.context["formset"].forms[0].instance.pk,
+            platform_path.pk,
+        )
 
     def test_job_search_saves_the_current_search_path_formset(self):
         platform = Platform.objects.create(name="Example Platform")

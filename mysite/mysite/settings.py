@@ -27,6 +27,11 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = 'django-insecure-)byphiz0s2oa@44x#)=r#cq*7584nqvlpx5@(_l04ctmvs342%'
 
 FREELANCER_TOKEN = os.environ.get('FREELANCER_TOKEN')
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_JOB_EVALUATION_MODEL = os.environ.get(
+    "OPENAI_JOB_EVALUATION_MODEL",
+    "gpt-5.6-luna",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
