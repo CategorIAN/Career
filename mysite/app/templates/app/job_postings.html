@@ -1,0 +1,448 @@
+{% extends "app/base.html" %}
+
+{% block title %}Job Postings{% endblock %}
+
+{% block content %}
+<style>
+    .job-posting-group {
+        margin-bottom: 2rem;
+    }
+
+    .job-posting-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1rem;
+    }
+
+    .job-posting-card {
+        position: relative;
+        margin-bottom: 0;
+        padding-bottom: 2.5rem;
+        cursor: pointer;
+    }
+
+    .job-posting-card[draggable="true"] {
+        cursor: grab;
+    }
+
+    .job-posting-card.dragging {
+        opacity: 0.5;
+    }
+
+    .job-posting-card-grid.drag-over {
+        outline: 2px dashed #555;
+        outline-offset: 0.35rem;
+    }
+
+    .job-posting-card h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    .job-posting-card p {
+        margin: 0.35rem 0;
+    }
+
+    .job-posting-created {
+        color: #555;
+        font-size: 0.9rem;
+    }
+
+    .job-posting-expired-status {
+        position: absolute;
+        right: 1rem;
+        bottom: 0.75rem;
+        margin: 0 !important;
+        color: #555;
+        font-size: 0.8rem;
+    }
+
+    .job-posting-detail-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: start;
+        margin: 0 2.5rem 1rem 0;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #000;
+    }
+
+    #job-posting-detail-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .job-posting-detail-header h2,
+    .job-posting-detail-header p {
+        margin: 0;
+    }
+
+    .job-posting-detail-company {
+        margin-top: 0.35rem !important;
+    }
+
+    .job-posting-apply-to-field {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.5rem;
+        color: #555;
+        font-size: 0.8rem;
+    }
+
+    .job-posting-apply-to-field select {
+        font-size: inherit;
+    }
+
+    .job-posting-detail-actions {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .job-posting-primary-actions,
+    .job-posting-decision-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .job-posting-detail-description {
+        margin: 0;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    #job-posting-detail-modal {
+        flex-direction: row;
+        gap: 1rem;
+    }
+
+    #job-posting-detail-modal .modal-content {
+        flex: 0 1 700px;
+    }
+
+    #job-posting-detail-modal.explanation-open .modal-content {
+        width: min(700px, calc(100vw - 26rem));
+    }
+
+    .job-posting-ai-explanation-panel {
+        position: relative;
+        width: min(22rem, calc(100vw - 2rem));
+        max-height: min(70vh, 640px);
+        box-sizing: border-box;
+        padding: 1.5rem;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        flex: 0 1 22rem;
+    }
+
+    .job-posting-ai-explanation-panel h2 {
+        margin: 0 2rem 1rem 0;
+    }
+
+    .job-posting-ai-explanation-panel p {
+        margin: 0;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .job-posting-ai-explanation-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    @media (max-width: 850px) {
+        #job-posting-detail-modal {
+            flex-direction: column;
+        }
+
+        #job-posting-detail-modal.explanation-open .modal-content {
+            width: min(700px, 100%);
+        }
+
+        .job-posting-ai-explanation-panel {
+            width: min(700px, 100%);
+            max-height: 40vh;
+        }
+    }
+</style>
+
+<section class="utility-page">
+    <h1>Job Postings</h1>
+
+    <section class="job-posting-group" aria-labelledby="apply-to-heading">
+        <h2 id="apply-to-heading">Apply To: Yes</h2>
+        <div class="job-posting-card-grid" data-apply-to="true">
+            {% for job_posting in apply_job_postings %}
+                <article
+                    class="utility-card job-posting-card open-job-posting-detail"
+                    role="button"
+                    tabindex="0"
+                    draggable="true"
+                    data-job-posting-id="{{ job_posting.pk }}"
+                    data-title="{{ job_posting.title|escape }}"
+                    data-company-name="{{ job_posting.company_name|escape }}"
+                    data-description="{{ job_posting.description|escape }}"
+                    data-url="{{ job_posting.url|escape }}"
+                    data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
+                    data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
+                    data-expired="{{ job_posting.expired|yesno:'true,false' }}"
+                    data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
+                    aria-label="View {{ job_posting }}"
+                >
+                    <h3>{{ job_posting.title }}</h3>
+                    <p>{{ job_posting.company_name }}</p>
+                    <p class="job-posting-created">Created: {{ job_posting.created|date:"M j, Y, g:i A" }}</p>
+                    <p class="job-posting-expired-status">Expired: {{ job_posting.expired|yesno:"Yes,No" }}</p>
+                </article>
+            {% empty %}
+                <p>No job postings marked to apply to.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="job-posting-group" aria-labelledby="do-not-apply-heading">
+        <h2 id="do-not-apply-heading">Apply To: No / Not Set</h2>
+        <div class="job-posting-card-grid" data-apply-to="false">
+            {% for job_posting in other_job_postings %}
+                <article
+                    class="utility-card job-posting-card open-job-posting-detail"
+                    role="button"
+                    tabindex="0"
+                    draggable="true"
+                    data-job-posting-id="{{ job_posting.pk }}"
+                    data-title="{{ job_posting.title|escape }}"
+                    data-company-name="{{ job_posting.company_name|escape }}"
+                    data-description="{{ job_posting.description|escape }}"
+                    data-url="{{ job_posting.url|escape }}"
+                    data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
+                    data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
+                    data-expired="{{ job_posting.expired|yesno:'true,false' }}"
+                    data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
+                    aria-label="View {{ job_posting }}"
+                >
+                    <h3>{{ job_posting.title }}</h3>
+                    <p>{{ job_posting.company_name }}</p>
+                    <p class="job-posting-created">Created: {{ job_posting.created|date:"M j, Y, g:i A" }}</p>
+                    <p class="job-posting-expired-status">Expired: {{ job_posting.expired|yesno:"Yes,No" }}</p>
+                </article>
+            {% empty %}
+                <p>No remaining job postings.</p>
+            {% endfor %}
+        </div>
+    </section>
+</section>
+
+<div id="job-posting-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="job-posting-detail-title">
+    <div class="modal-content">
+        <button id="job-posting-detail-close" type="button" aria-label="Close">&times;</button>
+        <div class="job-posting-detail-header">
+            <div>
+                <h2 id="job-posting-detail-title"></h2>
+                <p id="job-posting-detail-company" class="job-posting-detail-company"></p>
+                <div class="job-posting-apply-to-field">
+                    <label for="job-posting-apply-to">Apply To</label>
+                    <select id="job-posting-apply-to" name="apply_to" form="job-posting-decision-form">
+                        <option value="unknown">Unknown</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+            <div class="job-posting-detail-actions">
+                <div class="job-posting-primary-actions">
+                    <a id="job-posting-see-posting" class="copy-button" target="_blank" rel="noopener noreferrer" hidden>See Posting</a>
+                    <button id="job-posting-ai-explanation-button" class="copy-button" type="button">AI Explanation</button>
+                </div>
+                <form id="job-posting-decision-form" class="job-posting-decision-actions" method="post">
+                    {% csrf_token %}
+                    <input id="job-posting-decision-id" type="hidden" name="job_posting_id">
+                    <input id="job-posting-decision-action" type="hidden" name="action">
+                    <button id="job-posting-mark-expired" type="submit" class="copy-button">Mark Expired</button>
+                </form>
+            </div>
+        </div>
+        <div id="job-posting-detail-description" class="job-posting-detail-description"></div>
+    </div>
+    <aside id="job-posting-ai-explanation-panel" class="job-posting-ai-explanation-panel hidden" aria-labelledby="job-posting-ai-explanation-title">
+        <button id="job-posting-ai-explanation-close" class="job-posting-ai-explanation-close" type="button" aria-label="Close AI explanation">&times;</button>
+        <h2 id="job-posting-ai-explanation-title">AI Explanation</h2>
+        <p id="job-posting-ai-explanation-content"></p>
+    </aside>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const detailModal = document.getElementById("job-posting-detail-modal");
+        const explanationPanel = document.getElementById("job-posting-ai-explanation-panel");
+        const detailTitle = document.getElementById("job-posting-detail-title");
+        const detailCompany = document.getElementById("job-posting-detail-company");
+        const detailDescription = document.getElementById("job-posting-detail-description");
+        const seePosting = document.getElementById("job-posting-see-posting");
+        const explanationContent = document.getElementById("job-posting-ai-explanation-content");
+        const decisionForm = document.getElementById("job-posting-decision-form");
+        const decisionId = document.getElementById("job-posting-decision-id");
+        const decisionAction = document.getElementById("job-posting-decision-action");
+        const applyToSelect = document.getElementById("job-posting-apply-to");
+        const markExpiredButton = document.getElementById("job-posting-mark-expired");
+        const escapeHtml = value => value
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        const renderInlineMarkdown = value => escapeHtml(value)
+            .replace(/`([^`]+)`/g, "<code>$1</code>")
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+            .replace(
+                /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            );
+        const renderMarkdown = markdown => markdown
+            .split(/\r?\n/)
+            .map(line => {
+                if (/^###\s+/.test(line)) return `<h5>${renderInlineMarkdown(line.slice(4))}</h5>`;
+                if (/^##\s+/.test(line)) return `<h4>${renderInlineMarkdown(line.slice(3))}</h4>`;
+                if (/^#\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.slice(2))}</h3>`;
+                if (/^[-*]\s+/.test(line)) return `<li>${renderInlineMarkdown(line.slice(2))}</li>`;
+                if (!line.trim()) return "";
+                return `<p>${renderInlineMarkdown(line)}</p>`;
+            })
+            .join("")
+            .replace(/(<li>.*?<\/li>)+/g, match => `<ul>${match}</ul>`);
+
+        const closeDetailModal = () => {
+            detailModal.classList.add("hidden");
+            detailModal.classList.remove("explanation-open");
+            explanationPanel.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+
+        const openDetailModal = card => {
+            detailTitle.textContent = card.dataset.title;
+            detailCompany.textContent = card.dataset.companyName;
+            detailDescription.innerHTML = renderMarkdown(
+                card.dataset.description || "No description is available."
+            );
+            explanationContent.textContent = card.dataset.aiExplanation || "No AI explanation is available.";
+            seePosting.href = card.dataset.url;
+            seePosting.hidden = !card.dataset.url;
+            decisionId.value = card.dataset.jobPostingId;
+            decisionAction.value = "";
+            applyToSelect.value = card.dataset.applyTo;
+            markExpiredButton.textContent = card.dataset.expired === "true"
+                ? "Unmark Expired"
+                : "Mark Expired";
+            markExpiredButton.dataset.action = card.dataset.expired === "true"
+                ? "unmark_expired"
+                : "mark_expired";
+            detailModal.classList.remove("explanation-open");
+            explanationPanel.classList.add("hidden");
+            detailModal.classList.remove("hidden");
+            document.body.classList.add("modal-open");
+        };
+
+        document.querySelectorAll(".open-job-posting-detail").forEach(card => {
+            card.addEventListener("click", () => openDetailModal(card));
+            card.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openDetailModal(card);
+                }
+            });
+        });
+
+        document.getElementById("job-posting-detail-close").addEventListener("click", closeDetailModal);
+        document.getElementById("job-posting-ai-explanation-button").addEventListener("click", () => {
+            detailModal.classList.add("explanation-open");
+            explanationPanel.classList.remove("hidden");
+        });
+        document.getElementById("job-posting-ai-explanation-close").addEventListener("click", () => {
+            detailModal.classList.remove("explanation-open");
+            explanationPanel.classList.add("hidden");
+        });
+        markExpiredButton.addEventListener("click", () => {
+            decisionAction.value = markExpiredButton.dataset.action;
+        });
+        applyToSelect.addEventListener("change", () => {
+            decisionAction.value = "update_apply_to";
+            decisionForm.requestSubmit();
+        });
+
+        let draggedCard = null;
+        const csrfToken = document.querySelector(
+            "#job-posting-decision-form input[name=csrfmiddlewaretoken]"
+        ).value;
+        document.querySelectorAll(".job-posting-card[draggable=true]").forEach(card => {
+            card.addEventListener("dragstart", event => {
+                draggedCard = card;
+                card.classList.add("dragging");
+                event.dataTransfer.effectAllowed = "move";
+            });
+            card.addEventListener("dragend", () => {
+                card.classList.remove("dragging");
+                draggedCard = null;
+                document.querySelectorAll(".job-posting-card-grid").forEach(group => {
+                    group.classList.remove("drag-over");
+                });
+            });
+        });
+        document.querySelectorAll(".job-posting-card-grid").forEach(group => {
+            group.addEventListener("dragover", event => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                group.classList.add("drag-over");
+            });
+            group.addEventListener("dragleave", event => {
+                if (!group.contains(event.relatedTarget)) {
+                    group.classList.remove("drag-over");
+                }
+            });
+            group.addEventListener("drop", async event => {
+                event.preventDefault();
+                group.classList.remove("drag-over");
+                if (!draggedCard || draggedCard.dataset.applyTo === group.dataset.applyTo) {
+                    return;
+                }
+                const response = await fetch(draggedCard.dataset.updateApplyToUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken,
+                    },
+                    body: JSON.stringify({apply_to: group.dataset.applyTo === "true"}),
+                });
+                if (!response.ok) {
+                    window.alert("Unable to update the job posting.");
+                    return;
+                }
+                window.location.reload();
+            });
+        });
+        detailModal.addEventListener("click", event => {
+            if (event.target === detailModal) closeDetailModal();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !detailModal.classList.contains("hidden")) {
+                closeDetailModal();
+            }
+        });
+    });
+</script>
+{% endblock %}

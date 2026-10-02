@@ -2344,6 +2344,141 @@ class CompanySearchPathServiceTests(TestCase):
         self.assertEqual(disabled_result.existing, 0)
 
 
+class JobPostingsPageTests(TestCase):
+    def test_job_postings_are_grouped_and_sorted_by_apply_decision(self):
+        apply_older = JobPosting.objects.create(
+            title="Apply Older",
+            company_name="Company A",
+            apply_to=True,
+        )
+        apply_newer = JobPosting.objects.create(
+            title="Apply Newer",
+            company_name="Company B",
+            apply_to=True,
+            url="https://example.com/jobs/apply-newer",
+            description="# Data Engineering\n\nBuild **data products** with Python.",
+            ai_explanation="The Python background is a strong match.",
+        )
+        do_not_apply = JobPosting.objects.create(
+            title="Do Not Apply",
+            company_name="Company C",
+            apply_to=False,
+            expired=True,
+        )
+        undecided = JobPosting.objects.create(
+            title="Undecided",
+            company_name="Company D",
+        )
+        JobPosting.objects.filter(pk=apply_older.pk).update(
+            created=datetime(2026, 1, 1, tzinfo=UTC)
+        )
+        JobPosting.objects.filter(pk=apply_newer.pk).update(
+            created=datetime(2026, 1, 2, tzinfo=UTC)
+        )
+        JobPosting.objects.filter(pk=do_not_apply.pk).update(
+            created=datetime(2026, 1, 3, tzinfo=UTC)
+        )
+        JobPosting.objects.filter(pk=undecided.pk).update(
+            created=datetime(2026, 1, 4, tzinfo=UTC)
+        )
+
+        response = self.client.get(reverse("job_postings"))
+
+        self.assertContains(response, "Job Postings")
+        self.assertContains(response, "Expired: No")
+        self.assertContains(response, "Expired: Yes")
+        self.assertContains(response, 'id="job-posting-detail-modal"', html=False)
+        self.assertContains(response, 'data-description="# Data Engineering', html=False)
+        self.assertContains(response, "const renderMarkdown = markdown", html=False)
+        self.assertContains(response, 'id="job-posting-see-posting"', html=False)
+        self.assertContains(response, 'id="job-posting-ai-explanation-panel"', html=False)
+        self.assertContains(response, "Mark Expired")
+        self.assertContains(response, 'id="job-posting-apply-to"', html=False)
+        self.assertContains(response, 'class="job-posting-apply-to-field"', html=False)
+        self.assertContains(response, 'detailModal.classList.add("explanation-open")', html=False)
+        self.assertEqual(
+            [posting.pk for posting in response.context["apply_job_postings"]],
+            [apply_newer.pk, apply_older.pk],
+        )
+        self.assertEqual(
+            [posting.pk for posting in response.context["other_job_postings"]],
+            [undecided.pk, do_not_apply.pk],
+        )
+        content = response.content.decode()
+        self.assertLess(content.index("Apply Newer"), content.index("Do Not Apply"))
+
+    def test_job_postings_can_mark_a_posting_expired(self):
+        job_posting = JobPosting.objects.create(
+            title="Expired Role",
+            company_name="Example Co",
+            apply_to=True,
+        )
+
+        response = self.client.post(
+            reverse("job_postings"),
+            {"job_posting_id": job_posting.pk, "action": "mark_expired"},
+        )
+
+        self.assertRedirects(response, reverse("job_postings"))
+        job_posting.refresh_from_db()
+        self.assertFalse(job_posting.apply_to)
+        self.assertTrue(job_posting.expired)
+
+    def test_job_postings_can_update_apply_to(self):
+        job_posting = JobPosting.objects.create(
+            title="Undecided Role",
+            company_name="Example Co",
+        )
+
+        response = self.client.post(
+            reverse("job_postings"),
+            {
+                "job_posting_id": job_posting.pk,
+                "action": "update_apply_to",
+                "apply_to": "true",
+            },
+        )
+
+        self.assertRedirects(response, reverse("job_postings"))
+        job_posting.refresh_from_db()
+        self.assertTrue(job_posting.apply_to)
+
+    def test_job_postings_drag_drop_endpoint_updates_apply_to(self):
+        job_posting = JobPosting.objects.create(
+            title="Undecided Role",
+            company_name="Example Co",
+        )
+
+        response = self.client.post(
+            reverse("update_job_posting_apply_to", args=[job_posting.pk]),
+            data=json.dumps({"apply_to": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"apply_to": True})
+        job_posting.refresh_from_db()
+        self.assertTrue(job_posting.apply_to)
+
+    def test_job_postings_can_unmark_an_expired_posting(self):
+        job_posting = JobPosting.objects.create(
+            title="Expired Role",
+            company_name="Example Co",
+            apply_to=False,
+            expired=True,
+        )
+
+        response = self.client.post(
+            reverse("job_postings"),
+            {"job_posting_id": job_posting.pk, "action": "unmark_expired"},
+        )
+
+        self.assertRedirects(response, reverse("job_postings"))
+        job_posting.refresh_from_db()
+        self.assertFalse(job_posting.expired)
+        self.assertFalse(job_posting.apply_to)
+
+
 class JobSearchPageTests(TestCase):
     def test_job_search_shows_pending_observations_for_current_search_path(self):
         pending_path = SearchPath.objects.create(
@@ -2908,6 +3043,21 @@ class RecruiterPageTests(TestCase):
         self.assertRedirects(
             response,
             f"{reverse('recruiters')}?page=1&recruiter_id={recruiter.pk}",
+        )
+
+    def test_recruiter_invitation_uses_recruiter_specific_message(self):
+        recruiter = Recruiter.objects.create(name="Ada Recruiter")
+
+        response = self.client.get(
+            reverse("recruiters"),
+            {"invited_recruiter": recruiter.pk},
+        )
+
+        self.assertContains(
+            response,
+            "Hello Ada Recruiter! I have a Master's in Data Science, and I am looking "
+            "for software engineer roles focused in Python and SQL. Are you currently "
+            "recruiting for those kind of roles?",
         )
 
     def test_recruiters_page_creates_company_search_paths(self):

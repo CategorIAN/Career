@@ -1203,7 +1203,11 @@ class SearchPath(models.Model):
 
     @property
     def completed_observations(self):
-        return self.observations.filter(complete=True)
+        return self.observations.filter(
+            complete=True,
+        ).exclude(
+            job_posting__expired=True,
+        )
 
     @property
     def observation_count(self):
@@ -1287,6 +1291,8 @@ class JobPosting(models.Model):
 
     created = models.DateTimeField(auto_now_add=True)
 
+    expired = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.title} — {self.company_name}"
 
@@ -1317,10 +1323,13 @@ class SearchObservation(models.Model):
         if not self.complete:
             return None
 
-        return (
-                self.job_posting is not None
-                and self.job_posting.apply_to is True
-        )
+        if self.job_posting is None:
+            return False
+
+        if self.job_posting.expired:
+            return None
+
+        return self.job_posting.apply_to is True
 
     def __str__(self):
         return f"{self.search_path} — {self.created:%Y-%m-%d}"

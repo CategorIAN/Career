@@ -3,7 +3,7 @@ from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
                      Project, ProjectTask, Skill, Course, Supervisor, Reference,
                      Residency, ProfileSetting, SearchObservation, SearchPath,
-                     JobPosting)
+                     JobPosting, Professional, Recruiter)
 
 
 class RoleTaskInline(admin.TabularInline):
@@ -66,10 +66,29 @@ class RoleAdmin(admin.ModelAdmin):
     inlines = [RoleTaskInline, SupervisorInline]
 
 
+class ProfessionalCompanyInline(admin.TabularInline):
+    model = Professional.companies.through
+    extra = 1
+    verbose_name = "Professional"
+    verbose_name_plural = "Professionals"
+
+
+class RecruiterCompanyInline(admin.TabularInline):
+    model = Recruiter.companies.through
+    extra = 1
+    verbose_name = "Recruiter"
+    verbose_name_plural = "Recruiters"
+
+
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
     list_display = ("name", "website", "address")
     search_fields = ("name", "description")
+
+    inlines = [
+        ProfessionalCompanyInline,
+        RecruiterCompanyInline,
+    ]
 
 
 @admin.register(Address)

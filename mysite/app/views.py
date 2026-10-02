@@ -1479,6 +1479,62 @@ def search_terms_view(request):
     )
 
 
+def job_postings_view(request):
+    if request.method == "POST":
+        job_posting_id = request.POST.get("job_posting_id", "").strip()
+        action = request.POST.get("action", "").strip()
+        job_posting = JobPosting.objects.filter(pk=job_posting_id).first()
+
+        if job_posting is not None and action == "mark_expired":
+            job_posting.apply_to = False
+            job_posting.expired = True
+            job_posting.save(update_fields=["apply_to", "expired"])
+        elif job_posting is not None and action == "unmark_expired":
+            job_posting.expired = False
+            job_posting.save(update_fields=["expired"])
+        elif job_posting is not None and action == "update_apply_to":
+            apply_to_value = request.POST.get("apply_to")
+            if apply_to_value in {"true", "false", "unknown"}:
+                job_posting.apply_to = {
+                    "true": True,
+                    "false": False,
+                    "unknown": None,
+                }[apply_to_value]
+                job_posting.save(update_fields=["apply_to"])
+
+        return redirect("job_postings")
+
+    job_postings = JobPosting.objects.order_by("-created", "-pk")
+    return render(
+        request,
+        "app/job_postings.html",
+        {
+            "apply_job_postings": job_postings.filter(apply_to=True),
+            "other_job_postings": job_postings.filter(
+                Q(apply_to=False) | Q(apply_to__isnull=True)
+            ),
+        },
+    )
+
+
+@require_POST
+def update_job_posting_apply_to_view(request, job_posting_id):
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+
+    apply_to = payload.get("apply_to")
+    if not isinstance(apply_to, bool):
+        return JsonResponse({"error": "apply_to must be true or false."}, status=400)
+
+    updated = JobPosting.objects.filter(pk=job_posting_id).update(apply_to=apply_to)
+    if not updated:
+        return JsonResponse({"error": "Job posting not found."}, status=404)
+
+    return JsonResponse({"apply_to": apply_to})
+
+
 def job_search_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     search_text = (
