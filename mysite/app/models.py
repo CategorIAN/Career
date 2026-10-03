@@ -6,8 +6,7 @@ from django.utils.functional import cached_property
 from calendar import monthrange
 from datetime import timedelta
 from zoneinfo import ZoneInfo
-from django.db.models import Q
-
+from django.db.models import Max, Q
 
 MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
@@ -33,7 +32,6 @@ def _wait_parts(wait_value):
 
 
 class Skill(models.Model):
-
     name = models.CharField(max_length=100, unique=True)
 
     SKILL_TYPES = [(x, x) for x in ["Language", "Technology", "Domain", "Other"]]
@@ -243,6 +241,25 @@ class Company(models.Model):
     description = models.TextField(blank=True)
     job_search_enabled = models.BooleanField(default=True)
     supports_job_search_terms = models.BooleanField(default=True)
+
+    @cached_property
+    def last_applied(self):
+        try:
+            last_submitted = self.last_applied_submitted
+        except AttributeError:
+            last_submitted = self.applications.aggregate(
+                last_submitted=Max("submitted")
+            )["last_submitted"]
+
+        if last_submitted is None:
+            return None
+        return timezone.now() - last_submitted
+
+    @property
+    def last_applied_days(self):
+        if self.last_applied is None:
+            return None
+        return self.last_applied.days
 
     def __str__(self):
         return self.name
@@ -799,11 +816,11 @@ class Professional(models.Model):
         if self.connect_due is None:
             return self.invite_due <= current_date
         return (
-            self.connect_due <= current_date
-            and (
-                self.last_invited <= self.last_attended
-                or self.invite_due <= current_date
-            )
+                self.connect_due <= current_date
+                and (
+                        self.last_invited <= self.last_attended
+                        or self.invite_due <= current_date
+                )
         )
 
 
@@ -925,11 +942,11 @@ class Recruiter(models.Model):
         if self.connect_due is None:
             return self.invite_due <= current_date
         return (
-            self.connect_due <= current_date
-            and (
-                self.last_invited <= self.last_attended
-                or self.invite_due <= current_date
-            )
+                self.connect_due <= current_date
+                and (
+                        self.last_invited <= self.last_attended
+                        or self.invite_due <= current_date
+                )
         )
 
 
@@ -1333,3 +1350,31 @@ class SearchObservation(models.Model):
 
     def __str__(self):
         return f"{self.search_path} — {self.created:%Y-%m-%d}"
+
+
+class Application(models.Model):
+    job_posting = models.OneToOneField(
+        "JobPosting",
+        on_delete=models.CASCADE,
+        related_name="application",
+    )
+
+    company = models.ForeignKey(
+        "Company",
+        on_delete=models.PROTECT,
+        related_name="applications",
+        null=True,
+        blank=True,
+    )
+
+    cover_letter = models.TextField(blank=True)
+
+    created = models.DateTimeField(auto_now_add=True)
+
+    submitted = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    def __str__(self):
+        return f"Application — {self.job_posting}"

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
 from .models import (
+    Application,
     Company,
     Feature,
     FeatureLink,
@@ -131,6 +132,23 @@ class JobPostingForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class ApplicationCompanyForm(forms.ModelForm):
+    class Meta:
+        model = Application
+        fields = ["company"]
+        widgets = {
+            "company": forms.Select(
+                attrs={
+                    "id": "application-company-select",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["company"].queryset = Company.objects.order_by("name", "pk")
 
 
 class SkillForm(forms.ModelForm):

@@ -11,6 +11,7 @@ from django.db.models import (
     Exists,
     F,
     IntegerField,
+    Max,
     OuterRef,
     Prefetch,
     Q,
@@ -33,6 +34,7 @@ from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
 from .forms import (
+    ApplicationCompanyForm,
     CompanyForm,
     FeatureForm,
     FeatureFormSet,
@@ -53,6 +55,7 @@ from .forms import (
     SkillFormSet,
 )
 from .models import (
+    Application,
     Company,
     Course,
     Direction,
@@ -1492,6 +1495,8 @@ def job_postings_view(request):
         elif job_posting is not None and action == "unmark_expired":
             job_posting.expired = False
             job_posting.save(update_fields=["expired"])
+        elif job_posting is not None and action == "create_application":
+            Application.objects.get_or_create(job_posting=job_posting)
         elif job_posting is not None and action == "update_apply_to":
             apply_to_value = request.POST.get("apply_to")
             if apply_to_value in {"true", "false", "unknown"}:
@@ -1513,6 +1518,59 @@ def job_postings_view(request):
             "other_job_postings": job_postings.filter(
                 Q(apply_to=False) | Q(apply_to__isnull=True)
             ),
+        },
+    )
+
+
+def job_applications_view(request):
+    application_company_form = ApplicationCompanyForm()
+    new_company_form = CompanyForm(prefix="new-company")
+    show_application_modal_id = None
+    show_new_company_modal_id = None
+    if request.method == "POST":
+        application_id = request.POST.get("application_id", "").strip()
+        application = Application.objects.filter(pk=application_id).first()
+        if "add_new_company" in request.POST and application is not None:
+            new_company_form = CompanyForm(request.POST, prefix="new-company")
+            if new_company_form.is_valid():
+                company = new_company_form.save()
+                create_company_search_paths(company)
+                application.company = company
+                application.save(update_fields=["company"])
+                return redirect("job_applications")
+            show_application_modal_id = application.pk
+            show_new_company_modal_id = application.pk
+        elif application is not None:
+            application_company_form = ApplicationCompanyForm(
+                request.POST,
+                instance=application,
+            )
+            if application_company_form.is_valid():
+                application_company_form.save()
+                return redirect("job_applications")
+            show_application_modal_id = application.pk
+
+    companies = Company.objects.annotate(
+        last_applied_submitted=Max("applications__submitted")
+    )
+    applications = Application.objects.select_related("job_posting").prefetch_related(
+        Prefetch("company", queryset=companies)
+    )
+    return render(
+        request,
+        "app/job_applications.html",
+        {
+            "to_apply_applications": applications.filter(
+                submitted__isnull=True
+            ).order_by("-created", "-pk"),
+            "applied_applications": applications.filter(
+                submitted__isnull=False
+            ).order_by("-submitted", "-pk"),
+            "application_company_form": application_company_form,
+            "new_company_form": new_company_form,
+            "show_application_modal_id": show_application_modal_id,
+            "show_new_company_modal_id": show_new_company_modal_id,
+            "all_companies": Company.objects.order_by("name", "pk"),
         },
     )
 

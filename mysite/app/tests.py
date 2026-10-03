@@ -18,6 +18,7 @@ from django.utils import timezone
 from freelancersdk.resources.projects.exceptions import ProjectsNotFoundException
 
 from .models import (
+    Application,
     Address,
     City,
     Company,
@@ -2443,6 +2444,21 @@ class JobPostingsPageTests(TestCase):
         job_posting.refresh_from_db()
         self.assertTrue(job_posting.apply_to)
 
+    def test_job_postings_can_create_an_application(self):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+        )
+
+        response = self.client.post(
+            reverse("job_postings"),
+            {"job_posting_id": job_posting.pk, "action": "create_application"},
+        )
+
+        self.assertRedirects(response, reverse("job_postings"))
+        application = Application.objects.get(job_posting=job_posting)
+        self.assertEqual(application.job_posting, job_posting)
+
     def test_job_postings_drag_drop_endpoint_updates_apply_to(self):
         job_posting = JobPosting.objects.create(
             title="Undecided Role",
@@ -2477,6 +2493,179 @@ class JobPostingsPageTests(TestCase):
         job_posting.refresh_from_db()
         self.assertFalse(job_posting.expired)
         self.assertFalse(job_posting.apply_to)
+
+
+class JobApplicationsPageTests(TestCase):
+    def test_job_applications_are_grouped_and_sorted_by_submission_status(self):
+        to_apply_older = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="To Apply Older",
+                company_name="Company A",
+            )
+        )
+        to_apply_newer = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="To Apply Newer",
+                company_name="Company B",
+            )
+        )
+        applied_older = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Applied Older",
+                company_name="Company C",
+            ),
+            submitted=datetime(2026, 1, 3, tzinfo=UTC),
+        )
+        applied_newer = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Applied Newer",
+                company_name="Company D",
+            ),
+            submitted=datetime(2026, 1, 4, tzinfo=UTC),
+        )
+        Application.objects.filter(pk=to_apply_older.pk).update(
+            created=datetime(2026, 1, 1, tzinfo=UTC)
+        )
+        Application.objects.filter(pk=to_apply_newer.pk).update(
+            created=datetime(2026, 1, 2, tzinfo=UTC)
+        )
+
+        response = self.client.get(reverse("job_applications"))
+
+        self.assertContains(response, "Job Applications")
+        self.assertContains(response, "To Apply")
+        self.assertContains(response, "Applied")
+        self.assertEqual(
+            [application.pk for application in response.context["to_apply_applications"]],
+            [to_apply_newer.pk, to_apply_older.pk],
+        )
+        self.assertEqual(
+            [application.pk for application in response.context["applied_applications"]],
+            [applied_newer.pk, applied_older.pk],
+        )
+        content = response.content.decode()
+        self.assertLess(content.index("To Apply Newer"), content.index("Applied Newer"))
+
+    def test_job_application_modal_renders_description_and_saves_company(self):
+        company = Company.objects.create(name="Example Co")
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+                description="# Role\n\nBuild **data** systems.",
+            ),
+            company=company,
+        )
+
+        page_response = self.client.get(reverse("job_applications"))
+
+        self.assertContains(page_response, 'id="application-detail-modal"', html=False)
+        self.assertContains(page_response, 'id="application-company-search"', html=False)
+        self.assertContains(page_response, "Search Company")
+        self.assertContains(page_response, ">Save</button>", html=False)
+        self.assertContains(
+            page_response,
+            'class="application-company-search autofill-blocked"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'autocomplete="new-password"',
+            html=False,
+        )
+        self.assertContains(page_response, 'list="application-company-options"', html=False)
+        self.assertContains(page_response, 'id="application-company-id"', html=False)
+        self.assertContains(
+            page_response,
+            'data-job-posting-company-name="Example Co"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'data-application-company-name="Example Co"',
+            html=False,
+        )
+        self.assertContains(page_response, 'id="application-detail-company"', html=False)
+        self.assertContains(
+            page_response,
+            'id="application-detail-last-applied"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
+            'detailCompany.textContent = card.dataset.applicationCompanyName || "Unknown";',
+            html=False,
+        )
+        self.assertContains(page_response, "const syncCompanyId", html=False)
+        self.assertContains(page_response, 'data-description="# Role', html=False)
+        self.assertContains(page_response, "const renderMarkdown = markdown", html=False)
+
+        response = self.client.post(
+            reverse("job_applications"),
+            {
+                "application_id": application.pk,
+                "company": company.pk,
+            },
+        )
+
+        self.assertRedirects(response, reverse("job_applications"))
+        application.refresh_from_db()
+        self.assertEqual(application.company, company)
+
+    def test_job_application_modal_shows_company_last_applied_in_days(self):
+        company = Company.objects.create(name="Applied Company")
+        Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Earlier Application",
+                company_name="Applied Company",
+            ),
+            company=company,
+            submitted=timezone.now() - timedelta(days=5),
+        )
+
+        response = self.client.get(reverse("job_applications"))
+
+        self.assertContains(
+            response,
+            'data-application-company-last-applied-days="5"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            "application-last-applied-recent",
+            html=False,
+        )
+
+    def test_job_application_can_create_and_attach_a_new_company(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Software Engineer",
+                company_name="New Company",
+            )
+        )
+
+        page_response = self.client.get(reverse("job_applications"))
+
+        self.assertContains(page_response, ">Save New</button>", html=False)
+        self.assertContains(
+            page_response,
+            'id="application-new-company-panel"',
+            html=False,
+        )
+        self.assertContains(page_response, "Add New Company")
+
+        response = self.client.post(
+            reverse("job_applications"),
+            {
+                "application_id": application.pk,
+                "add_new_company": "1",
+                "new-company-name": "New Company",
+            },
+        )
+
+        self.assertRedirects(response, reverse("job_applications"))
+        application.refresh_from_db()
+        self.assertEqual(application.company.name, "New Company")
 
 
 class JobSearchPageTests(TestCase):

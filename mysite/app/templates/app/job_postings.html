@@ -273,6 +273,7 @@
                     {% csrf_token %}
                     <input id="job-posting-decision-id" type="hidden" name="job_posting_id">
                     <input id="job-posting-decision-action" type="hidden" name="action">
+                    <button id="job-posting-create-application" type="submit" class="copy-button">Create Application</button>
                     <button id="job-posting-mark-expired" type="submit" class="copy-button">Mark Expired</button>
                 </form>
             </div>
@@ -299,6 +300,7 @@
         const decisionId = document.getElementById("job-posting-decision-id");
         const decisionAction = document.getElementById("job-posting-decision-action");
         const applyToSelect = document.getElementById("job-posting-apply-to");
+        const createApplicationButton = document.getElementById("job-posting-create-application");
         const markExpiredButton = document.getElementById("job-posting-mark-expired");
         const escapeHtml = value => value
             .replaceAll("&", "&amp;")
@@ -379,6 +381,9 @@
         });
         markExpiredButton.addEventListener("click", () => {
             decisionAction.value = markExpiredButton.dataset.action;
+        });
+        createApplicationButton.addEventListener("click", () => {
+            decisionAction.value = "create_application";
         });
         applyToSelect.addEventListener("change", () => {
             decisionAction.value = "update_apply_to";

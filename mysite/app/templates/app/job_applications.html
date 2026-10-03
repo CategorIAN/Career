@@ -1,0 +1,406 @@
+{% extends "app/base.html" %}
+
+{% block title %}Job Applications{% endblock %}
+
+{% block content %}
+<style>
+    .job-application-group {
+        margin-bottom: 2rem;
+    }
+
+    .job-application-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1rem;
+    }
+
+    .job-application-card {
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+
+    .job-application-card h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    .job-application-card p {
+        margin: 0.35rem 0;
+    }
+
+    .job-application-date {
+        color: #555;
+        font-size: 0.9rem;
+    }
+
+    .application-detail-header {
+        margin: 0 2.5rem 1rem 0;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #000;
+    }
+
+    .application-detail-header h2 {
+        margin: 0;
+    }
+
+    #application-detail-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .application-company-form {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 22rem) max-content max-content;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .application-company-search {
+        max-width: 22rem;
+    }
+
+    .application-company-form .errorlist {
+        grid-column: 2 / -1;
+        margin: 0;
+    }
+
+    .application-linked-company-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 0.75rem 0 0;
+    }
+
+    .application-last-applied-recent {
+        color: #b00020;
+        font-weight: bold;
+    }
+
+    #application-detail-modal.new-company-open {
+        flex-direction: row;
+        gap: 1rem;
+    }
+
+    #application-detail-modal.new-company-open .modal-content {
+        width: min(700px, calc(100vw - 30rem));
+    }
+
+    .application-new-company-panel {
+        position: relative;
+        width: min(26rem, calc(100vw - 2rem));
+        max-height: min(70vh, 640px);
+        box-sizing: border-box;
+        padding: 1.5rem;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .application-new-company-panel h2 {
+        margin: 0 2rem 1rem 0;
+    }
+
+    .application-new-company-form-grid {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        align-items: start;
+        gap: 0.75rem;
+    }
+
+    .application-new-company-form-grid button {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    #application-new-company-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+        .application-company-form {
+            grid-template-columns: 1fr;
+        }
+
+        .application-company-form .errorlist {
+            grid-column: 1;
+        }
+
+        #application-detail-modal.new-company-open {
+            flex-direction: column;
+        }
+
+        #application-detail-modal.new-company-open .modal-content,
+        .application-new-company-panel {
+            width: min(700px, 100%);
+        }
+
+        .application-new-company-panel {
+            max-height: 40vh;
+        }
+    }
+
+    .application-detail-description {
+        line-height: 1.6;
+    }
+</style>
+
+<section class="utility-page">
+    <h1>Job Applications</h1>
+
+    <section class="job-application-group" aria-labelledby="to-apply-heading">
+        <h2 id="to-apply-heading">To Apply</h2>
+        <div class="job-application-card-grid">
+            {% for application in to_apply_applications %}
+                <article
+                    class="utility-card job-application-card open-application-detail"
+                    role="button"
+                    tabindex="0"
+                    data-application-id="{{ application.pk }}"
+                    data-title="{{ application.job_posting.title|escape }}"
+                    data-description="{{ application.job_posting.description|escape }}"
+                    data-job-posting-company-name="{{ application.job_posting.company_name|escape }}"
+                    data-application-company-name="{{ application.company.name|default:''|escape }}"
+                    data-application-company-last-applied-days="{{ application.company.last_applied_days|default_if_none:'' }}"
+                    aria-label="View {{ application }}"
+                >
+                    <h3>{{ application.job_posting.title }}</h3>
+                    <p>{{ application.job_posting.company_name }}</p>
+                    <p class="job-application-date">Created: {{ application.created|date:"M j, Y, g:i A" }}</p>
+                </article>
+            {% empty %}
+                <p>No applications are waiting to be submitted.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="job-application-group" aria-labelledby="applied-heading">
+        <h2 id="applied-heading">Applied</h2>
+        <div class="job-application-card-grid">
+            {% for application in applied_applications %}
+                <article
+                    class="utility-card job-application-card open-application-detail"
+                    role="button"
+                    tabindex="0"
+                    data-application-id="{{ application.pk }}"
+                    data-title="{{ application.job_posting.title|escape }}"
+                    data-description="{{ application.job_posting.description|escape }}"
+                    data-job-posting-company-name="{{ application.job_posting.company_name|escape }}"
+                    data-application-company-name="{{ application.company.name|default:''|escape }}"
+                    data-application-company-last-applied-days="{{ application.company.last_applied_days|default_if_none:'' }}"
+                    aria-label="View {{ application }}"
+                >
+                    <h3>{{ application.job_posting.title }}</h3>
+                    <p>{{ application.job_posting.company_name }}</p>
+                    <p class="job-application-date">Submitted: {{ application.submitted|date:"M j, Y, g:i A" }}</p>
+                </article>
+            {% empty %}
+                <p>No applications have been submitted.</p>
+            {% endfor %}
+        </div>
+    </section>
+</section>
+
+<div id="application-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-detail-title">
+    <div class="modal-content">
+        <button id="application-detail-close" type="button" aria-label="Close">&times;</button>
+        <div class="application-detail-header">
+            <h2 id="application-detail-title"></h2>
+            <form id="application-company-form" class="application-company-form" method="post">
+                {% csrf_token %}
+                <input id="application-company-application-id" type="hidden" name="application_id">
+                <label for="application-company-search">Search Company</label>
+                <input
+                    id="application-company-search"
+                    type="text"
+                    list="application-company-options"
+                    placeholder="Search companies"
+                    autocomplete="new-password"
+                    class="application-company-search autofill-blocked"
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    readonly="readonly"
+                >
+                <datalist id="application-company-options">
+                    {% for company in all_companies %}
+                        <option value="{{ company.name }}" data-company-id="{{ company.pk }}"></option>
+                    {% endfor %}
+                </datalist>
+                <input id="application-company-id" type="hidden" name="company">
+                <button type="submit">Save</button>
+                <button id="application-save-new-company" type="button">Save New</button>
+                {{ application_company_form.company.errors }}
+            </form>
+            <p class="application-linked-company-row">
+                <span><strong>Company:</strong> <span id="application-detail-company">Unknown</span></span>
+                <span><strong>Last Applied:</strong> <span id="application-detail-last-applied">Never</span></span>
+            </p>
+        </div>
+        <div id="application-detail-description" class="application-detail-description"></div>
+    </div>
+    <aside id="application-new-company-panel" class="application-new-company-panel hidden" aria-labelledby="application-new-company-title">
+        <button id="application-new-company-close" type="button" aria-label="Close Add New Company">&times;</button>
+        <h2 id="application-new-company-title">Add New Company</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input id="application-new-company-application-id" type="hidden" name="application_id">
+            <div class="application-new-company-form-grid">
+                {% for field in new_company_form %}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div>{{ field.errors }}{{ field }}</div>
+                {% endfor %}
+                <button type="submit" name="add_new_company" value="1">Save</button>
+            </div>
+        </form>
+    </aside>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        window.setTimeout(() => {
+            document.querySelectorAll(".autofill-blocked").forEach(input => {
+                input.removeAttribute("readonly");
+            });
+        }, 100);
+        const detailModal = document.getElementById("application-detail-modal");
+        const detailTitle = document.getElementById("application-detail-title");
+        const detailCompany = document.getElementById("application-detail-company");
+        const detailLastApplied = document.getElementById("application-detail-last-applied");
+        const detailDescription = document.getElementById("application-detail-description");
+        const newCompanyPanel = document.getElementById("application-new-company-panel");
+        const applicationIdInput = document.getElementById("application-company-application-id");
+        const newCompanyApplicationIdInput = document.getElementById(
+            "application-new-company-application-id"
+        );
+        const companySearch = document.getElementById("application-company-search");
+        const companyIdInput = document.getElementById("application-company-id");
+        const companyOptions = document.querySelectorAll("#application-company-options option");
+        const saveNewCompanyButton = document.getElementById("application-save-new-company");
+        const companyIdByName = new Map(
+            Array.from(companyOptions).map(option => [
+                option.value,
+                option.dataset.companyId,
+            ])
+        );
+        const escapeHtml = value => value
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        const renderInlineMarkdown = value => escapeHtml(value)
+            .replace(/`([^`]+)`/g, "<code>$1</code>")
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+            .replace(
+                /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            );
+        const renderMarkdown = markdown => markdown
+            .split(/\r?\n/)
+            .map(line => {
+                if (/^###\s+/.test(line)) return `<h5>${renderInlineMarkdown(line.slice(4))}</h5>`;
+                if (/^##\s+/.test(line)) return `<h4>${renderInlineMarkdown(line.slice(3))}</h4>`;
+                if (/^#\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.slice(2))}</h3>`;
+                if (/^[-*]\s+/.test(line)) return `<li>${renderInlineMarkdown(line.slice(2))}</li>`;
+                if (!line.trim()) return "";
+                return `<p>${renderInlineMarkdown(line)}</p>`;
+            })
+            .join("")
+            .replace(/(<li>.*?<\/li>)+/g, match => `<ul>${match}</ul>`);
+        const syncCompanyId = () => {
+            companyIdInput.value = companyIdByName.get(companySearch.value) || "";
+        };
+        const closeDetailModal = () => {
+            detailModal.classList.add("hidden");
+            detailModal.classList.remove("new-company-open");
+            newCompanyPanel.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+        const closeNewCompanyPanel = () => {
+            detailModal.classList.remove("new-company-open");
+            newCompanyPanel.classList.add("hidden");
+        };
+        const openNewCompanyPanel = () => {
+            newCompanyApplicationIdInput.value = applicationIdInput.value;
+            detailModal.classList.add("new-company-open");
+            newCompanyPanel.classList.remove("hidden");
+        };
+        const openDetailModal = card => {
+            detailTitle.textContent = card.dataset.title;
+            detailCompany.textContent = card.dataset.applicationCompanyName || "Unknown";
+            const lastAppliedDays = Number.parseInt(
+                card.dataset.applicationCompanyLastAppliedDays,
+                10
+            );
+            const hasLastApplied = Number.isInteger(lastAppliedDays);
+            detailLastApplied.textContent = hasLastApplied ? `${lastAppliedDays} days` : "Never";
+            detailLastApplied.classList.toggle(
+                "application-last-applied-recent",
+                hasLastApplied && lastAppliedDays <= 30
+            );
+            detailDescription.innerHTML = renderMarkdown(
+                card.dataset.description || "No job description is available."
+            );
+            applicationIdInput.value = card.dataset.applicationId;
+            companySearch.value = card.dataset.jobPostingCompanyName;
+            syncCompanyId();
+            closeNewCompanyPanel();
+            detailModal.classList.remove("hidden");
+            document.body.classList.add("modal-open");
+        };
+
+        document.querySelectorAll(".open-application-detail").forEach(card => {
+            card.addEventListener("click", () => openDetailModal(card));
+            card.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openDetailModal(card);
+                }
+            });
+        });
+        companySearch.addEventListener("input", syncCompanyId);
+        companySearch.addEventListener("change", syncCompanyId);
+        document.getElementById("application-company-form").addEventListener("submit", syncCompanyId);
+        document.getElementById("application-detail-close").addEventListener("click", closeDetailModal);
+        saveNewCompanyButton.addEventListener("click", openNewCompanyPanel);
+        document.getElementById("application-new-company-close").addEventListener("click", closeNewCompanyPanel);
+        detailModal.addEventListener("click", event => {
+            if (event.target === detailModal) closeDetailModal();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !detailModal.classList.contains("hidden")) {
+                closeDetailModal();
+            }
+        });
+
+        const invalidApplicationId = "{{ show_application_modal_id|default:'' }}";
+        if (invalidApplicationId) {
+            const card = document.querySelector(
+                `.open-application-detail[data-application-id="${invalidApplicationId}"]`
+            );
+            if (card) {
+                openDetailModal(card);
+                if ("{{ show_new_company_modal_id|default:'' }}") {
+                    openNewCompanyPanel();
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
