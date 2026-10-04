@@ -1,0 +1,376 @@
+{% extends "app/base.html" %}
+
+{% block title %}{{ application.job_posting.title }} @ {{ application.company|default:"Unknown" }}{% endblock %}
+
+{% block content %}
+<style>
+    .application-details-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .application-details-header h1 {
+        margin-top: 0;
+    }
+
+    .application-submit-button-pending {
+        background: #f4cccc;
+        border-color: #cc0000;
+    }
+
+    .application-submit-button-complete {
+        background: #d9ead3;
+        border-color: #6aa84f;
+    }
+
+    .application-submit-modal-content {
+        width: min(420px, 100%);
+    }
+
+    #application-submit-modal-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .application-submit-form {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .application-review-section {
+        margin-top: 2rem;
+    }
+
+    .application-review-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .application-review-heading h2 {
+        margin: 0;
+    }
+
+    .application-review-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .application-review-actions a {
+        padding: 0.35rem 0.75rem;
+        color: inherit;
+        text-decoration: none;
+        border: 1px solid #7d7d7d;
+        border-radius: 4px;
+    }
+
+    .application-review-actions a:hover {
+        background: #e7e7e7;
+    }
+
+    .application-portfolio-section {
+        margin-top: 2rem;
+    }
+
+    .application-portfolio-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .application-portfolio-heading h2 {
+        margin: 0;
+    }
+
+    .application-portfolio-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .application-portfolio-modal-content {
+        display: flex;
+        flex-direction: column;
+        width: min(1200px, 100%);
+        height: min(85vh, 900px);
+        max-height: none;
+        padding: 1.5rem;
+        overflow: hidden;
+    }
+
+    #application-portfolio-modal-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    #application-portfolio-frame {
+        flex: 1;
+        width: 100%;
+        border: 1px solid #bbb;
+    }
+
+    .application-review-modal-content {
+        width: min(700px, 100%);
+    }
+
+    .application-review-modal-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .application-review-content {
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    @media (max-width: 600px) {
+        .application-details-header {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+
+<section class="utility-page">
+    <header class="application-details-header">
+        <h1>
+            {{ application.job_posting.title }} @ {{ application.company|default:"Unknown" }}
+            <small style="font-size: 0.45em; font-weight: normal;">({{ application.created|date:"M j, Y, g:i A" }})</small>
+        </h1>
+        <button
+            id="application-submit-button"
+            class="{% if application.submitted %}application-submit-button-complete{% else %}application-submit-button-pending{% endif %}"
+            type="button"
+        >
+            {% if application.submitted %}Submitted{% else %}Submit{% endif %}
+        </button>
+    </header>
+
+    <section class="application-review-section" aria-labelledby="review-posting-details-title">
+        <div class="application-review-heading">
+            <h2 id="review-posting-details-title">Review Posting Details</h2>
+            <button
+                id="application-review-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-review-content"
+            >Show</button>
+        </div>
+        <div id="application-review-content" class="application-review-actions hidden">
+            <a
+                id="application-source-button"
+                href="{{ application.job_posting.url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+            >Source</a>
+            <button id="application-description-button" type="button">Description</button>
+            <button id="application-ai-explanation-button" type="button">AI Explanation</button>
+        </div>
+    </section>
+
+    <section class="application-portfolio-section" aria-labelledby="portfolio-information-title">
+        <div class="application-portfolio-heading">
+            <h2 id="portfolio-information-title">Portfolio Information</h2>
+            <button
+                id="application-portfolio-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-portfolio-content"
+            >Show</button>
+        </div>
+        <div id="application-portfolio-content" class="application-portfolio-actions hidden">
+            <button type="button" data-portfolio-url="{% url 'resume' %}?embed=1">Resume</button>
+            <button type="button" data-portfolio-url="{% url 'references' %}?embed=1">References</button>
+            <button type="button" data-portfolio-url="{% url 'experience' %}?embed=1">Experience</button>
+            <button type="button" data-portfolio-url="{% url 'residencies' %}?embed=1">Residencies</button>
+            <button type="button" data-portfolio-url="{% url 'projects' %}?embed=1">Projects</button>
+            <button type="button" data-portfolio-url="{% url 'courses' %}?embed=1">Education</button>
+        </div>
+    </section>
+</section>
+
+<div id="application-submit-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-submit-title">
+    <div class="modal-content application-submit-modal-content">
+        <button id="application-submit-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-submit-title">Submit Application</h2>
+        <form class="application-submit-form" method="post">
+            {% csrf_token %}
+            {{ submitted_form.submitted_date.errors }}
+            <label for="application-submitted-date">{{ submitted_form.submitted_date.label }}</label>
+            {{ submitted_form.submitted_date }}
+            <button type="submit" name="save_submitted" value="1">Save</button>
+        </form>
+    </div>
+</div>
+
+<div id="application-description-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-description-title">
+    <div class="modal-content application-review-modal-content">
+        <button class="application-review-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-description-title">Description</h2>
+        <div id="application-description-content" class="application-review-content"></div>
+    </div>
+</div>
+
+{{ application.job_posting.description|json_script:"application-posting-description" }}
+
+<div id="application-ai-explanation-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-ai-explanation-title">
+    <div class="modal-content application-review-modal-content">
+        <button class="application-review-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-ai-explanation-title">AI Explanation</h2>
+        <div class="application-review-content">{{ application.job_posting.ai_explanation|default:"No AI explanation is available."|linebreaksbr }}</div>
+    </div>
+</div>
+
+<div id="application-portfolio-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-portfolio-modal-title">
+    <div class="modal-content application-portfolio-modal-content">
+        <button id="application-portfolio-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-portfolio-modal-title"></h2>
+        <iframe id="application-portfolio-frame" title="Portfolio information"></iframe>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        window.setTimeout(() => {
+            document.querySelectorAll(".autofill-blocked").forEach(input => {
+                input.removeAttribute("readonly");
+            });
+        }, 100);
+        const submitButton = document.getElementById("application-submit-button");
+        const reviewToggle = document.getElementById("application-review-toggle");
+        const reviewContent = document.getElementById("application-review-content");
+        const portfolioToggle = document.getElementById("application-portfolio-toggle");
+        const portfolioContent = document.getElementById("application-portfolio-content");
+        const submitModal = document.getElementById("application-submit-modal");
+        const descriptionModal = document.getElementById("application-description-modal");
+        const explanationModal = document.getElementById("application-ai-explanation-modal");
+        const portfolioModal = document.getElementById("application-portfolio-modal");
+        const portfolioModalTitle = document.getElementById("application-portfolio-modal-title");
+        const portfolioFrame = document.getElementById("application-portfolio-frame");
+        const descriptionContent = document.getElementById("application-description-content");
+        const postingDescription = JSON.parse(
+            document.getElementById("application-posting-description").textContent
+        );
+        const escapeHtml = value => value
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        const renderInlineMarkdown = value => escapeHtml(value)
+            .replace(/`([^`]+)`/g, "<code>$1</code>")
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+            .replace(
+                /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            );
+        const renderMarkdown = markdown => markdown
+            .split(/\r?\n/)
+            .map(line => {
+                if (/^###\s+/.test(line)) return `<h5>${renderInlineMarkdown(line.slice(4))}</h5>`;
+                if (/^##\s+/.test(line)) return `<h4>${renderInlineMarkdown(line.slice(3))}</h4>`;
+                if (/^#\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.slice(2))}</h3>`;
+                if (/^[-*]\s+/.test(line)) return `<li>${renderInlineMarkdown(line.slice(2))}</li>`;
+                if (!line.trim()) return "";
+                return `<p>${renderInlineMarkdown(line)}</p>`;
+            })
+            .join("")
+            .replace(/(<li>.*?<\/li>)+/g, match => `<ul>${match}</ul>`);
+        const closeModal = modal => {
+            modal.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+        const openModal = modal => {
+            modal.classList.remove("hidden");
+            document.body.classList.add("modal-open");
+        };
+        const closeSubmitModal = () => {
+            closeModal(submitModal);
+        };
+        const openSubmitModal = () => {
+            openModal(submitModal);
+        };
+
+        submitButton.addEventListener("click", openSubmitModal);
+        reviewToggle.addEventListener("click", () => {
+            const isHidden = reviewContent.classList.toggle("hidden");
+            reviewToggle.textContent = isHidden ? "Show" : "Hide";
+            reviewToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
+        portfolioToggle.addEventListener("click", () => {
+            const isHidden = portfolioContent.classList.toggle("hidden");
+            portfolioToggle.textContent = isHidden ? "Show" : "Hide";
+            portfolioToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
+        document.getElementById("application-submit-modal-close").addEventListener(
+            "click",
+            closeSubmitModal
+        );
+        submitModal.addEventListener("click", event => {
+            if (event.target === submitModal) closeSubmitModal();
+        });
+        document.getElementById("application-description-button").addEventListener("click", () => {
+            descriptionContent.innerHTML = renderMarkdown(
+                postingDescription || "No posting description is available."
+            );
+            openModal(descriptionModal);
+        });
+        document.getElementById("application-ai-explanation-button").addEventListener("click", () => {
+            openModal(explanationModal);
+        });
+        [descriptionModal, explanationModal].forEach(modal => {
+            modal.querySelector(".application-review-modal-close").addEventListener(
+                "click",
+                () => closeModal(modal)
+            );
+            modal.addEventListener("click", event => {
+                if (event.target === modal) closeModal(modal);
+            });
+        });
+        document.querySelectorAll("[data-portfolio-url]").forEach(button => {
+            button.addEventListener("click", () => {
+                portfolioModalTitle.textContent = button.textContent;
+                portfolioFrame.src = button.dataset.portfolioUrl;
+                openModal(portfolioModal);
+            });
+        });
+        document.getElementById("application-portfolio-modal-close").addEventListener(
+            "click",
+            () => closeModal(portfolioModal)
+        );
+        portfolioModal.addEventListener("click", event => {
+            if (event.target === portfolioModal) closeModal(portfolioModal);
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                [submitModal, descriptionModal, explanationModal, portfolioModal].forEach(modal => {
+                    if (!modal.classList.contains("hidden")) closeModal(modal);
+                });
+            }
+        });
+
+        if ({{ show_submit_modal|yesno:"true,false" }}) openSubmitModal();
+    });
+</script>
+{% endblock %}

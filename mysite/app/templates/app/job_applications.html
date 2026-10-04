@@ -51,6 +51,28 @@
         margin: 0;
     }
 
+    .application-detail-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .application-see-details-button {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        color: #123d1d;
+        text-decoration: none;
+        background: #d9ead3;
+        border: 1px solid #6aa84f;
+        border-radius: 4px;
+        white-space: nowrap;
+    }
+
+    .application-see-details-button:hover {
+        background: #c6e0bc;
+    }
+
     #application-detail-close {
         position: absolute;
         top: 0.75rem;
@@ -269,11 +291,27 @@
     </section>
 </section>
 
-<div id="application-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-detail-title">
+<div
+    id="application-detail-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="application-detail-title"
+    data-application-details-url="{% url 'application_details' %}"
+>
     <div class="modal-content">
         <button id="application-detail-close" type="button" aria-label="Close">&times;</button>
         <div class="application-detail-header">
-            <h2 id="application-detail-title"></h2>
+            <div class="application-detail-title-row">
+                <h2 id="application-detail-title"></h2>
+                <a
+                    id="application-see-details"
+                    class="application-see-details-button"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >See Details</a>
+            </div>
             <form id="application-company-form" class="application-company-form" method="post">
                 {% csrf_token %}
                 <input id="application-company-application-id" type="hidden" name="application_id">
@@ -342,6 +380,7 @@
         const detailTitle = document.getElementById("application-detail-title");
         const detailCompany = document.getElementById("application-detail-company");
         const detailLastApplied = document.getElementById("application-detail-last-applied");
+        const seeDetailsLink = document.getElementById("application-see-details");
         const detailDescription = document.getElementById("application-detail-description");
         const newCompanyPanel = document.getElementById("application-new-company-panel");
         const applicationIdInput = document.getElementById("application-company-application-id");
@@ -420,6 +459,7 @@
                 card.dataset.description || "No job description is available."
             );
             applicationIdInput.value = card.dataset.applicationId;
+            seeDetailsLink.href = `${detailModal.dataset.applicationDetailsUrl}?application_id=${encodeURIComponent(card.dataset.applicationId)}`;
             companySearch.value = card.dataset.jobPostingCompanyName;
             syncCompanyId();
             stopReasonInput.value = card.dataset.applicationStopReason;

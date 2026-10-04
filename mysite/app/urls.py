@@ -13,6 +13,11 @@ urlpatterns = [
     path("job-postings/", views.job_postings_view, name="job_postings"),
     path("job-applications/", views.job_applications_view, name="job_applications"),
     path(
+        "application-details/",
+        views.application_details_view,
+        name="application_details",
+    ),
+    path(
         "job-postings/<int:job_posting_id>/apply-to/",
         views.update_job_posting_apply_to_view,
         name="update_job_posting_apply_to",

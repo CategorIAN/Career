@@ -439,6 +439,7 @@
 </head>
 <body>
     <div class="app-layout">
+        {% if not request.GET.embed %}
         <nav class="sidebar">
             <a class="nav-link" href="{% url 'skills' %}">Skills</a>
             <a class="nav-link" href="{% url 'platforms' %}">Platforms</a>
@@ -459,6 +460,7 @@
             <a class="nav-link" href="{% url 'projects' %}">Projects</a>
             <a class="nav-link" href="{% url 'courses' %}">Education</a>
         </nav>
+        {% endif %}
 
         <main class="page-content">
             {% block content %}{% endblock %}

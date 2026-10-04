@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -30,11 +30,13 @@ import logging
 import re
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
 from .forms import (
     ApplicationCompanyForm,
+    ApplicationSubmittedForm,
     CompanyForm,
     FeatureForm,
     FeatureFormSet,
@@ -1580,6 +1582,48 @@ def job_applications_view(request):
     )
 
 
+def application_details_view(request):
+    application = get_object_or_404(
+        Application.objects.select_related("company", "job_posting"),
+        pk=request.GET.get("application_id"),
+    )
+    show_submit_modal = False
+    initial_submitted_date = (
+        timezone.localtime(application.submitted, USER_TIMEZONE).date()
+        if application.submitted is not None
+        else timezone.localdate(timezone=USER_TIMEZONE)
+    )
+    submitted_form = ApplicationSubmittedForm(
+        initial={"submitted_date": initial_submitted_date}
+    )
+    if request.method == "POST" and "save_submitted" in request.POST:
+        submitted_form = ApplicationSubmittedForm(request.POST)
+        if submitted_form.is_valid():
+            submitted_date = submitted_form.cleaned_data["submitted_date"]
+            application.submitted = (
+                timezone.make_aware(
+                    datetime.combine(submitted_date, datetime.min.time()),
+                    USER_TIMEZONE,
+                )
+                if submitted_date is not None
+                else None
+            )
+            application.save(update_fields=["submitted"])
+            return redirect(
+                f"{reverse('application_details')}?application_id={application.pk}"
+            )
+        show_submit_modal = True
+    return render(
+        request,
+        "app/application_details.html",
+        {
+            "application": application,
+            "submitted_form": submitted_form,
+            "show_submit_modal": show_submit_modal,
+        },
+    )
+
+
 @require_POST
 def update_job_posting_apply_to_view(request, job_posting_id):
     try:
@@ -2470,6 +2514,7 @@ def save_freelancer_project_view(request):
     return redirect(redirect_url)
 
 
+@xframe_options_sameorigin
 def resume_view(request):
     profile_settings = ProfileSetting.objects.filter(
         key__in=[
@@ -2524,6 +2569,7 @@ def resume_view(request):
     )
 
 
+@xframe_options_sameorigin
 def references_view(request):
     references = (
         Reference.objects
@@ -2545,6 +2591,7 @@ def references_view(request):
     )
 
 
+@xframe_options_sameorigin
 def experience_view(request):
     roles = (
         Role.objects
@@ -2581,6 +2628,7 @@ def experience_view(request):
     )
 
 
+@xframe_options_sameorigin
 def residencies_view(request):
     residencies = (
         Residency.objects
@@ -2602,6 +2650,7 @@ def residencies_view(request):
     )
 
 
+@xframe_options_sameorigin
 def projects_view(request):
     projects = (
         Project.objects
@@ -2628,6 +2677,7 @@ def projects_view(request):
     )
 
 
+@xframe_options_sameorigin
 def courses_view(request):
     courses = (
         Course.objects

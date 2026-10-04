@@ -156,6 +156,27 @@ class ApplicationCompanyForm(forms.ModelForm):
         self.fields["company"].queryset = Company.objects.order_by("name", "pk")
 
 
+class ApplicationSubmittedForm(forms.Form):
+    submitted_date = forms.DateField(
+        label="Submit date",
+        required=False,
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={
+                "id": "application-submitted-date",
+                "type": "date",
+                "autocomplete": "new-password",
+                "class": "autofill-blocked",
+                "data-form-type": "other",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+                "data-bwignore": "true",
+                "readonly": "readonly",
+            },
+        ),
+    )
+
+
 class SkillForm(forms.ModelForm):
     class Meta:
         model = Skill

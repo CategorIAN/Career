@@ -2592,6 +2592,12 @@ class JobApplicationsPageTests(TestCase):
         page_response = self.client.get(reverse("job_applications"))
 
         self.assertContains(page_response, 'id="application-detail-modal"', html=False)
+        self.assertContains(page_response, ">See Details</a>", html=False)
+        self.assertContains(
+            page_response,
+            'data-application-details-url="/application-details/"',
+            html=False,
+        )
         self.assertContains(page_response, 'id="application-company-search"', html=False)
         self.assertContains(page_response, "Search Company")
         self.assertContains(page_response, ">Save</button>", html=False)
@@ -2650,6 +2656,116 @@ class JobApplicationsPageTests(TestCase):
         application.refresh_from_db()
         self.assertEqual(application.company, company)
         self.assertEqual(application.stop_reason, Application.StopReason.OTHER)
+
+    def test_application_details_page_shows_application_title(self):
+        company = Company.objects.create(name="Example Co")
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+                url="https://example.com/jobs/data-engineer",
+                description="Build data systems.",
+                ai_explanation="Strong Python match.",
+            ),
+            company=company,
+        )
+
+        response = self.client.get(
+            reverse("application_details"),
+            {"application_id": application.pk},
+        )
+
+        self.assertContains(response, "Data Engineer @ Example Co")
+        self.assertContains(response, "Review Posting Details")
+        self.assertContains(response, "Portfolio Information")
+        self.assertContains(response, 'id="application-portfolio-toggle"', html=False)
+        self.assertContains(
+            response,
+            'data-portfolio-url="/resume/?embed=1"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'data-portfolio-url="/education/?embed=1"',
+            html=False,
+        )
+        self.assertContains(response, 'id="application-review-toggle"', html=False)
+        self.assertContains(
+            response,
+            'id="application-review-content" class="application-review-actions hidden"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'href="https://example.com/jobs/data-engineer"',
+            html=False,
+        )
+        self.assertContains(response, 'id="application-description-button"', html=False)
+        self.assertContains(
+            response,
+            'id="application-ai-explanation-button"',
+            html=False,
+        )
+        self.assertContains(response, "Build data systems.")
+        self.assertContains(response, "Strong Python match.")
+        self.assertContains(response, "const renderMarkdown = markdown", html=False)
+
+    def test_portfolio_embed_pages_hide_the_navigation(self):
+        response = self.client.get(f"{reverse('resume')}?embed=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+        self.assertNotContains(response, 'class="sidebar"', html=False)
+
+    def test_application_details_can_set_and_edit_submitted_date(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            )
+        )
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        page_response = self.client.get(details_url)
+
+        self.assertContains(page_response, 'id="application-submit-button"', html=False)
+        self.assertContains(page_response, "Submit Application")
+        self.assertContains(
+            page_response,
+            'id="application-submitted-date"',
+            html=False,
+        )
+        self.assertContains(page_response, 'data-lpignore="true"', html=False)
+        self.assertEqual(
+            page_response.context["submitted_form"].initial["submitted_date"],
+            timezone.localdate(),
+        )
+
+        response = self.client.post(
+            details_url,
+            {
+                "save_submitted": "1",
+                "submitted_date": "2026-10-04",
+            },
+        )
+
+        self.assertRedirects(response, details_url)
+        application.refresh_from_db()
+        self.assertEqual(timezone.localdate(application.submitted), date(2026, 10, 4))
+        submitted_response = self.client.get(details_url)
+        self.assertContains(submitted_response, "Submitted")
+
+        clear_response = self.client.post(
+            details_url,
+            {
+                "save_submitted": "1",
+                "submitted_date": "",
+            },
+        )
+
+        self.assertRedirects(clear_response, details_url)
+        application.refresh_from_db()
+        self.assertIsNone(application.submitted)
 
     def test_job_application_modal_shows_company_last_applied_in_days(self):
         company = Company.objects.create(name="Applied Company")
