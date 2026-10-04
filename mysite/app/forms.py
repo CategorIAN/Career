@@ -137,11 +137,16 @@ class JobPostingForm(forms.ModelForm):
 class ApplicationCompanyForm(forms.ModelForm):
     class Meta:
         model = Application
-        fields = ["company"]
+        fields = ["company", "stop_reason"]
         widgets = {
             "company": forms.Select(
                 attrs={
                     "id": "application-company-select",
+                }
+            ),
+            "stop_reason": forms.Select(
+                attrs={
+                    "id": "application-stop-reason",
                 }
             ),
         }

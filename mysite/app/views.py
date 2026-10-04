@@ -1561,11 +1561,16 @@ def job_applications_view(request):
         "app/job_applications.html",
         {
             "to_apply_applications": applications.filter(
-                submitted__isnull=True
+                submitted__isnull=True,
+                stop_reason="",
             ).order_by("-created", "-pk"),
             "applied_applications": applications.filter(
-                submitted__isnull=False
+                submitted__isnull=False,
+                stop_reason="",
             ).order_by("-submitted", "-pk"),
+            "stopped_applications": applications.exclude(
+                stop_reason=""
+            ).order_by("-created", "-pk"),
             "application_company_form": application_company_form,
             "new_company_form": new_company_form,
             "show_application_modal_id": show_application_modal_id,

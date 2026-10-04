@@ -16,6 +16,7 @@
 
     .job-application-card {
         margin-bottom: 0;
+        position: relative;
         cursor: pointer;
     }
 
@@ -30,6 +31,14 @@
     .job-application-date {
         color: #555;
         font-size: 0.9rem;
+    }
+
+    .job-application-stop-reason {
+        position: absolute;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        color: #555;
+        font-size: 0.8rem;
     }
 
     .application-detail-header {
@@ -73,8 +82,16 @@
     .application-linked-company-row {
         display: flex;
         flex-wrap: wrap;
+        grid-column: 1 / -1;
         gap: 1rem;
         margin: 0.75rem 0 0;
+    }
+
+    .application-stop-reason-row {
+        display: flex;
+        grid-column: 1 / -1;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .application-last-applied-recent {
@@ -175,11 +192,15 @@
                     data-job-posting-company-name="{{ application.job_posting.company_name|escape }}"
                     data-application-company-name="{{ application.company.name|default:''|escape }}"
                     data-application-company-last-applied-days="{{ application.company.last_applied_days|default_if_none:'' }}"
+                    data-application-stop-reason="{{ application.stop_reason|escape }}"
                     aria-label="View {{ application }}"
                 >
                     <h3>{{ application.job_posting.title }}</h3>
                     <p>{{ application.job_posting.company_name }}</p>
-                    <p class="job-application-date">Created: {{ application.created|date:"M j, Y, g:i A" }}</p>
+                    <p class="job-application-date">{{ application.created|date:"M j, Y, g:i A" }}</p>
+                    {% if application.stop_reason %}
+                        <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
+                    {% endif %}
                 </article>
             {% empty %}
                 <p>No applications are waiting to be submitted.</p>
@@ -201,14 +222,48 @@
                     data-job-posting-company-name="{{ application.job_posting.company_name|escape }}"
                     data-application-company-name="{{ application.company.name|default:''|escape }}"
                     data-application-company-last-applied-days="{{ application.company.last_applied_days|default_if_none:'' }}"
+                    data-application-stop-reason="{{ application.stop_reason|escape }}"
                     aria-label="View {{ application }}"
                 >
                     <h3>{{ application.job_posting.title }}</h3>
                     <p>{{ application.job_posting.company_name }}</p>
                     <p class="job-application-date">Submitted: {{ application.submitted|date:"M j, Y, g:i A" }}</p>
+                    {% if application.stop_reason %}
+                        <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
+                    {% endif %}
                 </article>
             {% empty %}
                 <p>No applications have been submitted.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="job-application-group" aria-labelledby="stopped-heading">
+        <h2 id="stopped-heading">Stopped</h2>
+        <div class="job-application-card-grid">
+            {% for application in stopped_applications %}
+                <article
+                    class="utility-card job-application-card open-application-detail"
+                    role="button"
+                    tabindex="0"
+                    data-application-id="{{ application.pk }}"
+                    data-title="{{ application.job_posting.title|escape }}"
+                    data-description="{{ application.job_posting.description|escape }}"
+                    data-job-posting-company-name="{{ application.job_posting.company_name|escape }}"
+                    data-application-company-name="{{ application.company.name|default:''|escape }}"
+                    data-application-company-last-applied-days="{{ application.company.last_applied_days|default_if_none:'' }}"
+                    data-application-stop-reason="{{ application.stop_reason|escape }}"
+                    aria-label="View {{ application }}"
+                >
+                    <h3>{{ application.job_posting.title }}</h3>
+                    <p>{{ application.job_posting.company_name }}</p>
+                    <p class="job-application-date">{{ application.created|date:"M j, Y, g:i A" }}</p>
+                    {% if application.stop_reason %}
+                        <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <p>No applications have been stopped.</p>
             {% endfor %}
         </div>
     </section>
@@ -245,11 +300,17 @@
                 <button type="submit">Save</button>
                 <button id="application-save-new-company" type="button">Save New</button>
                 {{ application_company_form.company.errors }}
+                <p class="application-linked-company-row">
+                    <span><strong>Company:</strong> <span id="application-detail-company">Unknown</span></span>
+                    <span><strong>Last Applied:</strong> <span id="application-detail-last-applied">Never</span></span>
+                </p>
+                <div class="application-stop-reason-row">
+                    <label for="application-stop-reason">Stop reason</label>
+                    {{ application_company_form.stop_reason }}
+                    <button type="submit">Save Stop Reason</button>
+                    {{ application_company_form.stop_reason.errors }}
+                </div>
             </form>
-            <p class="application-linked-company-row">
-                <span><strong>Company:</strong> <span id="application-detail-company">Unknown</span></span>
-                <span><strong>Last Applied:</strong> <span id="application-detail-last-applied">Never</span></span>
-            </p>
         </div>
         <div id="application-detail-description" class="application-detail-description"></div>
     </div>
@@ -289,6 +350,7 @@
         );
         const companySearch = document.getElementById("application-company-search");
         const companyIdInput = document.getElementById("application-company-id");
+        const stopReasonInput = document.getElementById("application-stop-reason");
         const companyOptions = document.querySelectorAll("#application-company-options option");
         const saveNewCompanyButton = document.getElementById("application-save-new-company");
         const companyIdByName = new Map(
@@ -360,6 +422,7 @@
             applicationIdInput.value = card.dataset.applicationId;
             companySearch.value = card.dataset.jobPostingCompanyName;
             syncCompanyId();
+            stopReasonInput.value = card.dataset.applicationStopReason;
             closeNewCompanyPanel();
             detailModal.classList.remove("hidden");
             document.body.classList.add("modal-open");

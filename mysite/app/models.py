@@ -1265,6 +1265,16 @@ class SearchPath(models.Model):
         if not self.active:
             return True
 
+        # Hide company SearchPaths when there is a recent
+        # submitted application to that company.
+        if self.company_id is not None:
+            cutoff = timezone.now() - timedelta(days=30)
+
+            if self.company.applications.filter(
+                    submitted__gte=cutoff
+            ).exists():
+                return True
+
         last_observation = (
             SearchObservation.objects
             .filter(complete=True)
@@ -1346,7 +1356,21 @@ class SearchObservation(models.Model):
         if self.job_posting.expired:
             return None
 
-        return self.job_posting.apply_to is True
+        if self.job_posting.apply_to is False:
+            return False
+
+        try:
+            application = self.job_posting.application
+        except Application.DoesNotExist:
+            return True
+
+        if application.stopped:
+            return False
+
+        if application.submitted is not None:
+            return True
+
+        return True
 
     def __str__(self):
         return f"{self.search_path} — {self.created:%Y-%m-%d}"
@@ -1375,6 +1399,21 @@ class Application(models.Model):
         null=True,
         blank=True,
     )
+
+    class StopReason(models.TextChoices):
+        APPLICATION_ISSUE = "application_issue", "Application Issue"
+        RECENT_APPLICATION = "recent_application", "Recently Applied to Company"
+        OTHER = "other", "Other"
+
+    stop_reason = models.CharField(
+        max_length=30,
+        choices=StopReason.choices,
+        blank=True,
+    )
+
+    @property
+    def stopped(self):
+        return bool(self.stop_reason)
 
     def __str__(self):
         return f"Application — {self.job_posting}"

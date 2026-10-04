@@ -2523,11 +2523,31 @@ class JobApplicationsPageTests(TestCase):
             ),
             submitted=datetime(2026, 1, 4, tzinfo=UTC),
         )
+        stopped_older = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Stopped Older",
+                company_name="Company E",
+            ),
+            stop_reason=Application.StopReason.OTHER,
+        )
+        stopped_newer = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Stopped Newer",
+                company_name="Company F",
+            ),
+            stop_reason=Application.StopReason.APPLICATION_ISSUE,
+        )
         Application.objects.filter(pk=to_apply_older.pk).update(
             created=datetime(2026, 1, 1, tzinfo=UTC)
         )
         Application.objects.filter(pk=to_apply_newer.pk).update(
             created=datetime(2026, 1, 2, tzinfo=UTC)
+        )
+        Application.objects.filter(pk=stopped_older.pk).update(
+            created=datetime(2026, 1, 3, tzinfo=UTC)
+        )
+        Application.objects.filter(pk=stopped_newer.pk).update(
+            created=datetime(2026, 1, 4, tzinfo=UTC)
         )
 
         response = self.client.get(reverse("job_applications"))
@@ -2535,6 +2555,13 @@ class JobApplicationsPageTests(TestCase):
         self.assertContains(response, "Job Applications")
         self.assertContains(response, "To Apply")
         self.assertContains(response, "Applied")
+        self.assertContains(response, "Stopped")
+        self.assertContains(response, "Application Issue")
+        self.assertContains(
+            response,
+            'class="job-application-stop-reason"',
+            html=False,
+        )
         self.assertEqual(
             [application.pk for application in response.context["to_apply_applications"]],
             [to_apply_newer.pk, to_apply_older.pk],
@@ -2543,8 +2570,13 @@ class JobApplicationsPageTests(TestCase):
             [application.pk for application in response.context["applied_applications"]],
             [applied_newer.pk, applied_older.pk],
         )
+        self.assertEqual(
+            [application.pk for application in response.context["stopped_applications"]],
+            [stopped_newer.pk, stopped_older.pk],
+        )
         content = response.content.decode()
         self.assertLess(content.index("To Apply Newer"), content.index("Applied Newer"))
+        self.assertLess(content.index("Applied Newer"), content.index("Stopped Newer"))
 
     def test_job_application_modal_renders_description_and_saves_company(self):
         company = Company.objects.create(name="Example Co")
@@ -2593,6 +2625,11 @@ class JobApplicationsPageTests(TestCase):
         )
         self.assertContains(
             page_response,
+            'id="application-stop-reason"',
+            html=False,
+        )
+        self.assertContains(
+            page_response,
             'detailCompany.textContent = card.dataset.applicationCompanyName || "Unknown";',
             html=False,
         )
@@ -2605,12 +2642,14 @@ class JobApplicationsPageTests(TestCase):
             {
                 "application_id": application.pk,
                 "company": company.pk,
+                "stop_reason": Application.StopReason.OTHER,
             },
         )
 
         self.assertRedirects(response, reverse("job_applications"))
         application.refresh_from_db()
         self.assertEqual(application.company, company)
+        self.assertEqual(application.stop_reason, Application.StopReason.OTHER)
 
     def test_job_application_modal_shows_company_last_applied_in_days(self):
         company = Company.objects.create(name="Applied Company")
