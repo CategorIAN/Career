@@ -59,6 +59,12 @@ from .views import (
 )
 from .services.google_calendar import sync_meeting_event, sync_professional_connect
 from .services.candidate_background import build_candidate_background
+from .services.cover_letter import (
+    CoverLetterParseError,
+    CoverLetterRefusalError,
+    generate_cover_letter,
+)
+from .services.cover_letter_pdf import build_cover_letter_pdf, cover_letter_filename
 from .services.job_evaluation import (
     JobEvaluation,
     JobEvaluationParseError,
@@ -514,6 +520,100 @@ class JobEvaluationServiceTests(TestCase):
     def test_evaluate_job_command_rejects_unknown_posting_id(self):
         with self.assertRaisesMessage(CommandError, "Job posting with ID 999 does not exist"):
             call_command("evaluate_job", 999)
+
+
+class CoverLetterServiceTests(TestCase):
+    @override_settings(
+        OPENAI_API_KEY="test-api-key",
+        OPENAI_JOB_EVALUATION_MODEL="test-model",
+    )
+    @patch(
+        "app.services.cover_letter.build_candidate_background",
+        return_value="Candidate Background\n- Python",
+    )
+    @patch("app.services.cover_letter.OpenAI")
+    def test_generates_cover_letter_from_application_context(
+        self,
+        mock_openai,
+        mock_build_background,
+    ):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+                url="https://jobs.example.com/1",
+                description="Build Python data pipelines.",
+            )
+        )
+        mock_openai.return_value.responses.create.return_value = SimpleNamespace(
+            output_text="Dear Hiring Manager,\n\nI am interested in this role.",
+            output=[],
+            status="completed",
+        )
+
+        cover_letter = generate_cover_letter(application)
+
+        self.assertEqual(
+            cover_letter,
+            "Dear Hiring Manager,\n\nI am interested in this role.",
+        )
+        mock_build_background.assert_called_once_with()
+        create_kwargs = mock_openai.return_value.responses.create.call_args.kwargs
+        self.assertEqual(create_kwargs["model"], "test-model")
+        self.assertIn("Do not include a closing", create_kwargs["input"][0]["content"])
+        self.assertIn("signature", create_kwargs["input"][0]["content"])
+        self.assertIn("Data Engineer", create_kwargs["input"][1]["content"])
+        self.assertIn("Candidate Background", create_kwargs["input"][1]["content"])
+        application.refresh_from_db()
+        self.assertEqual(application.cover_letter, "")
+
+    @override_settings(OPENAI_API_KEY="test-api-key")
+    @patch("app.services.cover_letter.build_candidate_background", return_value="Background")
+    @patch("app.services.cover_letter.OpenAI")
+    def test_rejects_refused_or_empty_cover_letters(self, mock_openai, mock_background):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            )
+        )
+        mock_openai.return_value.responses.create.return_value = SimpleNamespace(
+            output_text="",
+            output=[SimpleNamespace(content=[SimpleNamespace(refusal="Cannot comply")])],
+            status="completed",
+        )
+
+        with self.assertRaisesMessage(CoverLetterRefusalError, "Cannot comply"):
+            generate_cover_letter(application)
+
+        mock_openai.return_value.responses.create.return_value = SimpleNamespace(
+            output_text="",
+            output=[],
+            status="completed",
+        )
+        with self.assertRaises(CoverLetterParseError):
+            generate_cover_letter(application)
+
+    @patch(
+        "app.services.cover_letter_pdf.timezone.localdate",
+        return_value=date(2026, 10, 7),
+    )
+    def test_builds_pdf_with_a_sanitized_filename(self, mock_localdate):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co.",
+            ),
+            cover_letter="Dear Hiring Manager,\n\nI build Python data systems.",
+        )
+
+        pdf_content = build_cover_letter_pdf(application)
+
+        self.assertTrue(pdf_content.startswith(b"%PDF"))
+        self.assertEqual(
+            cover_letter_filename(application),
+            "26.10.07 Data Engineer @ Example Co Cover Letter.pdf",
+        )
 
 
 class ApplicationReferencePageTests(TestCase):
@@ -2678,6 +2778,19 @@ class JobApplicationsPageTests(TestCase):
         self.assertContains(response, "Data Engineer @ Example Co")
         self.assertContains(response, "Review Posting Details")
         self.assertContains(response, "Portfolio Information")
+        self.assertContains(response, 'id="application-cover-letter-toggle"', html=False)
+        self.assertContains(
+            response,
+            'id="application-cover-letter-content" class="hidden"',
+            html=False,
+        )
+        self.assertContains(response, "AI Cover Letter")
+        self.assertContains(
+            response,
+            'id="application-download-cover-letter-button"',
+            html=False,
+        )
+        self.assertContains(response, "Save Cover Letter")
         self.assertContains(response, 'id="application-portfolio-toggle"', html=False)
         self.assertContains(
             response,
@@ -2709,6 +2822,116 @@ class JobApplicationsPageTests(TestCase):
         self.assertContains(response, "Build data systems.")
         self.assertContains(response, "Strong Python match.")
         self.assertContains(response, "const renderMarkdown = markdown", html=False)
+
+    @patch("app.views.generate_cover_letter", return_value="Generated cover letter.")
+    def test_application_details_generates_and_saves_cover_letter(self, mock_generate):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            ),
+            cover_letter="Existing draft.",
+        )
+
+        response = self.client.post(
+            reverse("generate_application_cover_letter", args=[application.pk]),
+            follow=True,
+        )
+
+        expected_url = f"{reverse('application_details')}?application_id={application.pk}"
+        self.assertRedirects(response, expected_url)
+        mock_generate.assert_called_once_with(application)
+        application.refresh_from_db()
+        self.assertEqual(application.cover_letter, "Generated cover letter.")
+        self.assertContains(response, "AI cover letter generated.")
+        self.assertContains(
+            response,
+            'form="application-cover-letter-form"',
+            html=False,
+        )
+
+    @patch("app.views.generate_cover_letter")
+    def test_cover_letter_generation_failure_preserves_existing_draft(self, mock_generate):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            ),
+            cover_letter="Existing draft.",
+        )
+        mock_generate.side_effect = CoverLetterParseError("No cover letter returned.")
+
+        response = self.client.post(
+            reverse("generate_application_cover_letter", args=[application.pk]),
+            follow=True,
+        )
+
+        application.refresh_from_db()
+        self.assertEqual(application.cover_letter, "Existing draft.")
+        self.assertContains(response, "AI cover letter generation failed")
+
+    def test_application_details_can_save_a_manual_cover_letter_edit(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            )
+        )
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        response = self.client.post(
+            details_url,
+            {
+                "save_cover_letter": "1",
+                "cover_letter": "Edited cover letter.",
+            },
+        )
+
+        self.assertRedirects(response, details_url)
+        application.refresh_from_db()
+        self.assertEqual(application.cover_letter, "Edited cover letter.")
+
+    @patch(
+        "app.services.cover_letter_pdf.timezone.localdate",
+        return_value=date(2026, 10, 7),
+    )
+    def test_cover_letter_download_returns_a_pdf(self, mock_localdate):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co.",
+            ),
+            cover_letter="Dear Hiring Manager,\n\nI build Python data systems.",
+        )
+
+        response = self.client.get(
+            reverse("download_application_cover_letter", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(
+            response["Content-Disposition"],
+            'attachment; filename="26.10.07 Data Engineer @ Example Co Cover Letter.pdf"',
+        )
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_cover_letter_download_requires_saved_body(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co.",
+            )
+        )
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        response = self.client.get(
+            reverse("download_application_cover_letter", args=[application.pk]),
+            follow=True,
+        )
+
+        self.assertRedirects(response, details_url)
+        self.assertContains(response, "Generate or save a cover letter before downloading it.")
 
     def test_portfolio_embed_pages_hide_the_navigation(self):
         response = self.client.get(f"{reverse('resume')}?embed=1")

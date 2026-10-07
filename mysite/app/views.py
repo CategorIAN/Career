@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
@@ -35,6 +35,7 @@ from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
 
 from .forms import (
+    ApplicationCoverLetterForm,
     ApplicationCompanyForm,
     ApplicationSubmittedForm,
     CompanyForm,
@@ -87,6 +88,12 @@ from .models import (
     Supervisor,
 )
 from .services.google_calendar import delete_meeting_event, sync_professional_connect
+from .services.cover_letter import CoverLetterError, generate_cover_letter
+from .services.cover_letter_pdf import (
+    CoverLetterPDFError,
+    build_cover_letter_pdf,
+    cover_letter_filename,
+)
 from .services.job_evaluation import JobEvaluationError, evaluate_job_posting
 from .services.search_paths import create_company_search_paths
 
@@ -1596,32 +1603,92 @@ def application_details_view(request):
     submitted_form = ApplicationSubmittedForm(
         initial={"submitted_date": initial_submitted_date}
     )
-    if request.method == "POST" and "save_submitted" in request.POST:
-        submitted_form = ApplicationSubmittedForm(request.POST)
-        if submitted_form.is_valid():
-            submitted_date = submitted_form.cleaned_data["submitted_date"]
-            application.submitted = (
-                timezone.make_aware(
-                    datetime.combine(submitted_date, datetime.min.time()),
-                    USER_TIMEZONE,
+    cover_letter_form = ApplicationCoverLetterForm(instance=application)
+    if request.method == "POST":
+        if "save_submitted" in request.POST:
+            submitted_form = ApplicationSubmittedForm(request.POST)
+            if submitted_form.is_valid():
+                submitted_date = submitted_form.cleaned_data["submitted_date"]
+                application.submitted = (
+                    timezone.make_aware(
+                        datetime.combine(submitted_date, datetime.min.time()),
+                        USER_TIMEZONE,
+                    )
+                    if submitted_date is not None
+                    else None
                 )
-                if submitted_date is not None
-                else None
+                application.save(update_fields=["submitted"])
+                return redirect(
+                    f"{reverse('application_details')}?application_id={application.pk}"
+                )
+            show_submit_modal = True
+        elif "save_cover_letter" in request.POST:
+            cover_letter_form = ApplicationCoverLetterForm(
+                request.POST,
+                instance=application,
             )
-            application.save(update_fields=["submitted"])
-            return redirect(
-                f"{reverse('application_details')}?application_id={application.pk}"
-            )
-        show_submit_modal = True
+            if cover_letter_form.is_valid():
+                cover_letter_form.save()
+                messages.success(request, "Cover letter saved.")
+                return redirect(
+                    f"{reverse('application_details')}?application_id={application.pk}"
+                )
     return render(
         request,
         "app/application_details.html",
         {
             "application": application,
             "submitted_form": submitted_form,
+            "cover_letter_form": cover_letter_form,
             "show_submit_modal": show_submit_modal,
         },
     )
+
+
+@require_POST
+def generate_application_cover_letter_view(request, application_id):
+    application = get_object_or_404(
+        Application.objects.select_related("job_posting"),
+        pk=application_id,
+    )
+    try:
+        cover_letter = generate_cover_letter(application)
+    except CoverLetterError as error:
+        messages.error(request, f"AI cover letter generation failed: {error}")
+    else:
+        application.cover_letter = cover_letter
+        application.save(update_fields=["cover_letter"])
+        messages.success(request, "AI cover letter generated.")
+    return redirect(
+        f"{reverse('application_details')}?application_id={application.pk}"
+    )
+
+
+@require_http_methods(["GET"])
+def download_application_cover_letter_view(request, application_id):
+    application = get_object_or_404(
+        Application.objects.select_related("company", "job_posting"),
+        pk=application_id,
+    )
+    if not application.cover_letter.strip():
+        messages.error(request, "Generate or save a cover letter before downloading it.")
+        return redirect(
+            f"{reverse('application_details')}?application_id={application.pk}"
+        )
+
+    try:
+        pdf_content = build_cover_letter_pdf(application)
+    except CoverLetterPDFError as error:
+        messages.error(request, f"Cover letter PDF download failed: {error}")
+        return redirect(
+            f"{reverse('application_details')}?application_id={application.pk}"
+        )
+
+    response = HttpResponse(pdf_content, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="{cover_letter_filename(application)}"'
+    )
+    return response
 
 
 @require_POST

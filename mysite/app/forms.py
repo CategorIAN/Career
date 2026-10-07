@@ -177,6 +177,21 @@ class ApplicationSubmittedForm(forms.Form):
     )
 
 
+class ApplicationCoverLetterForm(forms.ModelForm):
+    class Meta:
+        model = Application
+        fields = ["cover_letter"]
+        widgets = {
+            "cover_letter": forms.Textarea(
+                attrs={
+                    "id": "application-cover-letter",
+                    "rows": 18,
+                    "style": "width: min(100%, 52rem);",
+                }
+            ),
+        }
+
+
 class SkillForm(forms.ModelForm):
     class Meta:
         model = Skill

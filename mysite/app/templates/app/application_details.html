@@ -15,6 +15,16 @@
         margin-top: 0;
     }
 
+    .application-details-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .application-details-actions form {
+        margin: 0;
+    }
+
     .application-submit-button-pending {
         background: #f4cccc;
         border-color: #cc0000;
@@ -41,6 +51,36 @@
     }
 
     .application-submit-form {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .application-cover-letter-section {
+        margin-top: 2rem;
+    }
+
+    .application-cover-letter-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .application-cover-letter-heading h2 {
+        margin: 0;
+    }
+
+    .application-cover-letter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .application-cover-letter-actions form {
+        margin: 0;
+    }
+
+    .application-cover-letter-form {
         display: grid;
         gap: 0.75rem;
     }
@@ -166,6 +206,14 @@
         </button>
     </header>
 
+    {% if messages %}
+        <div aria-live="polite" style="margin-top: 1rem;">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <section class="application-review-section" aria-labelledby="review-posting-details-title">
         <div class="application-review-heading">
             <h2 id="review-posting-details-title">Review Posting Details</h2>
@@ -205,6 +253,40 @@
             <button type="button" data-portfolio-url="{% url 'residencies' %}?embed=1">Residencies</button>
             <button type="button" data-portfolio-url="{% url 'projects' %}?embed=1">Projects</button>
             <button type="button" data-portfolio-url="{% url 'courses' %}?embed=1">Education</button>
+        </div>
+    </section>
+
+    <section class="application-cover-letter-section" aria-labelledby="application-cover-letter-title">
+        <div class="application-cover-letter-heading">
+            <h2 id="application-cover-letter-title">Cover Letter</h2>
+            <button
+                id="application-cover-letter-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-cover-letter-content"
+            >Show</button>
+        </div>
+        <div id="application-cover-letter-content" class="hidden">
+            <div class="application-cover-letter-actions">
+                <form method="post" action="{% url 'generate_application_cover_letter' application.pk %}">
+                    {% csrf_token %}
+                    <button id="application-ai-cover-letter-button" type="submit">AI Cover Letter</button>
+                </form>
+                <form method="get" action="{% url 'download_application_cover_letter' application.pk %}">
+                    <button id="application-download-cover-letter-button" type="submit">Download Cover Letter</button>
+                </form>
+                <button
+                    type="submit"
+                    name="save_cover_letter"
+                    value="1"
+                    form="application-cover-letter-form"
+                >Save Cover Letter</button>
+            </div>
+            <form id="application-cover-letter-form" class="application-cover-letter-form" method="post">
+                {% csrf_token %}
+                {{ cover_letter_form.cover_letter.errors }}
+                {{ cover_letter_form.cover_letter }}
+            </form>
         </div>
     </section>
 </section>
@@ -261,6 +343,8 @@
         const reviewContent = document.getElementById("application-review-content");
         const portfolioToggle = document.getElementById("application-portfolio-toggle");
         const portfolioContent = document.getElementById("application-portfolio-content");
+        const coverLetterToggle = document.getElementById("application-cover-letter-toggle");
+        const coverLetterContent = document.getElementById("application-cover-letter-content");
         const submitModal = document.getElementById("application-submit-modal");
         const descriptionModal = document.getElementById("application-description-modal");
         const explanationModal = document.getElementById("application-ai-explanation-modal");
@@ -322,6 +406,11 @@
             const isHidden = portfolioContent.classList.toggle("hidden");
             portfolioToggle.textContent = isHidden ? "Show" : "Hide";
             portfolioToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
+        coverLetterToggle.addEventListener("click", () => {
+            const isHidden = coverLetterContent.classList.toggle("hidden");
+            coverLetterToggle.textContent = isHidden ? "Show" : "Hide";
+            coverLetterToggle.setAttribute("aria-expanded", String(!isHidden));
         });
         document.getElementById("application-submit-modal-close").addEventListener(
             "click",

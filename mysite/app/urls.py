@@ -18,6 +18,16 @@ urlpatterns = [
         name="application_details",
     ),
     path(
+        "applications/<int:application_id>/ai-cover-letter/",
+        views.generate_application_cover_letter_view,
+        name="generate_application_cover_letter",
+    ),
+    path(
+        "applications/<int:application_id>/cover-letter.pdf",
+        views.download_application_cover_letter_view,
+        name="download_application_cover_letter",
+    ),
+    path(
         "job-postings/<int:job_posting_id>/apply-to/",
         views.update_job_posting_apply_to_view,
         name="update_job_posting_apply_to",
