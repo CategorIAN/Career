@@ -9,6 +9,7 @@ from django.utils.dateparse import parse_duration
 
 from .models import (
     Application,
+    ApplicationEmail,
     Company,
     Feature,
     FeatureLink,
@@ -132,6 +133,61 @@ class JobPostingForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class JobPostingCreateForm(forms.ModelForm):
+    class Meta:
+        model = JobPosting
+        fields = ["title", "company_name", "url", "description"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                }
+            ),
+            "company_name": forms.TextInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                }
+            ),
+            "url": forms.URLInput(
+                attrs={
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 14,
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                }
+            ),
+        }
+
+
+class ApplicationEmailTypeForm(forms.ModelForm):
+    class Meta:
+        model = ApplicationEmail
+        fields = ["email_type"]
 
 
 class ApplicationCompanyForm(forms.ModelForm):

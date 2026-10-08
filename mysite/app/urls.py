@@ -11,6 +11,12 @@ urlpatterns = [
     path("search-terms/", views.search_terms_view, name="search_terms"),
     path("job-search/", views.job_search_view, name="job_search"),
     path("job-postings/", views.job_postings_view, name="job_postings"),
+    path("emails/", views.emails_view, name="emails"),
+    path(
+        "emails/<str:message_id>/applications/",
+        views.email_application_options_view,
+        name="email_application_options",
+    ),
     path("job-applications/", views.job_applications_view, name="job_applications"),
     path(
         "application-details/",

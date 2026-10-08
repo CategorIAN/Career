@@ -1,0 +1,404 @@
+{% extends "app/base.html" %}
+
+{% block title %}Emails{% endblock %}
+
+{% block content %}
+<style>
+    .emails-page {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .emails-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .emails-header h1 {
+        margin: 0;
+    }
+
+    .email-inbox-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .email-inbox-table th,
+    .email-inbox-table td {
+        padding: 0.7rem;
+        border: 1px solid #bbb;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .email-inbox-row {
+        cursor: pointer;
+    }
+
+    .email-inbox-row:hover {
+        background: #f0f0f0;
+    }
+
+    .email-preview {
+        max-width: 28rem;
+        color: #555;
+    }
+
+    .email-preview-button {
+        max-width: 18rem;
+        padding: 0;
+        overflow: hidden;
+        color: inherit;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+        border: 0;
+        background: none;
+    }
+
+    .email-preview-modal-body {
+        max-height: 50vh;
+        overflow-y: auto;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+    .email-assigned-status {
+        color: #35682d;
+        font-weight: 600;
+    }
+
+    .email-unassigned-status {
+        color: #555;
+    }
+
+    .emails-pagination {
+        margin-top: 1rem;
+    }
+
+    .email-assignment-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 1100;
+        display: flex;
+        flex-direction: column;
+        width: min(440px, 100vw);
+        height: 100vh;
+        box-sizing: border-box;
+        padding: 1.5rem;
+        overflow-y: auto;
+        background: #fff;
+        box-shadow: -12px 0 30px rgba(0, 0, 0, 0.24);
+        transform: translateX(100%);
+        transition: transform 0.2s ease;
+    }
+
+    .email-assignment-panel.open {
+        transform: translateX(0);
+    }
+
+    .email-assignment-panel-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .email-assignment-panel h2,
+    .email-assignment-panel p {
+        margin-top: 0;
+    }
+
+    .email-assignment-panel-close {
+        border: 0;
+        background: none;
+        font-size: 1.75rem;
+        cursor: pointer;
+    }
+
+    .email-application-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .email-application-choice {
+        padding: 0.85rem;
+        border: 1px solid #bbb;
+        background: #f8f8f8;
+    }
+
+    .email-application-choice.sender-match {
+        border-color: #5e8c4a;
+        background: #edf6e7;
+    }
+
+    .email-application-choice h3,
+    .email-application-choice p {
+        margin: 0 0 0.35rem;
+    }
+
+    .email-application-choice form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin-top: 0.75rem;
+    }
+
+    .email-sender-match {
+        color: #35682d;
+        font-weight: 700;
+    }
+
+    @media (max-width: 700px) {
+        .email-inbox-table th:nth-child(3),
+        .email-inbox-table td:nth-child(3) {
+            display: none;
+        }
+    }
+</style>
+
+<section class="emails-page">
+    <header class="emails-header">
+        <h1>Emails</h1>
+        <a class="copy-button" href="{% url 'emails' %}">Refresh Inbox</a>
+    </header>
+
+    {% if messages %}
+        <div aria-live="polite">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form id="emails-csrf-form" hidden>{% csrf_token %}</form>
+    <table class="email-inbox-table">
+        <thead>
+            <tr>
+                <th>Sender</th>
+                <th>Subject</th>
+                <th>Preview</th>
+                <th>Received</th>
+                <th>Assignment</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for email in inbox_emails %}
+                <tr
+                    class="email-inbox-row"
+                    tabindex="0"
+                    data-message-id="{{ email.message_id }}"
+                    data-subject="{{ email.subject|escape }}"
+                    data-sender="{{ email.sender|escape }}"
+                >
+                    <td>
+                        {% if email.sender_name %}<div>{{ email.sender_name }}</div>{% endif %}
+                        <div>&lt;{{ email.sender_email|default:email.sender }}&gt;</div>
+                    </td>
+                    <td>{{ email.subject }}</td>
+                    <td class="email-preview">
+                        <button
+                            type="button"
+                            class="email-preview-button"
+                            data-subject="{{ email.subject|escape }}"
+                            data-sender="{{ email.sender|escape }}"
+                            data-body="{{ email.body|escape }}"
+                        >{{ email.preview|default:"No preview available." }}</button>
+                    </td>
+                    <td>{{ email.received_at|date:"M j, Y, g:i A" }}</td>
+                    <td>
+                        {% if email.assigned_email %}
+                            <span class="email-assigned-status">Assigned: {{ email.assigned_email.application.job_posting.title }}</span>
+                        {% else %}
+                            <span class="email-unassigned-status">Not assigned</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">No Inbox messages are available.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if next_page_token %}
+        <p class="emails-pagination">
+            <a class="copy-button" href="{% url 'emails' %}?page_token={{ next_page_token|urlencode }}">Load More Messages</a>
+        </p>
+    {% endif %}
+</section>
+
+<aside id="email-assignment-panel" class="email-assignment-panel" aria-hidden="true" aria-labelledby="email-assignment-title">
+    <div class="email-assignment-panel-header">
+        <div>
+            <h2 id="email-assignment-title">Assign Email</h2>
+            <p id="email-assignment-subject"></p>
+            <p id="email-assignment-sender"></p>
+        </div>
+        <button id="email-assignment-panel-close" class="email-assignment-panel-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div id="email-assignment-content"></div>
+</aside>
+
+<div id="email-preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="email-preview-modal-title">
+    <div class="modal-content">
+        <button id="email-preview-modal-close" class="email-assignment-panel-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="email-preview-modal-title"></h2>
+        <p id="email-preview-modal-sender"></p>
+        <div id="email-preview-modal-body" class="email-preview-modal-body"></div>
+    </div>
+</div>
+
+{{ email_type_choices|json_script:"email-type-choices" }}
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const panel = document.getElementById("email-assignment-panel");
+        const panelSubject = document.getElementById("email-assignment-subject");
+        const panelSender = document.getElementById("email-assignment-sender");
+        const panelContent = document.getElementById("email-assignment-content");
+        const previewModal = document.getElementById("email-preview-modal");
+        const previewModalTitle = document.getElementById("email-preview-modal-title");
+        const previewModalSender = document.getElementById("email-preview-modal-sender");
+        const previewModalBody = document.getElementById("email-preview-modal-body");
+        const csrfToken = document.querySelector(
+            "#emails-csrf-form input[name=csrfmiddlewaretoken]"
+        ).value;
+        const emailTypeChoices = JSON.parse(document.getElementById("email-type-choices").textContent);
+        const pageToken = "{{ page_token|escapejs }}";
+        const optionsUrlTemplate = "{% url 'email_application_options' '__message_id__' %}";
+
+        const closePanel = () => {
+            panel.classList.remove("open");
+            panel.setAttribute("aria-hidden", "true");
+        };
+
+        const closePreviewModal = () => {
+            previewModal.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+
+        const addHiddenInput = (form, name, value) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = name;
+            input.value = value;
+            form.append(input);
+        };
+
+        const renderApplications = (messageId, data) => {
+            panelContent.replaceChildren();
+            if (data.error) {
+                panelContent.textContent = `Unable to load applications: ${data.error}`;
+                return;
+            }
+            if (data.assigned_application) {
+                const message = document.createElement("p");
+                message.textContent = `Already assigned to ${data.assigned_application.title} @ ${data.assigned_application.company}.`;
+                panelContent.append(message);
+                return;
+            }
+            const list = document.createElement("div");
+            list.className = "email-application-list";
+            data.applications.forEach(application => {
+                const choice = document.createElement("article");
+                choice.className = "email-application-choice";
+                if (application.sender_match) choice.classList.add("sender-match");
+
+                const title = document.createElement("h3");
+                title.textContent = application.title;
+                const company = document.createElement("p");
+                company.textContent = application.company;
+                const created = document.createElement("p");
+                created.textContent = `Created: ${application.created}`;
+                choice.append(title, company, created);
+                if (application.sender_match) {
+                    const match = document.createElement("p");
+                    match.className = "email-sender-match";
+                    match.textContent = "Matching sender";
+                    choice.append(match);
+                }
+
+                const form = document.createElement("form");
+                form.method = "post";
+                addHiddenInput(form, "csrfmiddlewaretoken", csrfToken);
+                addHiddenInput(form, "action", "assign_email");
+                addHiddenInput(form, "gmail_message_id", messageId);
+                addHiddenInput(form, "application_id", application.id);
+                if (pageToken) addHiddenInput(form, "page_token", pageToken);
+                const select = document.createElement("select");
+                select.name = "email_type";
+                emailTypeChoices.forEach(([value, label]) => {
+                    const option = document.createElement("option");
+                    option.value = value;
+                    option.textContent = label;
+                    option.selected = value === "other";
+                    select.append(option);
+                });
+                const submit = document.createElement("button");
+                submit.type = "submit";
+                submit.textContent = "Assign Email";
+                form.append(select, submit);
+                choice.append(form);
+                list.append(choice);
+            });
+            if (!data.applications.length) {
+                list.textContent = "No applications are available.";
+            }
+            panelContent.append(list);
+        };
+
+        const openPanel = async row => {
+            const messageId = row.dataset.messageId;
+            panelSubject.textContent = row.dataset.subject || "(No subject)";
+            panelSender.textContent = row.dataset.sender;
+            panelContent.textContent = "Loading applications…";
+            panel.classList.add("open");
+            panel.setAttribute("aria-hidden", "false");
+            try {
+                const response = await fetch(optionsUrlTemplate.replace("__message_id__", messageId));
+                const data = await response.json();
+                renderApplications(messageId, data);
+            } catch (error) {
+                panelContent.textContent = "Unable to load applications.";
+            }
+        };
+
+        document.querySelectorAll(".email-inbox-row").forEach(row => {
+            row.addEventListener("click", () => openPanel(row));
+            row.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openPanel(row);
+                }
+            });
+        });
+        document.querySelectorAll(".email-preview-button").forEach(button => {
+            button.addEventListener("click", event => {
+                event.stopPropagation();
+                previewModalTitle.textContent = button.dataset.subject || "(No subject)";
+                previewModalSender.textContent = button.dataset.sender;
+                previewModalBody.textContent = button.dataset.body || "No email body is available.";
+                previewModal.classList.remove("hidden");
+                document.body.classList.add("modal-open");
+            });
+        });
+        document.getElementById("email-assignment-panel-close").addEventListener("click", closePanel);
+        document.getElementById("email-preview-modal-close").addEventListener("click", closePreviewModal);
+        previewModal.addEventListener("click", event => {
+            if (event.target === previewModal) closePreviewModal();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closePanel();
+                closePreviewModal();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,48 +1,18 @@
-import datetime
-import os.path
-
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 from datetime import datetime, timedelta
+import os
 from zoneinfo import ZoneInfo
 
+import django
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
+django.setup()
+
+from app.services.google_calendar import get_calendar_service
 
 def main1():
-    creds = None
+    service = get_calendar_service()
 
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file(
-            "token.json",
-            SCOPES,
-        )
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
-                SCOPES,
-            )
-
-            creds = flow.run_local_server(port=0)
-
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    service = build(
-        "calendar",
-        "v3",
-        credentials=creds,
-    )
-
-    now = datetime.datetime.now(
-        tz=datetime.timezone.utc
-    ).isoformat()
+    now = datetime.now(tz=ZoneInfo("UTC")).isoformat()
 
     result = service.events().list(
         calendarId="primary",
@@ -64,33 +34,7 @@ def main1():
 
 
 def main2():
-    creds = None
-
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file(
-            "token.json",
-            SCOPES,
-        )
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
-                SCOPES,
-            )
-
-            creds = flow.run_local_server(port=0)
-
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    service = build(
-        "calendar",
-        "v3",
-        credentials=creds,
-    )
+    service = get_calendar_service()
 
     start = datetime.now(ZoneInfo("America/Denver")) + timedelta(hours=1)
     end = start + timedelta(hours=1)

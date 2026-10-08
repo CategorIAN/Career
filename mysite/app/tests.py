@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 import json
 from io import StringIO
 from types import SimpleNamespace
@@ -19,6 +19,7 @@ from freelancersdk.resources.projects.exceptions import ProjectsNotFoundExceptio
 
 from .models import (
     Application,
+    ApplicationEmail,
     Address,
     City,
     Company,
@@ -58,6 +59,17 @@ from .views import (
     _normalize_search_query,
 )
 from .services.google_calendar import sync_meeting_event, sync_professional_connect
+from .services.google_calendar import get_calendar_service
+from .services.gmail import (
+    GmailError,
+    apply_labels,
+    apply_labels_and_archive,
+    get_email,
+    get_or_create_label,
+    remove_labels,
+    search_emails,
+)
+from .services.google_auth import SCOPES, _missing_scopes, get_google_credentials
 from .services.candidate_background import build_candidate_background
 from .services.cover_letter import (
     CoverLetterParseError,
@@ -2446,6 +2458,74 @@ class CompanySearchPathServiceTests(TestCase):
 
 
 class JobPostingsPageTests(TestCase):
+    def test_job_postings_page_shows_add_posting_modal(self):
+        response = self.client.get(reverse("job_postings"))
+
+        self.assertContains(response, 'id="open-add-job-posting-modal"', html=False)
+        self.assertContains(response, 'id="add-job-posting-modal"', html=False)
+        self.assertContains(response, "Add Posting")
+        self.assertContains(response, "Create Posting")
+        self.assertContains(response, "Cancel")
+        self.assertContains(response, 'name="csrfmiddlewaretoken"', html=False)
+        self.assertContains(response, 'name="title"', html=False)
+        self.assertContains(response, 'name="company_name"', html=False)
+        self.assertContains(response, 'name="url"', html=False)
+        self.assertContains(response, 'name="description"', html=False)
+        for field_name in ("title", "company_name", "url", "description"):
+            attrs = response.context["new_job_posting_form"].fields[field_name].widget.attrs
+            self.assertEqual(attrs["autocomplete"], "new-password")
+            self.assertEqual(attrs["class"], "autofill-blocked")
+            self.assertEqual(attrs["data-lpignore"], "true")
+            self.assertEqual(attrs["data-1p-ignore"], "true")
+
+    def test_job_postings_can_create_a_posting_from_the_add_modal(self):
+        response = self.client.post(
+            reverse("job_postings"),
+            {
+                "action": "create_posting",
+                "title": "Data Engineer",
+                "company_name": "Example Co",
+                "url": "https://jobs.example.com/data-engineer",
+                "description": "Build reliable data systems.",
+            },
+            follow=True,
+        )
+
+        job_posting = JobPosting.objects.get(title="Data Engineer")
+        self.assertRedirects(response, reverse("job_postings"))
+        self.assertEqual(job_posting.company_name, "Example Co")
+        self.assertEqual(job_posting.url, "https://jobs.example.com/data-engineer")
+        self.assertEqual(job_posting.description, "Build reliable data systems.")
+        self.assertIsNone(job_posting.apply_to)
+        self.assertFalse(job_posting.expired)
+        self.assertFalse(Application.objects.filter(job_posting=job_posting).exists())
+        self.assertFalse(SearchObservation.objects.filter(job_posting=job_posting).exists())
+        self.assertContains(response, "Job posting created.")
+
+    def test_job_posting_modal_preserves_invalid_submission(self):
+        response = self.client.post(
+            reverse("job_postings"),
+            {
+                "action": "create_posting",
+                "title": "",
+                "company_name": "Example Co",
+                "url": "not-a-url",
+                "description": "Detailed job description.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["show_add_job_posting_modal"])
+        self.assertContains(
+            response,
+            'id="add-job-posting-modal" class="modal"',
+            html=False,
+        )
+        self.assertContains(response, 'value="Example Co"', html=False)
+        self.assertContains(response, "Detailed job description.")
+        self.assertContains(response, "Enter a valid URL.")
+        self.assertEqual(JobPosting.objects.count(), 0)
+
     def test_job_postings_are_grouped_and_sorted_by_apply_decision(self):
         apply_older = JobPosting.objects.create(
             title="Apply Older",
@@ -2495,6 +2575,12 @@ class JobPostingsPageTests(TestCase):
         self.assertContains(response, 'id="job-posting-ai-explanation-panel"', html=False)
         self.assertContains(response, "Mark Expired")
         self.assertContains(response, 'id="job-posting-apply-to"', html=False)
+        self.assertContains(
+            response,
+            'id="job-posting-ai-recommend-apply" disabled',
+            html=False,
+        )
+        self.assertContains(response, "AI Evaluate")
         self.assertContains(response, 'class="job-posting-apply-to-field"', html=False)
         self.assertContains(response, 'detailModal.classList.add("explanation-open")', html=False)
         self.assertEqual(
@@ -2543,6 +2629,42 @@ class JobPostingsPageTests(TestCase):
         self.assertRedirects(response, reverse("job_postings"))
         job_posting.refresh_from_db()
         self.assertTrue(job_posting.apply_to)
+
+    @patch("app.views.evaluate_job_posting")
+    def test_job_postings_ai_evaluation_updates_recommendation_and_decision(
+        self,
+        mock_evaluate,
+    ):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            ai_recommend_apply=None,
+            apply_to=None,
+        )
+        mock_evaluate.return_value = JobEvaluation(
+            apply=True,
+            explanation="The Python and SQL experience fits this role.",
+        )
+
+        response = self.client.post(
+            reverse("job_postings"),
+            {
+                "job_posting_id": job_posting.pk,
+                "action": "evaluate_job_posting",
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("job_postings"))
+        mock_evaluate.assert_called_once_with(job_posting)
+        job_posting.refresh_from_db()
+        self.assertTrue(job_posting.ai_recommend_apply)
+        self.assertTrue(job_posting.apply_to)
+        self.assertEqual(
+            job_posting.ai_explanation,
+            "The Python and SQL experience fits this role.",
+        )
+        self.assertContains(response, "AI evaluation completed.")
 
     def test_job_postings_can_create_an_application(self):
         job_posting = JobPosting.objects.create(
@@ -3044,6 +3166,358 @@ class JobApplicationsPageTests(TestCase):
         self.assertRedirects(response, reverse("job_applications"))
         application.refresh_from_db()
         self.assertEqual(application.company.name, "New Company")
+
+
+class ApplicationEmailModelTests(TestCase):
+    def setUp(self):
+        self.application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            )
+        )
+
+    def test_my_response_forces_outgoing_on_create_and_update_fields_save(self):
+        application_email = ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="message-1",
+            sender="ian@example.com",
+            received_at=datetime(2026, 10, 7, tzinfo=UTC),
+            email_type=ApplicationEmail.EmailType.MY_RESPONSE,
+            direction=ApplicationEmail.Direction.INCOMING,
+        )
+
+        self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
+
+        application_email.direction = ApplicationEmail.Direction.INCOMING
+        application_email.save(update_fields=["email_type"])
+        application_email.refresh_from_db()
+
+        self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
+
+    def test_reclassifying_from_my_response_preserves_existing_direction(self):
+        application_email = ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="message-1",
+            sender="ian@example.com",
+            received_at=datetime(2026, 10, 7, tzinfo=UTC),
+            email_type=ApplicationEmail.EmailType.MY_RESPONSE,
+        )
+
+        application_email.email_type = ApplicationEmail.EmailType.INTERVIEW
+        application_email.save(update_fields=["email_type"])
+        application_email.refresh_from_db()
+
+        self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
+
+
+class EmailsPageTests(TestCase):
+    @patch("app.views.get_email")
+    @patch("app.views.search_emails")
+    def test_emails_page_lists_inbox_messages_without_saving_them(
+        self,
+        mock_search_emails,
+        mock_get_email,
+    ):
+        mock_search_emails.return_value = {
+            "messages": [
+                {"message_id": "message-new", "thread_id": "thread-new"},
+                {"message_id": "message-old", "thread_id": "thread-old"},
+            ],
+            "next_page_token": "next-page",
+        }
+        mock_get_email.side_effect = [
+            {
+                "message_id": "message-new",
+                "sender": "Recruiter <jobs@example.com>",
+                "subject": "New role",
+                "plain_text_body": "This is a recent opportunity.",
+                "received_at": datetime(2026, 10, 2, 10, 0, tzinfo=UTC),
+            },
+            {
+                "message_id": "message-old",
+                "sender": "jobs@example.com",
+                "subject": "Older role",
+                "plain_text_body": "This is an older opportunity.",
+                "received_at": datetime(2026, 10, 1, 10, 0, tzinfo=UTC),
+            },
+        ]
+
+        response = self.client.get(reverse("emails"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Recruiter")
+        self.assertContains(response, "&lt;jobs@example.com&gt;", html=False)
+        self.assertContains(response, "New role")
+        self.assertContains(response, "Load More Messages")
+        self.assertContains(response, 'id="email-assignment-panel"', html=False)
+        self.assertContains(response, 'id="email-preview-modal"', html=False)
+        self.assertContains(response, 'class="email-preview-button"', html=False)
+        self.assertFalse(ApplicationEmail.objects.exists())
+        mock_search_emails.assert_called_once_with(
+            query="in:inbox",
+            max_results=20,
+            page_token=None,
+        )
+
+    @patch("app.views.get_email")
+    def test_email_options_prioritize_applications_with_matching_sender(self, mock_get_email):
+        older_match = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Older Match", company_name="A")
+        )
+        newer_match = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Newer Match", company_name="B")
+        )
+        newest_other = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Newest Other", company_name="C")
+        )
+        Application.objects.filter(pk=older_match.pk).update(
+            created=datetime(2026, 10, 1, tzinfo=UTC)
+        )
+        Application.objects.filter(pk=newer_match.pk).update(
+            created=datetime(2026, 10, 2, tzinfo=UTC)
+        )
+        Application.objects.filter(pk=newest_other.pk).update(
+            created=datetime(2026, 10, 3, tzinfo=UTC)
+        )
+        ApplicationEmail.objects.create(
+            application=older_match,
+            gmail_message_id="existing-older",
+            sender="recruiting@example.com",
+            received_at=datetime(2026, 9, 1, tzinfo=UTC),
+        )
+        ApplicationEmail.objects.create(
+            application=newer_match,
+            gmail_message_id="existing-newer",
+            sender="RECRUITING@example.com",
+            received_at=datetime(2026, 9, 2, tzinfo=UTC),
+        )
+        mock_get_email.return_value = {
+            "message_id": "message-1",
+            "sender": "Recruiting Team <recruiting@example.com>",
+        }
+
+        response = self.client.get(
+            reverse("email_application_options", args=["message-1"])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        applications = response.json()["applications"]
+        self.assertEqual(
+            [application["id"] for application in applications],
+            [newer_match.pk, older_match.pk, newest_other.pk],
+        )
+        self.assertTrue(applications[0]["sender_match"])
+        self.assertTrue(applications[1]["sender_match"])
+        self.assertFalse(applications[2]["sender_match"])
+
+    @patch("app.views.apply_labels_and_archive")
+    @patch("app.views.get_or_create_label", side_effect=["company-label", "type-label"])
+    @patch("app.views.get_email")
+    def test_assigning_email_saves_it_labels_it_and_archives_it(
+        self,
+        mock_get_email,
+        mock_get_or_create_label,
+        mock_apply_labels_and_archive,
+    ):
+        company = Company.objects.create(name="Example Co")
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co"),
+            company=company,
+        )
+        received_at = datetime(2026, 10, 2, 10, 0, tzinfo=UTC)
+        mock_get_email.return_value = {
+            "message_id": "message-1",
+            "thread_id": "thread-1",
+            "subject": "Application received",
+            "sender": "Recruiting Team <Recruiting@Example.com>",
+            "recipients": "ian@example.com",
+            "received_at": received_at,
+            "plain_text_body": "Thank you for applying.",
+            "html_body": "",
+        }
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "assign_email",
+                "gmail_message_id": "message-1",
+                "application_id": application.pk,
+                "email_type": ApplicationEmail.EmailType.CONFIRMATION,
+            },
+        )
+
+        self.assertRedirects(response, reverse("emails"))
+        assigned_email = ApplicationEmail.objects.get(gmail_message_id="message-1")
+        self.assertEqual(assigned_email.application, application)
+        self.assertEqual(assigned_email.gmail_thread_id, "thread-1")
+        self.assertEqual(assigned_email.sender, "recruiting@example.com")
+        self.assertEqual(assigned_email.recipients, "ian@example.com")
+        self.assertEqual(assigned_email.received_at, received_at)
+        self.assertEqual(assigned_email.body, "Thank you for applying.")
+        mock_get_or_create_label.assert_has_calls(
+            [
+                call("Career/Companies/Example Co"),
+                call("Career/Types/Application Confirmation"),
+            ]
+        )
+        mock_apply_labels_and_archive.assert_called_once_with(
+            "message-1",
+            ["company-label", "type-label"],
+        )
+
+    @patch("app.views.apply_labels_and_archive", side_effect=GmailError("Gmail unavailable"))
+    @patch("app.views.get_or_create_label", side_effect=["company-label", "type-label"])
+    @patch("app.views.get_email")
+    def test_assignment_is_preserved_when_gmail_labeling_and_archiving_fails(
+        self,
+        mock_get_email,
+        mock_get_or_create_label,
+        mock_apply_labels_and_archive,
+    ):
+        company = Company.objects.create(name="Example Co")
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co"),
+            company=company,
+        )
+        mock_get_email.return_value = {
+            "message_id": "message-1",
+            "sender": "recruiting@example.com",
+            "received_at": datetime(2026, 10, 2, 10, 0, tzinfo=UTC),
+        }
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "assign_email",
+                "gmail_message_id": "message-1",
+                "application_id": application.pk,
+                "email_type": ApplicationEmail.EmailType.OTHER,
+            },
+            follow=True,
+        )
+
+        self.assertTrue(ApplicationEmail.objects.filter(gmail_message_id="message-1").exists())
+        self.assertContains(response, "could not be archived")
+        mock_apply_labels_and_archive.assert_called_once_with(
+            "message-1",
+            ["company-label", "type-label"],
+        )
+
+    @patch("app.views.get_email")
+    def test_assigning_existing_gmail_message_does_not_create_a_duplicate(self, mock_get_email):
+        original_application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Original", company_name="A")
+        )
+        other_application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Other", company_name="B")
+        )
+        ApplicationEmail.objects.create(
+            application=original_application,
+            gmail_message_id="message-1",
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        mock_get_email.return_value = {
+            "message_id": "message-1",
+            "sender": "recruiter@example.com",
+            "received_at": datetime(2026, 10, 1, tzinfo=UTC),
+        }
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "assign_email",
+                "gmail_message_id": "message-1",
+                "application_id": other_application.pk,
+                "email_type": ApplicationEmail.EmailType.OTHER,
+            },
+        )
+
+        self.assertRedirects(response, reverse("emails"))
+        self.assertEqual(ApplicationEmail.objects.filter(gmail_message_id="message-1").count(), 1)
+        assigned_email = ApplicationEmail.objects.get(gmail_message_id="message-1")
+        self.assertEqual(assigned_email.application, original_application)
+
+    def test_application_details_groups_emails_by_thread_and_orders_them(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        older_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="older",
+            gmail_thread_id="thread-1",
+            sender="old@example.com",
+            subject="Older email",
+            body="Older saved body",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        newer_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="newer",
+            gmail_thread_id="thread-1",
+            sender="new@example.com",
+            subject="Newer email",
+            body="Newer saved body",
+            received_at=datetime(2026, 10, 2, tzinfo=UTC),
+        )
+        standalone_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="standalone",
+            sender="standalone@example.com",
+            subject="Standalone email",
+            received_at=datetime(2026, 10, 3, tzinfo=UTC),
+            direction=ApplicationEmail.Direction.OUTGOING,
+        )
+
+        response = self.client.get(
+            reverse("application_details"),
+            {"application_id": application.pk},
+        )
+
+        self.assertContains(response, "Emails")
+        self.assertContains(response, "Older email")
+        self.assertContains(response, "Newer email")
+        self.assertContains(response, "Standalone email")
+        self.assertContains(response, "2 messages")
+        self.assertContains(response, "Outgoing")
+        self.assertContains(response, "Older saved body")
+        content = response.content.decode()
+        self.assertLess(content.index("Older email"), content.index("Newer email"))
+        self.assertLess(content.index("Standalone email"), content.index("Older email"))
+        self.assertEqual(
+            response.context["application_email_threads"][0]["messages"],
+            [standalone_email],
+        )
+        self.assertEqual(
+            response.context["application_email_threads"][1]["messages"],
+            [older_email, newer_email],
+        )
+
+    def test_application_details_can_update_saved_email_classification(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        application_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-1",
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        response = self.client.post(
+            details_url,
+            {
+                "save_application_email_type": "1",
+                "application_email_id": application_email.pk,
+                "email_type": ApplicationEmail.EmailType.INTERVIEW,
+            },
+        )
+
+        self.assertRedirects(response, details_url)
+        application_email.refresh_from_db()
+        self.assertEqual(application_email.email_type, ApplicationEmail.EmailType.INTERVIEW)
 
 
 class JobSearchPageTests(TestCase):
@@ -4344,6 +4818,159 @@ class GoogleCalendarSyncTests(TestCase):
         connection.refresh_from_db()
         self.assertEqual(connection.google_invite_event_id, "")
         mock_service.assert_not_called()
+
+    @patch("app.services.google_calendar.build")
+    @patch("app.services.google_calendar.get_google_credentials")
+    def test_calendar_service_uses_shared_google_credentials(
+        self,
+        mock_credentials,
+        mock_build,
+    ):
+        credentials = MagicMock()
+        mock_credentials.return_value = credentials
+
+        service = get_calendar_service()
+
+        self.assertEqual(service, mock_build.return_value)
+        mock_build.assert_called_once_with("calendar", "v3", credentials=credentials)
+
+
+class GoogleAuthTests(TestCase):
+    def test_calendar_only_scope_is_detected_as_insufficient(self):
+        missing = _missing_scopes(["https://www.googleapis.com/auth/calendar"])
+
+        self.assertEqual(missing, {"https://www.googleapis.com/auth/gmail.modify"})
+
+    @patch("app.services.google_auth._authorize")
+    @patch("app.services.google_auth.credential_paths")
+    def test_calendar_only_token_reauthorizes_for_both_services(
+        self,
+        mock_paths,
+        mock_authorize,
+    ):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+
+        with TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            credentials_path = directory_path / "credentials.json"
+            token_path = directory_path / "token.json"
+            credentials_path.write_text("{}", encoding="utf-8")
+            token_path.write_text(
+                json.dumps({"scopes": ["https://www.googleapis.com/auth/calendar"]}),
+                encoding="utf-8",
+            )
+            credentials = MagicMock(valid=True)
+            credentials.to_json.return_value = json.dumps({"scopes": SCOPES})
+            mock_paths.return_value = credentials_path, token_path
+            mock_authorize.return_value = credentials
+
+            result = get_google_credentials()
+
+        self.assertEqual(result, credentials)
+        mock_authorize.assert_called_once_with(credentials_path)
+
+
+class GmailServiceTests(TestCase):
+    @patch("app.services.gmail.get_gmail_service")
+    def test_search_returns_identifiers_and_next_page_token(self, mock_service):
+        mock_service.return_value.users.return_value.messages.return_value.list.return_value.execute.return_value = {
+            "messages": [{"id": "message-1", "threadId": "thread-1"}],
+            "nextPageToken": "next-page",
+        }
+
+        result = search_emails("subject:application", max_results=10, page_token="page")
+
+        self.assertEqual(
+            result,
+            {
+                "messages": [{"message_id": "message-1", "thread_id": "thread-1"}],
+                "next_page_token": "next-page",
+            },
+        )
+        mock_service.return_value.users.return_value.messages.return_value.list.assert_called_once_with(
+            userId="me",
+            q="subject:application",
+            maxResults=10,
+            pageToken="page",
+        )
+
+    @patch("app.services.gmail.get_gmail_service")
+    def test_get_email_parses_multipart_bodies_and_headers(self, mock_service):
+        plain_text = "Hello from Gmail".encode()
+        html_text = "<p>Hello from Gmail</p>".encode()
+        mock_service.return_value.users.return_value.messages.return_value.get.return_value.execute.return_value = {
+            "id": "message-1",
+            "threadId": "thread-1",
+            "labelIds": ["INBOX", "Label_1"],
+            "payload": {
+                "mimeType": "multipart/alternative",
+                "headers": [
+                    {"name": "Subject", "value": "Application update"},
+                    {"name": "From", "value": "Recruiter <jobs@example.com>"},
+                    {"name": "To", "value": "ian@example.com"},
+                    {"name": "Cc", "value": "other@example.com"},
+                    {"name": "Date", "value": "Tue, 7 Oct 2026 10:00:00 -0600"},
+                ],
+                "parts": [
+                    {
+                        "mimeType": "text/plain",
+                        "body": {"data": "SGVsbG8gZnJvbSBHbWFpbA"},
+                    },
+                    {
+                        "mimeType": "text/html",
+                        "body": {"data": "PHA-SGVsbG8gZnJvbSBHbWFpbDwvcD4"},
+                    },
+                    {
+                        "mimeType": "text/plain",
+                        "filename": "attachment.txt",
+                        "body": {"data": "c2tpcCBtZQ"},
+                    },
+                ],
+            },
+        }
+
+        parsed = get_email("message-1")
+
+        self.assertEqual(parsed["message_id"], "message-1")
+        self.assertEqual(parsed["thread_id"], "thread-1")
+        self.assertEqual(parsed["subject"], "Application update")
+        self.assertEqual(parsed["recipients"], "ian@example.com, other@example.com")
+        self.assertEqual(parsed["date"], "Tue, 7 Oct 2026 10:00:00 -0600")
+        self.assertEqual(parsed["plain_text_body"], plain_text.decode())
+        self.assertEqual(parsed["html_body"], html_text.decode())
+        self.assertEqual(parsed["label_ids"], ["INBOX", "Label_1"])
+
+    @patch("app.services.gmail.get_gmail_service")
+    def test_label_helpers_preserve_unrelated_labels(self, mock_service):
+        service = mock_service.return_value
+        service.users.return_value.labels.return_value.list.return_value.execute.return_value = {
+            "labels": [{"id": "Label_Company", "name": "Career/Companies/Example"}]
+        }
+
+        label_id = get_or_create_label("Career/Companies/Example")
+        apply_labels("message-1", [label_id, "Label_Type"])
+        remove_labels("message-1", ["Label_Type"])
+
+        self.assertEqual(label_id, "Label_Company")
+        service.users.return_value.labels.return_value.create.assert_not_called()
+        modify = service.users.return_value.messages.return_value.modify
+        self.assertEqual(modify.call_count, 2)
+        self.assertEqual(modify.call_args_list[0].kwargs["body"], {"addLabelIds": [label_id, "Label_Type"]})
+        self.assertEqual(modify.call_args_list[1].kwargs["body"], {"removeLabelIds": ["Label_Type"]})
+
+    @patch("app.services.gmail.get_gmail_service")
+    def test_apply_labels_and_archive_removes_only_inbox(self, mock_service):
+        apply_labels_and_archive("message-1", ["Label_Company", "Label_Type"])
+
+        mock_service.return_value.users.return_value.messages.return_value.modify.assert_called_once_with(
+            userId="me",
+            id="message-1",
+            body={
+                "addLabelIds": ["Label_Company", "Label_Type"],
+                "removeLabelIds": ["INBOX"],
+            },
+        )
 
 
 class SkillPageTests(TestCase):

@@ -1417,3 +1417,68 @@ class Application(models.Model):
 
     def __str__(self):
         return f"Application — {self.job_posting}"
+
+
+class ApplicationEmail(models.Model):
+    class EmailType(models.TextChoices):
+        CONFIRMATION = "confirmation", "Application Confirmation"
+        ASSESSMENT = "assessment", "Online Assessment Request"
+        INTERVIEW = "interview", "Interview Request"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+        MY_RESPONSE = "my_response", "My Response"
+        OTHER = "other", "Other"
+
+    class Direction(models.TextChoices):
+        INCOMING = "incoming", "Incoming"
+        OUTGOING = "outgoing", "Outgoing"
+
+    application = models.ForeignKey(
+        "Application",
+        on_delete=models.CASCADE,
+        related_name="emails",
+    )
+
+    gmail_message_id = models.CharField(
+        max_length=255,
+        unique=True,
+    )
+
+    gmail_thread_id = models.CharField(
+        max_length=255,
+        blank=True,
+    )
+
+    email_type = models.CharField(
+        max_length=30,
+        choices=EmailType.choices,
+        default=EmailType.OTHER,
+    )
+
+    direction = models.CharField(
+        max_length=10,
+        choices=Direction.choices,
+        default=Direction.INCOMING,
+    )
+
+    subject = models.CharField(
+        max_length=500,
+        blank=True,
+    )
+
+    sender = models.EmailField()
+
+    recipients = models.TextField(blank=True)
+
+    received_at = models.DateTimeField()
+
+    body = models.TextField(blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.email_type == self.EmailType.MY_RESPONSE:
+            self.direction = self.Direction.OUTGOING
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {"direction"}
+
+        super().save(*args, **kwargs)

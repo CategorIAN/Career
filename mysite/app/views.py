@@ -24,6 +24,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from datetime import date, datetime, timedelta, UTC
 from calendar import monthrange
+from email.utils import parseaddr, parsedate_to_datetime
 import hashlib
 import json
 import logging
@@ -37,12 +38,14 @@ from zoneinfo import ZoneInfo
 from .forms import (
     ApplicationCoverLetterForm,
     ApplicationCompanyForm,
+    ApplicationEmailTypeForm,
     ApplicationSubmittedForm,
     CompanyForm,
     FeatureForm,
     FeatureFormSet,
     FeatureLinkForm,
     FeatureLinkFormSet,
+    JobPostingCreateForm,
     JobPostingForm,
     PlatformForm,
     PlatformFeatureFormSet,
@@ -59,6 +62,7 @@ from .forms import (
 )
 from .models import (
     Application,
+    ApplicationEmail,
     Company,
     Course,
     Direction,
@@ -88,6 +92,7 @@ from .models import (
     Supervisor,
 )
 from .services.google_calendar import delete_meeting_event, sync_professional_connect
+from .services.google_auth import GoogleAuthError
 from .services.cover_letter import CoverLetterError, generate_cover_letter
 from .services.cover_letter_pdf import (
     CoverLetterPDFError,
@@ -95,6 +100,13 @@ from .services.cover_letter_pdf import (
     cover_letter_filename,
 )
 from .services.job_evaluation import JobEvaluationError, evaluate_job_posting
+from .services.gmail import (
+    GmailError,
+    apply_labels_and_archive,
+    get_email,
+    get_or_create_label,
+    search_emails,
+)
 from .services.search_paths import create_company_search_paths
 
 from freelancersdk.session import Session
@@ -105,6 +117,7 @@ from freelancersdk.resources.projects.helpers import create_get_projects_project
 
 SEARCH_PAGE_SIZE = 10
 SEARCH_API_RESULT_LIMIT = 50
+GMAIL_INBOX_PAGE_SIZE = 20
 SEARCH_CACHE_TIMEOUT = 60 * 60
 FREELANCER_RATE_LIMIT_MESSAGE = (
     "Freelancer has temporarily rate-limited project searches. Please try again later."
@@ -112,6 +125,36 @@ FREELANCER_RATE_LIMIT_MESSAGE = (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _normalized_email_address(value):
+    return parseaddr(value or "")[1].strip().lower()
+
+
+def _email_received_at(email):
+    if email.get("received_at") is not None:
+        return email["received_at"]
+    try:
+        received_at = parsedate_to_datetime(email.get("sent_received_date", ""))
+    except (TypeError, ValueError, IndexError):
+        received_at = None
+    if received_at is None:
+        return timezone.now()
+    if timezone.is_naive(received_at):
+        return timezone.make_aware(received_at, UTC)
+    return received_at
+
+
+def _applications_for_sender(sender_email):
+    sender_matches = ApplicationEmail.objects.filter(
+        application_id=OuterRef("pk"),
+        sender__iexact=sender_email,
+    )
+    return (
+        Application.objects.select_related("company", "job_posting")
+        .annotate(sender_matches=Exists(sender_matches))
+        .order_by("-sender_matches", "-created", "-pk")
+    )
 USER_TIMEZONE = ZoneInfo("America/Denver")
 
 
@@ -1492,31 +1535,58 @@ def search_terms_view(request):
 
 
 def job_postings_view(request):
+    new_job_posting_form = JobPostingCreateForm()
+    show_add_job_posting_modal = False
     if request.method == "POST":
         job_posting_id = request.POST.get("job_posting_id", "").strip()
         action = request.POST.get("action", "").strip()
-        job_posting = JobPosting.objects.filter(pk=job_posting_id).first()
+        if action == "create_posting":
+            new_job_posting_form = JobPostingCreateForm(request.POST)
+            if new_job_posting_form.is_valid():
+                new_job_posting_form.save()
+                messages.success(request, "Job posting created.")
+                return redirect("job_postings")
+            show_add_job_posting_modal = True
+        else:
+            job_posting = JobPosting.objects.filter(pk=job_posting_id).first()
 
-        if job_posting is not None and action == "mark_expired":
-            job_posting.apply_to = False
-            job_posting.expired = True
-            job_posting.save(update_fields=["apply_to", "expired"])
-        elif job_posting is not None and action == "unmark_expired":
-            job_posting.expired = False
-            job_posting.save(update_fields=["expired"])
-        elif job_posting is not None and action == "create_application":
-            Application.objects.get_or_create(job_posting=job_posting)
-        elif job_posting is not None and action == "update_apply_to":
-            apply_to_value = request.POST.get("apply_to")
-            if apply_to_value in {"true", "false", "unknown"}:
-                job_posting.apply_to = {
-                    "true": True,
-                    "false": False,
-                    "unknown": None,
-                }[apply_to_value]
-                job_posting.save(update_fields=["apply_to"])
+            if job_posting is not None and action == "mark_expired":
+                job_posting.apply_to = False
+                job_posting.expired = True
+                job_posting.save(update_fields=["apply_to", "expired"])
+            elif job_posting is not None and action == "unmark_expired":
+                job_posting.expired = False
+                job_posting.save(update_fields=["expired"])
+            elif job_posting is not None and action == "create_application":
+                Application.objects.get_or_create(job_posting=job_posting)
+            elif job_posting is not None and action == "evaluate_job_posting":
+                try:
+                    evaluation = evaluate_job_posting(job_posting)
+                except JobEvaluationError as error:
+                    messages.error(request, f"AI evaluation failed: {error}")
+                else:
+                    job_posting.ai_recommend_apply = evaluation.apply
+                    job_posting.apply_to = evaluation.apply
+                    job_posting.ai_explanation = evaluation.explanation
+                    job_posting.save(
+                        update_fields=[
+                            "ai_recommend_apply",
+                            "apply_to",
+                            "ai_explanation",
+                        ]
+                    )
+                    messages.success(request, "AI evaluation completed.")
+            elif job_posting is not None and action == "update_apply_to":
+                apply_to_value = request.POST.get("apply_to")
+                if apply_to_value in {"true", "false", "unknown"}:
+                    job_posting.apply_to = {
+                        "true": True,
+                        "false": False,
+                        "unknown": None,
+                    }[apply_to_value]
+                    job_posting.save(update_fields=["apply_to"])
 
-        return redirect("job_postings")
+            return redirect("job_postings")
 
     job_postings = JobPosting.objects.order_by("-created", "-pk")
     return render(
@@ -1527,7 +1597,182 @@ def job_postings_view(request):
             "other_job_postings": job_postings.filter(
                 Q(apply_to=False) | Q(apply_to__isnull=True)
             ),
+            "new_job_posting_form": new_job_posting_form,
+            "show_add_job_posting_modal": show_add_job_posting_modal,
         },
+    )
+
+
+def emails_view(request):
+    page_token = request.GET.get("page_token", "").strip() or None
+    if request.method == "POST" and request.POST.get("action") == "assign_email":
+        page_token = request.POST.get("page_token", "").strip() or page_token
+        message_id = request.POST.get("gmail_message_id", "").strip()
+        application = get_object_or_404(
+            Application.objects.select_related("company", "job_posting"),
+            pk=request.POST.get("application_id"),
+        )
+        email_type_form = ApplicationEmailTypeForm(request.POST)
+        redirect_url = reverse("emails")
+        if page_token:
+            redirect_url = f"{redirect_url}?{urlencode({'page_token': page_token})}"
+
+        if not message_id or not email_type_form.is_valid():
+            messages.error(request, "Choose a valid email classification before assigning.")
+            return redirect(redirect_url)
+
+        try:
+            gmail_email = get_email(message_id)
+        except (GmailError, GoogleAuthError) as error:
+            messages.error(request, f"Unable to retrieve the Gmail message: {error}")
+            return redirect(redirect_url)
+
+        sender = _normalized_email_address(gmail_email.get("sender"))
+        if not sender:
+            messages.error(request, "The Gmail message does not include a sender address.")
+            return redirect(redirect_url)
+
+        application_email, created = ApplicationEmail.objects.get_or_create(
+            gmail_message_id=gmail_email["message_id"],
+            defaults={
+                "application": application,
+                "gmail_thread_id": gmail_email.get("thread_id", ""),
+                "email_type": email_type_form.cleaned_data["email_type"],
+                "subject": gmail_email.get("subject", "")[:500],
+                "sender": sender,
+                "recipients": gmail_email.get("recipients", ""),
+                "received_at": _email_received_at(gmail_email),
+                "body": gmail_email.get("plain_text_body")
+                or gmail_email.get("html_body", ""),
+            },
+        )
+        if not created:
+            messages.warning(
+                request,
+                "This Gmail message is already assigned to "
+                f"{application_email.application.job_posting.title}.",
+            )
+            return redirect(redirect_url)
+
+        label_names = [f"Career/Types/{application_email.get_email_type_display()}"]
+        if application.company_id:
+            label_names.insert(0, f"Career/Companies/{application.company.name}")
+        try:
+            apply_labels_and_archive(
+                application_email.gmail_message_id,
+                [get_or_create_label(label_name) for label_name in label_names],
+            )
+        except (GmailError, GoogleAuthError) as error:
+            messages.warning(
+                request,
+                "Email was assigned, but Gmail labels could not be applied and the message "
+                "could not be archived: "
+                f"{error}",
+            )
+        else:
+            messages.success(request, "Email assigned to the application and archived in Gmail.")
+        return redirect(redirect_url)
+
+    inbox_emails = []
+    next_page_token = None
+    try:
+        gmail_result = search_emails(
+            query="in:inbox",
+            max_results=GMAIL_INBOX_PAGE_SIZE,
+            page_token=page_token,
+        )
+        message_ids = [message["message_id"] for message in gmail_result["messages"]]
+        assigned_emails = {
+            email.gmail_message_id: email
+            for email in ApplicationEmail.objects.select_related("application__job_posting").filter(
+                gmail_message_id__in=message_ids
+            )
+        }
+        for message_id in message_ids:
+            try:
+                gmail_email = get_email(message_id)
+            except GmailError:
+                continue
+            body = gmail_email.get("plain_text_body") or gmail_email.get("html_body", "")
+            sender_name, sender_email = parseaddr(gmail_email.get("sender", ""))
+            inbox_emails.append(
+                {
+                    "message_id": gmail_email["message_id"],
+                    "sender": gmail_email.get("sender", ""),
+                    "sender_name": sender_name,
+                    "sender_email": sender_email,
+                    "subject": gmail_email.get("subject", "") or "(No subject)",
+                    "received_at": _email_received_at(gmail_email),
+                    "preview": re.sub(r"\s+", " ", body).strip()[:100],
+                    "body": body,
+                    "assigned_email": assigned_emails.get(gmail_email["message_id"]),
+                }
+            )
+        inbox_emails.sort(key=lambda email: email["received_at"], reverse=True)
+        next_page_token = gmail_result.get("next_page_token")
+    except (GmailError, GoogleAuthError) as error:
+        messages.error(request, f"Unable to retrieve the Gmail inbox: {error}")
+
+    return render(
+        request,
+        "app/emails.html",
+        {
+            "inbox_emails": inbox_emails,
+            "next_page_token": next_page_token,
+            "page_token": page_token,
+            "email_type_choices": ApplicationEmail.EmailType.choices,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def email_application_options_view(request, message_id):
+    assigned_email = (
+        ApplicationEmail.objects.select_related("application__company", "application__job_posting")
+        .filter(gmail_message_id=message_id)
+        .first()
+    )
+    if assigned_email is not None:
+        return JsonResponse(
+            {
+                "assigned_application": {
+                    "id": assigned_email.application_id,
+                    "title": assigned_email.application.job_posting.title,
+                    "company": (
+                        assigned_email.application.company.name
+                        if assigned_email.application.company_id
+                        else assigned_email.application.job_posting.company_name
+                    ),
+                }
+            }
+        )
+
+    try:
+        gmail_email = get_email(message_id)
+    except (GmailError, GoogleAuthError) as error:
+        return JsonResponse({"error": str(error)}, status=502)
+    sender = _normalized_email_address(gmail_email.get("sender"))
+    applications = _applications_for_sender(sender)
+    return JsonResponse(
+        {
+            "assigned_application": None,
+            "applications": [
+                {
+                    "id": application.pk,
+                    "title": application.job_posting.title,
+                    "company": (
+                        application.company.name
+                        if application.company_id
+                        else application.job_posting.company_name
+                    ),
+                    "created": str(
+                        timezone.localtime(application.created, USER_TIMEZONE).date()
+                    ),
+                    "sender_match": application.sender_matches,
+                }
+                for application in applications
+            ],
+        }
     )
 
 
@@ -1633,6 +1878,46 @@ def application_details_view(request):
                 return redirect(
                     f"{reverse('application_details')}?application_id={application.pk}"
                 )
+        elif "save_application_email_type" in request.POST:
+            application_email = application.emails.filter(
+                pk=request.POST.get("application_email_id")
+            ).first()
+            if application_email is None:
+                messages.error(request, "The selected application email was not found.")
+            else:
+                email_type_form = ApplicationEmailTypeForm(
+                    request.POST,
+                    instance=application_email,
+                )
+                if email_type_form.is_valid():
+                    email_type_form.save()
+                    messages.success(request, "Email classification saved.")
+                    return redirect(
+                        f"{reverse('application_details')}?application_id={application.pk}"
+                    )
+                messages.error(request, "Choose a valid email classification.")
+
+    email_threads_by_id = {}
+    for application_email in application.emails.order_by("received_at", "pk"):
+        thread_id = application_email.gmail_thread_id or f"standalone-{application_email.pk}"
+        thread = email_threads_by_id.setdefault(
+            thread_id,
+            {
+                "subject": application_email.subject or "(No subject)",
+                "messages": [],
+                "latest_message_date": application_email.received_at,
+            },
+        )
+        if thread["subject"] == "(No subject)" and application_email.subject:
+            thread["subject"] = application_email.subject
+        thread["messages"].append(application_email)
+        thread["latest_message_date"] = application_email.received_at
+    application_email_threads = sorted(
+        email_threads_by_id.values(),
+        key=lambda thread: thread["latest_message_date"],
+        reverse=True,
+    )
+
     return render(
         request,
         "app/application_details.html",
@@ -1641,6 +1926,8 @@ def application_details_view(request):
             "submitted_form": submitted_form,
             "cover_letter_form": cover_letter_form,
             "show_submit_modal": show_submit_modal,
+            "application_email_threads": application_email_threads,
+            "email_type_choices": ApplicationEmail.EmailType.choices,
         },
     )
 

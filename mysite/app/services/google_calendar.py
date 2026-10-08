@@ -1,51 +1,19 @@
 from datetime import timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.utils import timezone
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from app.services.google_auth import get_google_credentials
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
 CALENDAR_ID = "primary"
 CALENDAR_TIME_ZONE = "America/Denver"
 CALENDAR_TIMEZONE = ZoneInfo(CALENDAR_TIME_ZONE)
 
 
-def _credential_paths():
-    base_dir = Path(settings.BASE_DIR)
-    return base_dir / "credentials.json", base_dir / "token.json"
-
-
 def get_calendar_service():
-    credentials_path, token_path = _credential_paths()
-    credentials = None
-
-    if token_path.exists():
-        credentials = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if not credentials or not credentials.valid:
-        if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-        else:
-            if not credentials_path.exists():
-                raise FileNotFoundError(
-                    f"Google Calendar credentials were not found at {credentials_path}."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(
-                str(credentials_path),
-                SCOPES,
-            )
-            credentials = flow.run_local_server(port=0)
-
-        token_path.write_text(credentials.to_json(), encoding="utf-8")
-
-    return build("calendar", "v3", credentials=credentials)
+    return build("calendar", "v3", credentials=get_google_credentials())
 
 
 def _event_result(status, message):

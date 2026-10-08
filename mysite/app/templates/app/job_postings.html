@@ -8,6 +8,47 @@
         margin-bottom: 2rem;
     }
 
+    .job-postings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .job-postings-header h1 {
+        margin: 0;
+    }
+
+    .job-posting-create-form {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .job-posting-create-form textarea {
+        min-height: 16rem;
+        resize: vertical;
+    }
+
+    .job-posting-create-form label,
+    .job-posting-create-form .errorlist {
+        display: block;
+        margin-bottom: 0.35rem;
+    }
+
+    .job-posting-create-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .job-posting-message {
+        margin: 0 0 1rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid #8aa77a;
+        background: #e6f2df;
+    }
+
     .job-posting-card-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -183,7 +224,15 @@
 </style>
 
 <section class="utility-page">
-    <h1>Job Postings</h1>
+    <div class="job-postings-header">
+        <h1>Job Postings</h1>
+        <button id="open-add-job-posting-modal" class="copy-button" type="button">Add Posting</button>
+    </div>
+    {% if messages %}
+        {% for message in messages %}
+            <p class="job-posting-message">{{ message }}</p>
+        {% endfor %}
+    {% endif %}
 
     <section class="job-posting-group" aria-labelledby="apply-to-heading">
         <h2 id="apply-to-heading">Apply To: Yes</h2>
@@ -200,6 +249,7 @@
                     data-description="{{ job_posting.description|escape }}"
                     data-url="{{ job_posting.url|escape }}"
                     data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
+                    data-ai-recommend-apply="{{ job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
                     data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
                     data-expired="{{ job_posting.expired|yesno:'true,false' }}"
                     data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
@@ -231,6 +281,7 @@
                     data-description="{{ job_posting.description|escape }}"
                     data-url="{{ job_posting.url|escape }}"
                     data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
+                    data-ai-recommend-apply="{{ job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
                     data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
                     data-expired="{{ job_posting.expired|yesno:'true,false' }}"
                     data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
@@ -248,6 +299,29 @@
     </section>
 </section>
 
+<div id="add-job-posting-modal" class="modal{% if not show_add_job_posting_modal %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="add-job-posting-title">
+    <div class="modal-content">
+        <button id="add-job-posting-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="add-job-posting-title">Add Posting</h2>
+        <form class="job-posting-create-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_posting">
+            {{ new_job_posting_form.non_field_errors }}
+            {% for field in new_job_posting_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field.errors }}
+                    {{ field }}
+                </div>
+            {% endfor %}
+            <div class="job-posting-create-actions">
+                <button id="cancel-add-job-posting" type="button">Cancel</button>
+                <button type="submit">Create Posting</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="job-posting-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="job-posting-detail-title">
     <div class="modal-content">
         <button id="job-posting-detail-close" type="button" aria-label="Close">&times;</button>
@@ -258,6 +332,14 @@
                 <div class="job-posting-apply-to-field">
                     <label for="job-posting-apply-to">Apply To</label>
                     <select id="job-posting-apply-to" name="apply_to" form="job-posting-decision-form">
+                        <option value="unknown">Unknown</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+                <div class="job-posting-apply-to-field">
+                    <label for="job-posting-ai-recommend-apply">AI Recommend Apply</label>
+                    <select id="job-posting-ai-recommend-apply" disabled>
                         <option value="unknown">Unknown</option>
                         <option value="true">Yes</option>
                         <option value="false">No</option>
@@ -274,6 +356,7 @@
                     <input id="job-posting-decision-id" type="hidden" name="job_posting_id">
                     <input id="job-posting-decision-action" type="hidden" name="action">
                     <button id="job-posting-create-application" type="submit" class="copy-button">Create Application</button>
+                    <button id="job-posting-ai-evaluate-button" type="submit" class="copy-button">AI Evaluate</button>
                     <button id="job-posting-mark-expired" type="submit" class="copy-button">Mark Expired</button>
                 </form>
             </div>
@@ -289,6 +372,7 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", () => {
+        const addPostingModal = document.getElementById("add-job-posting-modal");
         const detailModal = document.getElementById("job-posting-detail-modal");
         const explanationPanel = document.getElementById("job-posting-ai-explanation-panel");
         const detailTitle = document.getElementById("job-posting-detail-title");
@@ -300,8 +384,18 @@
         const decisionId = document.getElementById("job-posting-decision-id");
         const decisionAction = document.getElementById("job-posting-decision-action");
         const applyToSelect = document.getElementById("job-posting-apply-to");
+        const aiRecommendApplySelect = document.getElementById("job-posting-ai-recommend-apply");
         const createApplicationButton = document.getElementById("job-posting-create-application");
+        const aiEvaluateButton = document.getElementById("job-posting-ai-evaluate-button");
         const markExpiredButton = document.getElementById("job-posting-mark-expired");
+        const closeAddPostingModal = () => {
+            addPostingModal.classList.add("hidden");
+            document.body.classList.remove("modal-open");
+        };
+        const openAddPostingModal = () => {
+            addPostingModal.classList.remove("hidden");
+            document.body.classList.add("modal-open");
+        };
         const escapeHtml = value => value
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
@@ -348,6 +442,7 @@
             decisionId.value = card.dataset.jobPostingId;
             decisionAction.value = "";
             applyToSelect.value = card.dataset.applyTo;
+            aiRecommendApplySelect.value = card.dataset.aiRecommendApply;
             markExpiredButton.textContent = card.dataset.expired === "true"
                 ? "Unmark Expired"
                 : "Mark Expired";
@@ -370,6 +465,9 @@
             });
         });
 
+        document.getElementById("open-add-job-posting-modal").addEventListener("click", openAddPostingModal);
+        document.getElementById("add-job-posting-close").addEventListener("click", closeAddPostingModal);
+        document.getElementById("cancel-add-job-posting").addEventListener("click", closeAddPostingModal);
         document.getElementById("job-posting-detail-close").addEventListener("click", closeDetailModal);
         document.getElementById("job-posting-ai-explanation-button").addEventListener("click", () => {
             detailModal.classList.add("explanation-open");
@@ -384,6 +482,9 @@
         });
         createApplicationButton.addEventListener("click", () => {
             decisionAction.value = "create_application";
+        });
+        aiEvaluateButton.addEventListener("click", () => {
+            decisionAction.value = "evaluate_job_posting";
         });
         applyToSelect.addEventListener("change", () => {
             decisionAction.value = "update_apply_to";
@@ -443,9 +544,16 @@
         detailModal.addEventListener("click", event => {
             if (event.target === detailModal) closeDetailModal();
         });
+        addPostingModal.addEventListener("click", event => {
+            if (event.target === addPostingModal) closeAddPostingModal();
+        });
+        if (!addPostingModal.classList.contains("hidden")) {
+            document.body.classList.add("modal-open");
+        }
         document.addEventListener("keydown", event => {
-            if (event.key === "Escape" && !detailModal.classList.contains("hidden")) {
-                closeDetailModal();
+            if (event.key === "Escape") {
+                if (!addPostingModal.classList.contains("hidden")) closeAddPostingModal();
+                if (!detailModal.classList.contains("hidden")) closeDetailModal();
             }
         });
     });

@@ -59,6 +59,57 @@
         margin-top: 2rem;
     }
 
+    .application-emails-section {
+        margin-top: 2rem;
+    }
+
+    .application-email-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .application-email-table th,
+    .application-email-table td {
+        padding: 0.6rem;
+        border: 1px solid #bbb;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .application-email-table form {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0;
+    }
+
+    .application-email-thread {
+        border: 1px solid #bbb;
+        border-radius: 4px;
+        margin-bottom: 0.75rem;
+    }
+
+    .application-email-thread summary {
+        cursor: pointer;
+        padding: 0.75rem;
+    }
+
+    .application-email-thread-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: baseline;
+    }
+
+    .application-email-thread-subject {
+        font-weight: 700;
+    }
+
+    .application-email-thread-meta {
+        color: #555;
+        font-size: 0.9rem;
+    }
+
     .application-cover-letter-heading {
         display: flex;
         align-items: center;
@@ -195,7 +246,7 @@
     <header class="application-details-header">
         <h1>
             {{ application.job_posting.title }} @ {{ application.company|default:"Unknown" }}
-            <small style="font-size: 0.45em; font-weight: normal;">({{ application.created|date:"M j, Y, g:i A" }})</small>
+            <small style="font-size: 0.45em; font-weight: normal;">({{ application.created|date:"M j, Y" }})</small>
         </h1>
         <button
             id="application-submit-button"
@@ -289,6 +340,74 @@
             </form>
         </div>
     </section>
+
+    <section class="application-emails-section" aria-labelledby="application-emails-title">
+        <div class="application-cover-letter-heading">
+            <h2 id="application-emails-title">Emails</h2>
+            <button
+                id="application-emails-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-emails-content"
+            >Show</button>
+        </div>
+        <div id="application-emails-content" class="hidden">
+            {% if application_email_threads %}
+                {% for thread in application_email_threads %}
+                    <details class="application-email-thread">
+                        <summary>
+                            <span class="application-email-thread-summary">
+                                <span class="application-email-thread-subject">{{ thread.subject }}</span>
+                                <span class="application-email-thread-meta">{{ thread.messages|length }} message{{ thread.messages|length|pluralize }}</span>
+                                <span class="application-email-thread-meta">Latest: {{ thread.latest_message_date|date:"M j, Y, g:i A" }}</span>
+                            </span>
+                        </summary>
+                        <table class="application-email-table">
+                            <thead>
+                                <tr>
+                                    <th>Sender</th>
+                                    <th>Received</th>
+                                    <th>Classification</th>
+                                    <th>Direction</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for application_email in thread.messages %}
+                                    <tr>
+                                        <td>{{ application_email.sender }}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="open-application-email"
+                                                data-subject="{{ application_email.subject|escape }}"
+                                                data-sender="{{ application_email.sender|escape }}"
+                                                data-body="{{ application_email.body|escape }}"
+                                            >{{ application_email.received_at|date:"M j, Y, g:i A" }}</button>
+                                        </td>
+                                        <td>
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="application_email_id" value="{{ application_email.pk }}">
+                                                <select name="email_type">
+                                                    {% for value, label in email_type_choices %}
+                                                        <option value="{{ value }}"{% if application_email.email_type == value %} selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" name="save_application_email_type" value="1">Save</button>
+                                            </form>
+                                        </td>
+                                        <td>{{ application_email.get_direction_display }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </details>
+                {% endfor %}
+            {% else %}
+                <p>No emails have been assigned to this application.</p>
+            {% endif %}
+        </div>
+    </section>
 </section>
 
 <div id="application-submit-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-submit-title">
@@ -323,6 +442,15 @@
     </div>
 </div>
 
+<div id="application-email-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-email-modal-title">
+    <div class="modal-content application-review-modal-content">
+        <button id="application-email-modal-close" class="application-review-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-email-modal-title"></h2>
+        <p id="application-email-modal-sender"></p>
+        <div id="application-email-modal-body" class="application-review-content"></div>
+    </div>
+</div>
+
 <div id="application-portfolio-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-portfolio-modal-title">
     <div class="modal-content application-portfolio-modal-content">
         <button id="application-portfolio-modal-close" type="button" aria-label="Close">&times;</button>
@@ -348,6 +476,10 @@
         const submitModal = document.getElementById("application-submit-modal");
         const descriptionModal = document.getElementById("application-description-modal");
         const explanationModal = document.getElementById("application-ai-explanation-modal");
+        const emailModal = document.getElementById("application-email-modal");
+        const emailModalTitle = document.getElementById("application-email-modal-title");
+        const emailModalSender = document.getElementById("application-email-modal-sender");
+        const emailModalBody = document.getElementById("application-email-modal-body");
         const portfolioModal = document.getElementById("application-portfolio-modal");
         const portfolioModalTitle = document.getElementById("application-portfolio-modal-title");
         const portfolioFrame = document.getElementById("application-portfolio-frame");
@@ -412,6 +544,13 @@
             coverLetterToggle.textContent = isHidden ? "Show" : "Hide";
             coverLetterToggle.setAttribute("aria-expanded", String(!isHidden));
         });
+        const emailsToggle = document.getElementById("application-emails-toggle");
+        const emailsContent = document.getElementById("application-emails-content");
+        emailsToggle.addEventListener("click", () => {
+            const isHidden = emailsContent.classList.toggle("hidden");
+            emailsToggle.textContent = isHidden ? "Show" : "Hide";
+            emailsToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
         document.getElementById("application-submit-modal-close").addEventListener(
             "click",
             closeSubmitModal
@@ -437,6 +576,21 @@
                 if (event.target === modal) closeModal(modal);
             });
         });
+        document.querySelectorAll(".open-application-email").forEach(button => {
+            button.addEventListener("click", () => {
+                emailModalTitle.textContent = button.dataset.subject || "(No subject)";
+                emailModalSender.textContent = button.dataset.sender;
+                emailModalBody.textContent = button.dataset.body || "No saved email body is available.";
+                openModal(emailModal);
+            });
+        });
+        document.getElementById("application-email-modal-close").addEventListener(
+            "click",
+            () => closeModal(emailModal)
+        );
+        emailModal.addEventListener("click", event => {
+            if (event.target === emailModal) closeModal(emailModal);
+        });
         document.querySelectorAll("[data-portfolio-url]").forEach(button => {
             button.addEventListener("click", () => {
                 portfolioModalTitle.textContent = button.textContent;
@@ -453,7 +607,7 @@
         });
         document.addEventListener("keydown", event => {
             if (event.key === "Escape") {
-                [submitModal, descriptionModal, explanationModal, portfolioModal].forEach(modal => {
+                [submitModal, descriptionModal, explanationModal, emailModal, portfolioModal].forEach(modal => {
                     if (!modal.classList.contains("hidden")) closeModal(modal);
                 });
             }
