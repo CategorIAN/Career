@@ -3219,6 +3219,154 @@ class ApplicationEmailModelTests(TestCase):
         self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
 
 
+class SearchObservationSuccessTests(TestCase):
+    def create_observation(self, *, complete=True, job_posting=None):
+        return SearchObservation.objects.create(
+            complete=complete,
+            job_posting=job_posting,
+        )
+
+    def create_application(self, **application_fields):
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name="Example Co",
+            apply_to=True,
+        )
+        return Application.objects.create(job_posting=job_posting, **application_fields)
+
+    def test_existing_observation_success_rules_are_preserved(self):
+        self.assertIsNone(self.create_observation(complete=False).success)
+        self.assertFalse(self.create_observation().success)
+
+        expired_posting = JobPosting.objects.create(
+            title="Expired",
+            company_name="Example Co",
+            expired=True,
+        )
+        self.assertIsNone(self.create_observation(job_posting=expired_posting).success)
+
+        declined_posting = JobPosting.objects.create(
+            title="Declined",
+            company_name="Example Co",
+            apply_to=False,
+        )
+        self.assertFalse(self.create_observation(job_posting=declined_posting).success)
+
+        applied_posting = JobPosting.objects.create(
+            title="Applied",
+            company_name="Example Co",
+            apply_to=True,
+        )
+        self.assertTrue(self.create_observation(job_posting=applied_posting).success)
+
+    def test_stopped_application_is_unsuccessful_regardless_of_outcome_and_stage(self):
+        application = self.create_application(
+            stop_reason=Application.StopReason.OTHER,
+            outcome=Application.Outcome.ACCEPTED,
+            stage=Application.Stage.INTERVIEWED,
+        )
+
+        self.assertFalse(self.create_observation(job_posting=application.job_posting).success)
+
+    def test_application_success_uses_outcome_and_highest_stage(self):
+        for outcome in Application.Outcome:
+            for stage in Application.Stage:
+                with self.subTest(outcome=outcome, stage=stage):
+                    application = self.create_application(outcome=outcome, stage=stage)
+                    observation = self.create_observation(job_posting=application.job_posting)
+                    expected = (
+                        True
+                        if outcome in {
+                            Application.Outcome.IN_PROCESS,
+                            Application.Outcome.ACCEPTED,
+                        }
+                        else stage in {
+                            Application.Stage.ASSESSED,
+                            Application.Stage.INTERVIEWED,
+                        }
+                    )
+                    self.assertEqual(observation.success, expected)
+
+    def test_application_defaults_and_stage_are_not_automatically_decreased_on_rejection(self):
+        application = self.create_application()
+        self.assertEqual(application.outcome, Application.Outcome.IN_PROCESS)
+        self.assertEqual(application.stage, Application.Stage.SUBMITTED)
+
+        application.stage = Application.Stage.INTERVIEWED
+        application.outcome = Application.Outcome.REJECTED
+        application.save(update_fields=["stage", "outcome"])
+        application.refresh_from_db()
+
+        self.assertEqual(application.stage, Application.Stage.INTERVIEWED)
+        self.assertEqual(application.outcome, Application.Outcome.REJECTED)
+
+
+class ApplicationProgressTests(TestCase):
+    def test_application_details_saves_outcome_and_stage(self):
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+            )
+        )
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        response = self.client.post(
+            details_url,
+            {
+                "save_application_progress": "1",
+                "outcome": Application.Outcome.REJECTED,
+                "stage": Application.Stage.INTERVIEWED,
+            },
+        )
+
+        self.assertRedirects(response, details_url)
+        application.refresh_from_db()
+        self.assertEqual(application.outcome, Application.Outcome.REJECTED)
+        self.assertEqual(application.stage, Application.Stage.INTERVIEWED)
+
+        page_response = self.client.get(details_url)
+        self.assertContains(page_response, "Application Progress")
+        self.assertContains(page_response, "Rejected")
+        self.assertContains(page_response, "Interviewed")
+
+    def test_job_search_statistics_reflect_outcome_and_stage_changes(self):
+        company = Company.objects.create(name="Example Co")
+        search_path = SearchPath.objects.create(company=company)
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Data Engineer",
+                company_name="Example Co",
+                apply_to=True,
+            )
+        )
+        SearchObservation.objects.create(
+            search_path=search_path,
+            job_posting=application.job_posting,
+            complete=True,
+        )
+
+        def success_count():
+            response = self.client.get(reverse("job_search"))
+            displayed_path = next(
+                path
+                for path in response.context["search_path_options"]
+                if path.pk == search_path.pk
+            )
+            return displayed_path.page_success_count
+
+        self.assertEqual(success_count(), 1)
+
+        application.outcome = Application.Outcome.REJECTED
+        application.stage = Application.Stage.SUBMITTED
+        application.save(update_fields=["outcome", "stage"])
+        self.assertEqual(success_count(), 0)
+
+        application.stage = Application.Stage.ASSESSED
+        application.save(update_fields=["stage"])
+        self.assertEqual(success_count(), 1)
+
+
 class EmailsPageTests(TestCase):
     @patch("app.views.get_email")
     @patch("app.views.search_emails")
@@ -3764,6 +3912,15 @@ class InterviewPracticeTests(TestCase):
         self.assertRedirects(end_response, reverse("interview_practice_session", args=[session.pk]))
         self.assertIsNotNone(session.ended_at)
         self.assertEqual(session.feedback, "Strengths\n- Clear answers")
+        session_response = self.client.get(
+            reverse("interview_practice_session", args=[session.pk])
+        )
+        self.assertContains(session_response, 'id="interview-feedback-content"', html=False)
+        self.assertContains(session_response, 'id="interview-feedback-markdown"', html=False)
+        self.assertContains(session_response, 'id="interview-feedback-toggle"', html=False)
+        self.assertContains(session_response, 'id="interview-feedback-section"', html=False)
+        self.assertContains(session_response, 'class="hidden"', html=False)
+        self.assertContains(session_response, "const renderMarkdown = markdown", html=False)
         message_response = self.client.post(
             reverse("interview_practice_message", args=[session.pk]),
             data=json.dumps({"content": "Another answer"}),

@@ -15,7 +15,7 @@
     .interview-answer-form { display: grid; gap: 0.75rem; }
     .interview-answer-form textarea { width: 100%; min-height: 9rem; box-sizing: border-box; }
     .interview-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; }
-    .interview-feedback { margin-top: 1.5rem; padding: 1rem; border: 1px solid #888; white-space: pre-wrap; line-height: 1.55; }
+    .interview-feedback { margin-top: 1.5rem; padding: 1rem; border: 1px solid #888; line-height: 1.55; }
     .interview-error { color: #a40000; }
     .interview-loading { color: #555; }
 </style>
@@ -36,6 +36,17 @@
     {% if messages %}
         <div aria-live="polite">
             {% for message in messages %}<p class="{{ message.tags }}">{{ message }}</p>{% endfor %}
+        </div>
+    {% endif %}
+
+    {% if interview_session.feedback %}
+        <div class="interview-actions">
+            <button
+                id="interview-feedback-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="interview-feedback-section"
+            >Show Feedback</button>
         </div>
     {% endif %}
 
@@ -70,10 +81,14 @@
     {% endif %}
 
     {% if interview_session.ended_at %}
-        <section>
+        <section
+            id="interview-feedback-section"
+            {% if interview_session.feedback %}class="hidden"{% endif %}
+        >
             <h2>Interview Feedback</h2>
             {% if interview_session.feedback %}
-                <div class="interview-feedback">{{ interview_session.feedback|linebreaksbr }}</div>
+                <div id="interview-feedback-content" class="interview-feedback"></div>
+                {{ interview_session.feedback|json_script:"interview-feedback-markdown" }}
             {% else %}
                 <p>Feedback has not been generated yet.</p>
                 <form method="post" action="{% url 'retry_interview_practice_feedback' interview_session.pk %}">
@@ -174,6 +189,53 @@ document.addEventListener("DOMContentLoaded", () => {
             event.currentTarget.disabled = false;
             event.currentTarget.textContent = error.message || "Retry Opening Question";
         }
+    });
+});
+</script>
+{% endif %}
+{% if interview_session.feedback %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const feedbackContent = document.getElementById("interview-feedback-content");
+    const feedbackSection = document.getElementById("interview-feedback-section");
+    const conversation = document.getElementById("interview-conversation");
+    const feedbackToggle = document.getElementById("interview-feedback-toggle");
+    const feedbackMarkdown = JSON.parse(
+        document.getElementById("interview-feedback-markdown").textContent
+    );
+    const escapeHtml = value => value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    const renderInlineMarkdown = value => escapeHtml(value)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+        .replace(
+            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+    const renderMarkdown = markdown => markdown
+        .split(/\r?\n/)
+        .map(line => {
+            if (/^###\s+/.test(line)) return `<h5>${renderInlineMarkdown(line.slice(4))}</h5>`;
+            if (/^##\s+/.test(line)) return `<h4>${renderInlineMarkdown(line.slice(3))}</h4>`;
+            if (/^#\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.slice(2))}</h3>`;
+            if (/^[-*]\s+/.test(line)) return `<li>${renderInlineMarkdown(line.slice(2))}</li>`;
+            if (!line.trim()) return "";
+            return `<p>${renderInlineMarkdown(line)}</p>`;
+        })
+        .join("")
+        .replace(/(<li>.*?<\/li>)+/g, match => `<ul>${match}</ul>`);
+    feedbackContent.innerHTML = renderMarkdown(feedbackMarkdown);
+    feedbackToggle.addEventListener("click", () => {
+        const showingFeedback = feedbackSection.classList.contains("hidden");
+        feedbackSection.classList.toggle("hidden", !showingFeedback);
+        conversation.classList.toggle("hidden", showingFeedback);
+        feedbackToggle.textContent = showingFeedback ? "Show Conversation" : "Show Feedback";
+        feedbackToggle.setAttribute("aria-expanded", String(showingFeedback));
     });
 });
 </script>

@@ -191,6 +191,12 @@ class ApplicationEmailTypeForm(forms.ModelForm):
         fields = ["email_type"]
 
 
+class ApplicationProgressForm(forms.ModelForm):
+    class Meta:
+        model = Application
+        fields = ["outcome", "stage"]
+
+
 class InterviewPracticeSessionForm(forms.ModelForm):
     class Meta:
         model = InterviewPracticeSession

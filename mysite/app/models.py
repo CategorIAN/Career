@@ -1367,8 +1367,14 @@ class SearchObservation(models.Model):
         if application.stopped:
             return False
 
-        if application.submitted is not None:
+        if application.outcome == Application.Outcome.ACCEPTED:
             return True
+
+        if application.outcome == Application.Outcome.REJECTED:
+            return application.stage in {
+                Application.Stage.ASSESSED,
+                Application.Stage.INTERVIEWED,
+            }
 
         return True
 
@@ -1377,6 +1383,17 @@ class SearchObservation(models.Model):
 
 
 class Application(models.Model):
+    class Outcome(models.TextChoices):
+        IN_PROCESS = "in_process", "In Process"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+
+    class Stage(models.IntegerChoices):
+        SUBMITTED = 1, "Submitted"
+        CONFIRMED = 2, "Confirmed"
+        ASSESSED = 3, "Assessed"
+        INTERVIEWED = 4, "Interviewed"
+
     job_posting = models.OneToOneField(
         "JobPosting",
         on_delete=models.CASCADE,
@@ -1398,6 +1415,17 @@ class Application(models.Model):
     submitted = models.DateTimeField(
         null=True,
         blank=True,
+    )
+
+    outcome = models.CharField(
+        max_length=20,
+        choices=Outcome.choices,
+        default=Outcome.IN_PROCESS,
+    )
+
+    stage = models.PositiveSmallIntegerField(
+        choices=Stage.choices,
+        default=Stage.SUBMITTED,
     )
 
     class StopReason(models.TextChoices):

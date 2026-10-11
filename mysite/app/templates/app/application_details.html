@@ -55,6 +55,19 @@
         gap: 0.75rem;
     }
 
+    .application-progress-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .application-progress-field {
+        display: grid;
+        gap: 0.35rem;
+    }
+
     .application-cover-letter-section {
         margin-top: 2rem;
     }
@@ -283,6 +296,36 @@
         </button>
     </header>
 
+    <section class="application-review-section" aria-labelledby="application-progress-title">
+        <div class="application-review-heading">
+            <h2 id="application-progress-title">Application Progress</h2>
+            <button
+                id="application-progress-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-progress-content"
+            >Show</button>
+        </div>
+        <div id="application-progress-content" class="hidden">
+            <form class="application-progress-form" method="post">
+                {% csrf_token %}
+                <div class="application-progress-field">
+                    <label for="{{ application_progress_form.outcome.id_for_label }}">Outcome</label>
+                    {{ application_progress_form.outcome.errors }}
+                    {{ application_progress_form.outcome }}
+                    <small>Current: {{ application.get_outcome_display }}</small>
+                </div>
+                <div class="application-progress-field">
+                    <label for="{{ application_progress_form.stage.id_for_label }}">Stage</label>
+                    {{ application_progress_form.stage.errors }}
+                    {{ application_progress_form.stage }}
+                    <small>Highest stage reached: {{ application.get_stage_display }}</small>
+                </div>
+                <button type="submit" name="save_application_progress" value="1">Save Progress</button>
+            </form>
+        </div>
+    </section>
+
     {% if messages %}
         <div aria-live="polite" style="margin-top: 1rem;">
             {% for message in messages %}
@@ -367,34 +410,6 @@
         </div>
     </section>
 
-    <section class="application-cover-letter-section" aria-labelledby="application-interview-practice-title">
-        <div class="application-cover-letter-heading">
-            <h2 id="application-interview-practice-title">Interview Practice</h2>
-            <button id="application-new-interview-session" type="button">New Session</button>
-        </div>
-        {% if interview_practice_sessions %}
-            <div class="application-interview-session-list">
-                {% for interview_session in interview_practice_sessions %}
-                    <div class="application-interview-session">
-                        <strong>{{ interview_session.get_interview_type_display }}</strong>
-                        <span>{{ interview_session.created|date:"M j, Y, g:i A" }}</span>
-                        <span class="application-interview-session-status">
-                            {% if interview_session.ended_at %}Completed{% else %}In Progress{% endif %}
-                        </span>
-                        {% if interview_session.interview_email %}
-                            <span class="application-interview-session-status">
-                                {{ interview_session.interview_email.subject|default:"Interview Request" }}
-                            </span>
-                        {% endif %}
-                        <a href="{% url 'interview_practice_session' interview_session.pk %}">Open Session</a>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>No interview practice sessions yet.</p>
-        {% endif %}
-    </section>
-
     <section class="application-emails-section" aria-labelledby="application-emails-title">
         <div class="application-cover-letter-heading">
             <h2 id="application-emails-title">Emails</h2>
@@ -459,6 +474,42 @@
                 {% endfor %}
             {% else %}
                 <p>No emails have been assigned to this application.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="application-cover-letter-section" aria-labelledby="application-interview-practice-title">
+        <div class="application-cover-letter-heading">
+            <h2 id="application-interview-practice-title">Interview Practice</h2>
+            <button
+                id="application-interview-practice-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="application-interview-practice-content"
+            >Show</button>
+        </div>
+        <div id="application-interview-practice-content" class="hidden">
+            <button id="application-new-interview-session" type="button">New Session</button>
+            {% if interview_practice_sessions %}
+                <div class="application-interview-session-list">
+                    {% for interview_session in interview_practice_sessions %}
+                        <div class="application-interview-session">
+                            <strong>{{ interview_session.get_interview_type_display }}</strong>
+                            <span>{{ interview_session.created|date:"M j, Y, g:i A" }}</span>
+                            <span class="application-interview-session-status">
+                                {% if interview_session.ended_at %}Completed{% else %}In Progress{% endif %}
+                            </span>
+                            {% if interview_session.interview_email %}
+                                <span class="application-interview-session-status">
+                                    {{ interview_session.interview_email.subject|default:"Interview Request" }}
+                                </span>
+                            {% endif %}
+                            <a href="{% url 'interview_practice_session' interview_session.pk %}">Open Session</a>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>No interview practice sessions yet.</p>
             {% endif %}
         </div>
     </section>
@@ -541,10 +592,14 @@
         const submitButton = document.getElementById("application-submit-button");
         const reviewToggle = document.getElementById("application-review-toggle");
         const reviewContent = document.getElementById("application-review-content");
+        const progressToggle = document.getElementById("application-progress-toggle");
+        const progressContent = document.getElementById("application-progress-content");
         const portfolioToggle = document.getElementById("application-portfolio-toggle");
         const portfolioContent = document.getElementById("application-portfolio-content");
         const coverLetterToggle = document.getElementById("application-cover-letter-toggle");
         const coverLetterContent = document.getElementById("application-cover-letter-content");
+        const interviewPracticeToggle = document.getElementById("application-interview-practice-toggle");
+        const interviewPracticeContent = document.getElementById("application-interview-practice-content");
         const newInterviewSessionButton = document.getElementById("application-new-interview-session");
         const interviewSessionModal = document.getElementById("application-interview-session-modal");
         const submitModal = document.getElementById("application-submit-modal");
@@ -611,6 +666,11 @@
             reviewToggle.textContent = isHidden ? "Show" : "Hide";
             reviewToggle.setAttribute("aria-expanded", String(!isHidden));
         });
+        progressToggle.addEventListener("click", () => {
+            const isHidden = progressContent.classList.toggle("hidden");
+            progressToggle.textContent = isHidden ? "Show" : "Hide";
+            progressToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
         portfolioToggle.addEventListener("click", () => {
             const isHidden = portfolioContent.classList.toggle("hidden");
             portfolioToggle.textContent = isHidden ? "Show" : "Hide";
@@ -620,6 +680,11 @@
             const isHidden = coverLetterContent.classList.toggle("hidden");
             coverLetterToggle.textContent = isHidden ? "Show" : "Hide";
             coverLetterToggle.setAttribute("aria-expanded", String(!isHidden));
+        });
+        interviewPracticeToggle.addEventListener("click", () => {
+            const isHidden = interviewPracticeContent.classList.toggle("hidden");
+            interviewPracticeToggle.textContent = isHidden ? "Show" : "Hide";
+            interviewPracticeToggle.setAttribute("aria-expanded", String(!isHidden));
         });
         const emailsToggle = document.getElementById("application-emails-toggle");
         const emailsContent = document.getElementById("application-emails-content");

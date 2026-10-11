@@ -3,7 +3,7 @@ from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
                      Project, ProjectTask, Skill, Course, Supervisor, Reference,
                      Residency, ProfileSetting, SearchObservation, SearchPath,
-                     JobPosting, Professional, Recruiter, InterviewPracticeSession,
+                     JobPosting, Application, Professional, Recruiter, InterviewPracticeSession,
                      InterviewPracticeMessage)
 
 
@@ -339,6 +339,24 @@ class JobPostingAdmin(admin.ModelAdmin):
     )
 
     ordering = ("-created",)
+
+
+@admin.register(Application)
+class ApplicationAdmin(admin.ModelAdmin):
+    list_display = (
+        "job_posting",
+        "company",
+        "outcome",
+        "stage",
+        "submitted",
+        "stop_reason",
+        "created",
+    )
+    list_filter = ("outcome", "stage", "stop_reason")
+    search_fields = ("job_posting__title", "job_posting__company_name", "company__name")
+    list_select_related = ("job_posting", "company")
+    readonly_fields = ("created",)
+    ordering = ("-created", "-pk")
 
 
 @admin.register(InterviewPracticeSession)

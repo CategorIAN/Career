@@ -39,6 +39,7 @@ from .forms import (
     ApplicationCoverLetterForm,
     ApplicationCompanyForm,
     ApplicationEmailTypeForm,
+    ApplicationProgressForm,
     InterviewPracticeSessionForm,
     ApplicationSubmittedForm,
     CompanyForm,
@@ -1859,6 +1860,7 @@ def application_details_view(request):
         initial={"submitted_date": initial_submitted_date}
     )
     cover_letter_form = ApplicationCoverLetterForm(instance=application)
+    application_progress_form = ApplicationProgressForm(instance=application)
     interview_session_form = InterviewPracticeSessionForm(application=application)
     show_interview_session_modal = False
     if request.method == "POST":
@@ -1887,6 +1889,17 @@ def application_details_view(request):
             if cover_letter_form.is_valid():
                 cover_letter_form.save()
                 messages.success(request, "Cover letter saved.")
+                return redirect(
+                    f"{reverse('application_details')}?application_id={application.pk}"
+                )
+        elif "save_application_progress" in request.POST:
+            application_progress_form = ApplicationProgressForm(
+                request.POST,
+                instance=application,
+            )
+            if application_progress_form.is_valid():
+                application_progress_form.save()
+                messages.success(request, "Application outcome and stage saved.")
                 return redirect(
                     f"{reverse('application_details')}?application_id={application.pk}"
                 )
@@ -1958,6 +1971,7 @@ def application_details_view(request):
             "application": application,
             "submitted_form": submitted_form,
             "cover_letter_form": cover_letter_form,
+            "application_progress_form": application_progress_form,
             "interview_session_form": interview_session_form,
             "show_interview_session_modal": show_interview_session_modal,
             "show_submit_modal": show_submit_modal,
@@ -2190,6 +2204,35 @@ def job_search_view(request):
         .values_list("search_path__platform_id", "search_path__company_id")
         .first()
     )
+    completed_observation_filter = Q(observations__complete=True) & ~Q(
+        observations__job_posting__expired=True
+    )
+    successful_observation_filter = (
+        completed_observation_filter
+        & Q(observations__job_posting__isnull=False)
+        & ~Q(observations__job_posting__apply_to=False)
+        & (
+            Q(observations__job_posting__application__isnull=True)
+            | (
+                Q(observations__job_posting__application__stop_reason="")
+                & (
+                    Q(
+                        observations__job_posting__application__outcome__in=[
+                            Application.Outcome.IN_PROCESS,
+                            Application.Outcome.ACCEPTED,
+                        ]
+                    )
+                    | Q(
+                        observations__job_posting__application__outcome=Application.Outcome.REJECTED,
+                        observations__job_posting__application__stage__in=[
+                            Application.Stage.ASSESSED,
+                            Application.Stage.INTERVIEWED,
+                        ],
+                    )
+                )
+            )
+        )
+    )
     search_paths_queryset = (
         SearchPath.objects.filter(active=True)
         .select_related("company", "platform", "search_term")
@@ -2202,14 +2245,11 @@ def job_search_view(request):
             ),
             page_observation_count=Count(
                 "observations",
-                filter=Q(observations__complete=True),
+                filter=completed_observation_filter,
             ),
             page_success_count=Count(
                 "observations",
-                filter=Q(
-                    observations__complete=True,
-                    observations__job_posting__apply_to=True,
-                ),
+                filter=successful_observation_filter,
             ),
         )
     )
