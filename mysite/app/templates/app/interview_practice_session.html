@@ -1,0 +1,181 @@
+{% extends "app/base.html" %}
+
+{% block title %}Interview Practice | Career{% endblock %}
+
+{% block content %}
+<style>
+    .interview-practice-page { max-width: 900px; margin: 0 auto; }
+    .interview-practice-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: start; }
+    .interview-practice-meta { color: #555; margin: 0.35rem 0; }
+    .interview-conversation { display: grid; gap: 0.85rem; margin: 1.5rem 0; }
+    .interview-message { max-width: 78%; padding: 0.8rem 1rem; border-radius: 10px; white-space: pre-wrap; line-height: 1.5; }
+    .interview-message.assistant { justify-self: start; background: #ececec; }
+    .interview-message.user { justify-self: end; background: #dcefff; }
+    .interview-message-meta { display: block; margin-top: 0.4rem; font-size: 0.78rem; color: #555; }
+    .interview-answer-form { display: grid; gap: 0.75rem; }
+    .interview-answer-form textarea { width: 100%; min-height: 9rem; box-sizing: border-box; }
+    .interview-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; }
+    .interview-feedback { margin-top: 1.5rem; padding: 1rem; border: 1px solid #888; white-space: pre-wrap; line-height: 1.55; }
+    .interview-error { color: #a40000; }
+    .interview-loading { color: #555; }
+</style>
+
+<main class="interview-practice-page">
+    <header class="interview-practice-header">
+        <div>
+            <h1>Interview Practice</h1>
+            <h2>{{ interview_session.application.job_posting.title }} @ {{ interview_session.application.company|default:interview_session.application.job_posting.company_name }}</h2>
+            <p class="interview-practice-meta">{{ interview_session.get_interview_type_display }} · Started {{ interview_session.created|date:"M j, Y, g:i A" }}</p>
+            {% if interview_session.interview_email %}
+                <p class="interview-practice-meta">Interview Request: {{ interview_session.interview_email.subject|default:"(No subject)" }}</p>
+            {% endif %}
+        </div>
+        <a href="{% url 'application_details' %}?application_id={{ interview_session.application_id }}">Back to Application</a>
+    </header>
+
+    {% if messages %}
+        <div aria-live="polite">
+            {% for message in messages %}<p class="{{ message.tags }}">{{ message }}</p>{% endfor %}
+        </div>
+    {% endif %}
+
+    <section id="interview-conversation" class="interview-conversation" aria-live="polite">
+        {% for message in interview_messages %}
+            <article class="interview-message {{ message.role }}" data-message-id="{{ message.pk }}">
+                {{ message.content|linebreaksbr }}
+                <small class="interview-message-meta">{{ message.get_role_display }} · {{ message.created|date:"M j, Y, g:i A" }}</small>
+            </article>
+        {% endfor %}
+    </section>
+
+    {% if not interview_session.ended_at %}
+        {% if not interview_messages %}
+            <div class="interview-actions">
+                <button id="retry-opening" type="button">Generate Opening Question</button>
+            </div>
+        {% else %}
+            <form id="interview-answer-form" class="interview-answer-form">
+                {% csrf_token %}
+                <label for="interview-answer">Your response</label>
+                <textarea id="interview-answer" required></textarea>
+                <div class="interview-actions">
+                    <button id="interview-send" type="submit">Send</button>
+                    <button id="interview-end" type="button">End Session</button>
+                </div>
+                <p id="interview-status" role="status"></p>
+                <button id="retry-interviewer-response" class="hidden" type="button">Retry Interviewer Response</button>
+            </form>
+        {% endif %}
+        <form id="interview-end-form" class="hidden" method="post" action="{% url 'end_interview_practice_session' interview_session.pk %}">{% csrf_token %}</form>
+    {% endif %}
+
+    {% if interview_session.ended_at %}
+        <section>
+            <h2>Interview Feedback</h2>
+            {% if interview_session.feedback %}
+                <div class="interview-feedback">{{ interview_session.feedback|linebreaksbr }}</div>
+            {% else %}
+                <p>Feedback has not been generated yet.</p>
+                <form method="post" action="{% url 'retry_interview_practice_feedback' interview_session.pk %}">
+                    {% csrf_token %}
+                    <button type="submit">Generate Feedback</button>
+                </form>
+            {% endif %}
+        </section>
+    {% endif %}
+</main>
+
+{% if not interview_session.ended_at %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const conversation = document.getElementById("interview-conversation");
+    const answerForm = document.getElementById("interview-answer-form");
+    const status = document.getElementById("interview-status");
+    const retryButton = document.getElementById("retry-interviewer-response");
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+    let pendingUserMessageId = null;
+
+    const appendMessage = message => {
+        if (!message || conversation.querySelector(`[data-message-id="${message.id}"]`)) return;
+        const element = document.createElement("article");
+        element.className = `interview-message ${message.role}`;
+        element.dataset.messageId = message.id;
+        const content = document.createElement("div");
+        content.textContent = message.content;
+        const meta = document.createElement("small");
+        meta.className = "interview-message-meta";
+        meta.textContent = `${message.role_display} · ${new Date(message.created).toLocaleString()}`;
+        element.append(content, meta);
+        conversation.append(element);
+        element.scrollIntoView({ behavior: "smooth", block: "end" });
+    };
+
+    const setBusy = busy => {
+        if (answerForm) {
+            answerForm.querySelectorAll("button, textarea").forEach(element => { element.disabled = busy; });
+        }
+        status.className = busy ? "interview-loading" : "";
+        status.textContent = busy ? "Waiting for the interviewer…" : "";
+    };
+
+    const postJson = async (url, payload) => {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+            body: JSON.stringify(payload),
+        });
+        return { response, data: await response.json() };
+    };
+
+    const requestInterviewerResponse = async payload => {
+        setBusy(true);
+        retryButton.classList.add("hidden");
+        try {
+            const { response, data } = await postJson("{% url 'interview_practice_message' interview_session.pk %}", payload);
+            appendMessage(data.user_message);
+            if (!response.ok) {
+                pendingUserMessageId = data.user_message?.id || pendingUserMessageId;
+                status.className = "interview-error";
+                status.textContent = data.error || "The interviewer response could not be generated.";
+                retryButton.classList.remove("hidden");
+                return;
+            }
+            appendMessage(data.assistant_message);
+            pendingUserMessageId = null;
+            document.getElementById("interview-answer").value = "";
+        } catch (error) {
+            status.className = "interview-error";
+            status.textContent = "The interviewer response could not be generated. Try again.";
+            retryButton.classList.remove("hidden");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    answerForm?.addEventListener("submit", event => {
+        event.preventDefault();
+        const content = document.getElementById("interview-answer").value.trim();
+        if (content) requestInterviewerResponse({ content });
+    });
+    retryButton?.addEventListener("click", () => {
+        if (pendingUserMessageId) requestInterviewerResponse({ retry_user_message_id: pendingUserMessageId });
+    });
+    document.getElementById("interview-end")?.addEventListener("click", () => {
+        document.getElementById("interview-end-form").submit();
+    });
+    document.getElementById("retry-opening")?.addEventListener("click", async event => {
+        event.currentTarget.disabled = true;
+        try {
+            const { response, data } = await postJson("{% url 'interview_practice_opening' interview_session.pk %}", {});
+            if (!response.ok) throw new Error(data.error);
+            appendMessage(data.assistant_message);
+            window.location.reload();
+        } catch (error) {
+            event.currentTarget.disabled = false;
+            event.currentTarget.textContent = error.message || "Retry Opening Question";
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

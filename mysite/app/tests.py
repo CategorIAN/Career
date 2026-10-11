@@ -20,6 +20,8 @@ from freelancersdk.resources.projects.exceptions import ProjectsNotFoundExceptio
 from .models import (
     Application,
     ApplicationEmail,
+    InterviewPracticeMessage,
+    InterviewPracticeSession,
     Address,
     City,
     Company,
@@ -84,6 +86,12 @@ from .services.job_evaluation import (
     evaluate_job_posting,
 )
 from .services.search_paths import create_company_search_paths
+from .services.interview_practice import (
+    InterviewPracticeAPIError,
+    build_interview_context,
+    generate_interviewer_response,
+    start_interview,
+)
 
 
 def make_project(
@@ -3518,6 +3526,251 @@ class EmailsPageTests(TestCase):
         self.assertRedirects(response, details_url)
         application_email.refresh_from_db()
         self.assertEqual(application_email.email_type, ApplicationEmail.EmailType.INTERVIEW)
+
+
+class InterviewPracticeTests(TestCase):
+    def setUp(self):
+        self.application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Backend Engineer",
+                company_name="Example Co",
+                description="Build Django and Python APIs.",
+            ),
+            cover_letter="I build reliable Python applications.",
+        )
+        self.interview_email = ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="interview-email",
+            email_type=ApplicationEmail.EmailType.INTERVIEW,
+            subject="Interview details",
+            sender="recruiter@example.com",
+            body="Prepare for a technical interview about Django.",
+            received_at=datetime(2026, 10, 10, tzinfo=UTC),
+        )
+        self.details_url = f"{reverse('application_details')}?application_id={self.application.pk}"
+
+    @patch("app.views.start_interview")
+    @patch("app.views.build_interview_context")
+    def test_creating_session_saves_snapshot_and_selected_interview_email(
+        self,
+        mock_build_context,
+        mock_start_interview,
+    ):
+        mock_build_context.return_value = {"candidate_background": "Candidate Background"}
+
+        response = self.client.post(
+            self.details_url,
+            {
+                "start_interview_practice": "1",
+                "interview_type": InterviewPracticeSession.InterviewType.TECHNICAL,
+                "interview_email": self.interview_email.pk,
+            },
+        )
+
+        session = InterviewPracticeSession.objects.get()
+        self.assertEqual(session.application, self.application)
+        self.assertEqual(session.interview_email, self.interview_email)
+        self.assertEqual(session.context_snapshot, mock_build_context.return_value)
+        mock_start_interview.assert_called_once_with(session)
+        self.assertRedirects(response, reverse("interview_practice_session", args=[session.pk]))
+
+    @patch("app.views.start_interview")
+    @patch("app.views.build_interview_context", return_value={})
+    def test_session_rejects_email_from_another_application(self, mock_context, mock_start):
+        other_application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Other", company_name="Other Co")
+        )
+        other_email = ApplicationEmail.objects.create(
+            application=other_application,
+            gmail_message_id="other-email",
+            email_type=ApplicationEmail.EmailType.INTERVIEW,
+            sender="other@example.com",
+            received_at=datetime(2026, 10, 10, tzinfo=UTC),
+        )
+
+        response = self.client.post(
+            self.details_url,
+            {"start_interview_practice": "1", "interview_email": other_email.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(InterviewPracticeSession.objects.exists())
+        mock_context.assert_not_called()
+        mock_start.assert_not_called()
+
+    @patch("app.views.start_interview")
+    @patch("app.views.build_interview_context", return_value={})
+    def test_session_rejects_non_interview_email(self, mock_context, mock_start):
+        non_interview_email = ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="confirmation-email",
+            email_type=ApplicationEmail.EmailType.CONFIRMATION,
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 10, 9, tzinfo=UTC),
+        )
+
+        response = self.client.post(
+            self.details_url,
+            {"start_interview_practice": "1", "interview_email": non_interview_email.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(InterviewPracticeSession.objects.exists())
+        mock_context.assert_not_called()
+        mock_start.assert_not_called()
+
+    @patch("app.services.interview_practice.build_candidate_background")
+    def test_context_snapshot_includes_expected_application_data(self, mock_background):
+        mock_background.return_value = "Candidate Background"
+        session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            interview_email=self.interview_email,
+        )
+
+        context = build_interview_context(session)
+
+        self.assertEqual(context["job_posting"]["title"], "Backend Engineer")
+        self.assertEqual(context["candidate_background"], "Candidate Background")
+        self.assertEqual(context["cover_letter"], self.application.cover_letter)
+        self.assertEqual(context["interview_request_email"]["subject"], "Interview details")
+
+    @patch("app.services.interview_practice.build_candidate_background", return_value="Candidate Background")
+    def test_context_snapshot_allows_missing_cover_letter_and_interview_email(self, mock_background):
+        self.application.cover_letter = ""
+        self.application.save(update_fields=["cover_letter"])
+        session = InterviewPracticeSession.objects.create(application=self.application)
+
+        context = build_interview_context(session)
+
+        self.assertEqual(context["cover_letter"], "")
+        self.assertIsNone(context["interview_request_email"])
+
+    @patch("app.services.interview_practice._generate_text", return_value="What interests you about this role?")
+    def test_start_interview_creates_only_one_opening_question(self, mock_generate):
+        session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "Snapshot"},
+        )
+
+        first_message = start_interview(session)
+        second_message = start_interview(session)
+
+        self.assertEqual(first_message, second_message)
+        self.assertEqual(session.messages.count(), 1)
+        self.assertEqual(first_message.role, InterviewPracticeMessage.Role.ASSISTANT)
+        mock_generate.assert_called_once()
+
+    @patch("app.views.generate_interviewer_response", return_value="Tell me about a Django project.")
+    def test_message_endpoint_saves_user_and_assistant_messages(self, mock_generate):
+        session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "Snapshot"},
+        )
+        InterviewPracticeMessage.objects.create(
+            session=session,
+            role=InterviewPracticeMessage.Role.ASSISTANT,
+            content="What interests you about this role?",
+        )
+
+        response = self.client.post(
+            reverse("interview_practice_message", args=[session.pk]),
+            data=json.dumps({"content": "I enjoy building reliable backend systems."}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(session.messages.values_list("role", "content")),
+            [
+                ("assistant", "What interests you about this role?"),
+                ("user", "I enjoy building reliable backend systems."),
+                ("assistant", "Tell me about a Django project."),
+            ],
+        )
+        mock_generate.assert_called_once_with(session)
+
+    @patch("app.views.generate_interviewer_response")
+    def test_failed_ai_response_can_retry_without_duplicate_user_message(self, mock_generate):
+        session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "Snapshot"},
+        )
+        InterviewPracticeMessage.objects.create(
+            session=session,
+            role=InterviewPracticeMessage.Role.ASSISTANT,
+            content="What interests you about this role?",
+        )
+        mock_generate.side_effect = [
+            InterviewPracticeAPIError("OpenAI unavailable"),
+            "What database tradeoffs would you consider?",
+        ]
+        endpoint = reverse("interview_practice_message", args=[session.pk])
+
+        failed_response = self.client.post(
+            endpoint,
+            data=json.dumps({"content": "I enjoy building reliable backend systems."}),
+            content_type="application/json",
+        )
+        user_message_id = failed_response.json()["user_message"]["id"]
+        retry_response = self.client.post(
+            endpoint,
+            data=json.dumps({"retry_user_message_id": user_message_id}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(failed_response.status_code, 502)
+        self.assertEqual(retry_response.status_code, 200)
+        self.assertEqual(session.messages.filter(role=InterviewPracticeMessage.Role.USER).count(), 1)
+        self.assertEqual(session.messages.filter(role=InterviewPracticeMessage.Role.ASSISTANT).count(), 2)
+
+    @patch("app.services.interview_practice._generate_text", return_value="First session question")
+    def test_interviewer_response_uses_only_its_own_session_history(self, mock_generate):
+        first_session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "First snapshot"},
+        )
+        second_session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "Second snapshot"},
+        )
+        InterviewPracticeMessage.objects.create(
+            session=first_session,
+            role=InterviewPracticeMessage.Role.USER,
+            content="First-session response",
+        )
+        InterviewPracticeMessage.objects.create(
+            session=second_session,
+            role=InterviewPracticeMessage.Role.USER,
+            content="Second-session response",
+        )
+
+        generate_interviewer_response(first_session)
+
+        serialized_input = json.dumps(mock_generate.call_args.args[0])
+        self.assertIn("First-session response", serialized_input)
+        self.assertNotIn("Second-session response", serialized_input)
+        self.assertIn("First snapshot", serialized_input)
+        self.assertNotIn("Second snapshot", serialized_input)
+
+    @patch("app.views.generate_interview_feedback", return_value="Strengths\n- Clear answers")
+    def test_ending_session_saves_feedback_and_blocks_new_messages(self, mock_feedback):
+        session = InterviewPracticeSession.objects.create(
+            application=self.application,
+            context_snapshot={"candidate_background": "Snapshot"},
+        )
+        end_response = self.client.post(reverse("end_interview_practice_session", args=[session.pk]))
+        session.refresh_from_db()
+
+        self.assertRedirects(end_response, reverse("interview_practice_session", args=[session.pk]))
+        self.assertIsNotNone(session.ended_at)
+        self.assertEqual(session.feedback, "Strengths\n- Clear answers")
+        message_response = self.client.post(
+            reverse("interview_practice_message", args=[session.pk]),
+            data=json.dumps({"content": "Another answer"}),
+            content_type="application/json",
+        )
+        self.assertEqual(message_response.status_code, 400)
+        mock_feedback.assert_called_once_with(session)
 
 
 class JobSearchPageTests(TestCase):

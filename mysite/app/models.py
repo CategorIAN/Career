@@ -1482,3 +1482,73 @@ class ApplicationEmail(models.Model):
                 kwargs["update_fields"] = set(update_fields) | {"direction"}
 
         super().save(*args, **kwargs)
+
+
+class InterviewPracticeSession(models.Model):
+    class InterviewType(models.TextChoices):
+        GENERAL = "general", "General Interview"
+        TECHNICAL = "technical", "Technical Interview"
+        BEHAVIORAL = "behavioral", "Behavioral Interview"
+
+    application = models.ForeignKey(
+        "Application",
+        on_delete=models.CASCADE,
+        related_name="interview_practice_sessions",
+    )
+    interview_type = models.CharField(
+        max_length=20,
+        choices=InterviewType.choices,
+        default=InterviewType.GENERAL,
+    )
+    interview_email = models.ForeignKey(
+        "ApplicationEmail",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="interview_practice_sessions",
+    )
+    context_snapshot = models.JSONField(default=dict, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    feedback = models.TextField(blank=True)
+
+    def clean(self):
+        super().clean()
+        if self.interview_email_id is None:
+            return
+        if self.interview_email.application_id != self.application_id:
+            raise ValidationError(
+                {"interview_email": "Choose an Interview Request email from this application."}
+            )
+        if self.interview_email.email_type != ApplicationEmail.EmailType.INTERVIEW:
+            raise ValidationError(
+                {"interview_email": "Choose an email classified as Interview Request."}
+            )
+
+    @property
+    def completed(self):
+        return self.ended_at is not None
+
+    def __str__(self):
+        return f"{self.application} — {self.get_interview_type_display()}"
+
+
+class InterviewPracticeMessage(models.Model):
+    class Role(models.TextChoices):
+        USER = "user", "User"
+        ASSISTANT = "assistant", "Assistant"
+
+    session = models.ForeignKey(
+        "InterviewPracticeSession",
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role = models.CharField(max_length=10, choices=Role.choices)
+    content = models.TextField()
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created", "pk"]
+
+    def __str__(self):
+        return f"{self.session} — {self.get_role_display()}"

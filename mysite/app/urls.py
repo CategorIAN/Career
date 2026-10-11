@@ -24,6 +24,31 @@ urlpatterns = [
         name="application_details",
     ),
     path(
+        "interview-practice/<int:session_id>/",
+        views.interview_practice_session_view,
+        name="interview_practice_session",
+    ),
+    path(
+        "interview-practice/<int:session_id>/opening/",
+        views.interview_practice_opening_view,
+        name="interview_practice_opening",
+    ),
+    path(
+        "interview-practice/<int:session_id>/messages/",
+        views.interview_practice_message_view,
+        name="interview_practice_message",
+    ),
+    path(
+        "interview-practice/<int:session_id>/end/",
+        views.end_interview_practice_session_view,
+        name="end_interview_practice_session",
+    ),
+    path(
+        "interview-practice/<int:session_id>/feedback/",
+        views.retry_interview_practice_feedback_view,
+        name="retry_interview_practice_feedback",
+    ),
+    path(
         "applications/<int:application_id>/ai-cover-letter/",
         views.generate_application_cover_letter_view,
         name="generate_application_cover_letter",

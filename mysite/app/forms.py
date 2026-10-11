@@ -10,6 +10,7 @@ from django.utils.dateparse import parse_duration
 from .models import (
     Application,
     ApplicationEmail,
+    InterviewPracticeSession,
     Company,
     Feature,
     FeatureLink,
@@ -188,6 +189,35 @@ class ApplicationEmailTypeForm(forms.ModelForm):
     class Meta:
         model = ApplicationEmail
         fields = ["email_type"]
+
+
+class InterviewPracticeSessionForm(forms.ModelForm):
+    class Meta:
+        model = InterviewPracticeSession
+        fields = ["interview_type", "interview_email"]
+
+    def __init__(self, *args, application, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.application = application
+        self.instance.application = application
+        self.fields["interview_email"].queryset = application.emails.filter(
+            email_type=ApplicationEmail.EmailType.INTERVIEW
+        ).order_by("-received_at", "-pk")
+        self.fields["interview_email"].label_from_instance = lambda email: (
+            f"{email.subject or '(No subject)'} — {timezone.localtime(email.received_at).strftime('%Y-%m-%d %I:%M %p')}"
+        )
+        self.fields["interview_email"].required = False
+        self.fields["interview_email"].label = "Interview Request email (optional)"
+
+    def clean_interview_email(self):
+        interview_email = self.cleaned_data.get("interview_email")
+        if interview_email is None:
+            return None
+        if interview_email.application_id != self.application.pk:
+            raise forms.ValidationError("Choose an Interview Request email from this application.")
+        if interview_email.email_type != ApplicationEmail.EmailType.INTERVIEW:
+            raise forms.ValidationError("Choose an email classified as Interview Request.")
+        return interview_email
 
 
 class ApplicationCompanyForm(forms.ModelForm):

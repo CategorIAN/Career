@@ -39,6 +39,7 @@ from .forms import (
     ApplicationCoverLetterForm,
     ApplicationCompanyForm,
     ApplicationEmailTypeForm,
+    InterviewPracticeSessionForm,
     ApplicationSubmittedForm,
     CompanyForm,
     FeatureForm,
@@ -63,6 +64,8 @@ from .forms import (
 from .models import (
     Application,
     ApplicationEmail,
+    InterviewPracticeMessage,
+    InterviewPracticeSession,
     Company,
     Course,
     Direction,
@@ -108,6 +111,13 @@ from .services.gmail import (
     search_emails,
 )
 from .services.search_paths import create_company_search_paths
+from .services.interview_practice import (
+    InterviewPracticeError,
+    build_interview_context,
+    generate_interview_feedback,
+    generate_interviewer_response,
+    start_interview,
+)
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -1849,6 +1859,8 @@ def application_details_view(request):
         initial={"submitted_date": initial_submitted_date}
     )
     cover_letter_form = ApplicationCoverLetterForm(instance=application)
+    interview_session_form = InterviewPracticeSessionForm(application=application)
+    show_interview_session_modal = False
     if request.method == "POST":
         if "save_submitted" in request.POST:
             submitted_form = ApplicationSubmittedForm(request.POST)
@@ -1878,6 +1890,27 @@ def application_details_view(request):
                 return redirect(
                     f"{reverse('application_details')}?application_id={application.pk}"
                 )
+        elif "start_interview_practice" in request.POST:
+            interview_session_form = InterviewPracticeSessionForm(
+                request.POST,
+                application=application,
+            )
+            if interview_session_form.is_valid():
+                interview_session = interview_session_form.save()
+                interview_session.context_snapshot = build_interview_context(interview_session)
+                interview_session.save(update_fields=["context_snapshot"])
+                try:
+                    start_interview(interview_session)
+                except InterviewPracticeError as error:
+                    messages.warning(
+                        request,
+                        "Interview session was created, but the opening question could not be generated: "
+                        f"{error}",
+                    )
+                return redirect(
+                    reverse("interview_practice_session", args=[interview_session.pk])
+                )
+            show_interview_session_modal = True
         elif "save_application_email_type" in request.POST:
             application_email = application.emails.filter(
                 pk=request.POST.get("application_email_id")
@@ -1925,11 +1958,159 @@ def application_details_view(request):
             "application": application,
             "submitted_form": submitted_form,
             "cover_letter_form": cover_letter_form,
+            "interview_session_form": interview_session_form,
+            "show_interview_session_modal": show_interview_session_modal,
             "show_submit_modal": show_submit_modal,
             "application_email_threads": application_email_threads,
             "email_type_choices": ApplicationEmail.EmailType.choices,
+            "interview_practice_sessions": application.interview_practice_sessions.select_related(
+                "interview_email"
+            ).order_by("-created", "-pk"),
         },
     )
+
+
+def _interview_message_payload(message):
+    return {
+        "id": message.pk,
+        "role": message.role,
+        "role_display": message.get_role_display(),
+        "content": message.content,
+        "created": timezone.localtime(message.created, USER_TIMEZONE).isoformat(),
+    }
+
+
+def interview_practice_session_view(request, session_id):
+    interview_session = get_object_or_404(
+        InterviewPracticeSession.objects.select_related(
+            "application__job_posting",
+            "application__company",
+            "interview_email",
+        ),
+        pk=session_id,
+    )
+    return render(
+        request,
+        "app/interview_practice_session.html",
+        {
+            "interview_session": interview_session,
+            "interview_messages": interview_session.messages.all(),
+        },
+    )
+
+
+@require_POST
+def interview_practice_opening_view(request, session_id):
+    interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
+    if interview_session.ended_at is not None:
+        return JsonResponse({"error": "This interview session has ended."}, status=400)
+    try:
+        message = start_interview(interview_session)
+    except InterviewPracticeError as error:
+        return JsonResponse({"error": str(error)}, status=502)
+    return JsonResponse({"assistant_message": _interview_message_payload(message)})
+
+
+@require_POST
+def interview_practice_message_view(request, session_id):
+    interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
+    if interview_session.ended_at is not None:
+        return JsonResponse({"error": "This interview session has ended."}, status=400)
+    try:
+        payload = json.loads(request.body)
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid request data."}, status=400)
+
+    retry_message_id = payload.get("retry_user_message_id")
+    if retry_message_id:
+        user_message = interview_session.messages.filter(
+            pk=retry_message_id,
+            role=InterviewPracticeMessage.Role.USER,
+        ).first()
+        if user_message is None:
+            return JsonResponse({"error": "The saved response was not found."}, status=404)
+        assistant_message = interview_session.messages.filter(
+            role=InterviewPracticeMessage.Role.ASSISTANT,
+            pk__gt=user_message.pk,
+        ).first()
+        if assistant_message is not None:
+            return JsonResponse(
+                {
+                    "user_message": _interview_message_payload(user_message),
+                    "assistant_message": _interview_message_payload(assistant_message),
+                }
+            )
+    else:
+        content = payload.get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            return JsonResponse({"error": "Enter an interview response before sending."}, status=400)
+        if not interview_session.messages.filter(
+            role=InterviewPracticeMessage.Role.ASSISTANT
+        ).exists():
+            return JsonResponse({"error": "Generate the opening question before responding."}, status=400)
+        user_message = InterviewPracticeMessage.objects.create(
+            session=interview_session,
+            role=InterviewPracticeMessage.Role.USER,
+            content=content.strip(),
+        )
+
+    try:
+        assistant_content = generate_interviewer_response(interview_session)
+    except InterviewPracticeError as error:
+        return JsonResponse(
+            {
+                "error": str(error),
+                "user_message": _interview_message_payload(user_message),
+            },
+            status=502,
+        )
+    assistant_message = InterviewPracticeMessage.objects.create(
+        session=interview_session,
+        role=InterviewPracticeMessage.Role.ASSISTANT,
+        content=assistant_content,
+    )
+    return JsonResponse(
+        {
+            "user_message": _interview_message_payload(user_message),
+            "assistant_message": _interview_message_payload(assistant_message),
+        }
+    )
+
+
+@require_POST
+def end_interview_practice_session_view(request, session_id):
+    interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
+    if interview_session.ended_at is None:
+        interview_session.ended_at = timezone.now()
+        interview_session.save(update_fields=["ended_at"])
+    if not interview_session.feedback:
+        try:
+            interview_session.feedback = generate_interview_feedback(interview_session)
+            interview_session.save(update_fields=["feedback"])
+            messages.success(request, "Interview session ended and feedback generated.")
+        except InterviewPracticeError as error:
+            messages.warning(
+                request,
+                "Interview session ended, but feedback could not be generated: " f"{error}",
+            )
+    return redirect(reverse("interview_practice_session", args=[interview_session.pk]))
+
+
+@require_POST
+def retry_interview_practice_feedback_view(request, session_id):
+    interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
+    if interview_session.ended_at is None:
+        messages.error(request, "End the interview session before requesting feedback.")
+    elif interview_session.feedback:
+        messages.info(request, "Feedback has already been generated.")
+    else:
+        try:
+            interview_session.feedback = generate_interview_feedback(interview_session)
+            interview_session.save(update_fields=["feedback"])
+            messages.success(request, "Interview feedback generated.")
+        except InterviewPracticeError as error:
+            messages.error(request, f"Interview feedback could not be generated: {error}")
+    return redirect(reverse("interview_practice_session", args=[interview_session.pk]))
 
 
 @require_POST

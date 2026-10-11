@@ -3,7 +3,8 @@ from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
                      Project, ProjectTask, Skill, Course, Supervisor, Reference,
                      Residency, ProfileSetting, SearchObservation, SearchPath,
-                     JobPosting, Professional, Recruiter)
+                     JobPosting, Professional, Recruiter, InterviewPracticeSession,
+                     InterviewPracticeMessage)
 
 
 class RoleTaskInline(admin.TabularInline):
@@ -338,6 +339,36 @@ class JobPostingAdmin(admin.ModelAdmin):
     )
 
     ordering = ("-created",)
+
+
+@admin.register(InterviewPracticeSession)
+class InterviewPracticeSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "application",
+        "interview_type",
+        "created",
+        "ended_at",
+        "interview_email",
+    )
+    list_filter = ("interview_type", ("ended_at", admin.EmptyFieldListFilter))
+    search_fields = (
+        "application__job_posting__title",
+        "application__job_posting__company_name",
+        "interview_email__subject",
+    )
+    list_select_related = ("application__job_posting", "interview_email")
+    readonly_fields = ("created", "context_snapshot", "feedback")
+    ordering = ("-created", "-pk")
+
+
+@admin.register(InterviewPracticeMessage)
+class InterviewPracticeMessageAdmin(admin.ModelAdmin):
+    list_display = ("session", "role", "created")
+    list_filter = ("role", "created")
+    search_fields = ("content", "session__application__job_posting__title")
+    list_select_related = ("session__application__job_posting",)
+    readonly_fields = ("created",)
+    ordering = ("created", "pk")
 
 
 

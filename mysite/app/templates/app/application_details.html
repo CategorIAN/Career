@@ -59,6 +59,32 @@
         margin-top: 2rem;
     }
 
+    .application-interview-session-list {
+        display: grid;
+        gap: 0.6rem;
+        margin-top: 0.75rem;
+    }
+
+    .application-interview-session {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+        padding: 0.7rem;
+        border: 1px solid #bbb;
+        border-radius: 4px;
+    }
+
+    .application-interview-session-status {
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    .application-interview-form {
+        display: grid;
+        gap: 0.75rem;
+    }
+
     .application-emails-section {
         margin-top: 2rem;
     }
@@ -341,6 +367,34 @@
         </div>
     </section>
 
+    <section class="application-cover-letter-section" aria-labelledby="application-interview-practice-title">
+        <div class="application-cover-letter-heading">
+            <h2 id="application-interview-practice-title">Interview Practice</h2>
+            <button id="application-new-interview-session" type="button">New Session</button>
+        </div>
+        {% if interview_practice_sessions %}
+            <div class="application-interview-session-list">
+                {% for interview_session in interview_practice_sessions %}
+                    <div class="application-interview-session">
+                        <strong>{{ interview_session.get_interview_type_display }}</strong>
+                        <span>{{ interview_session.created|date:"M j, Y, g:i A" }}</span>
+                        <span class="application-interview-session-status">
+                            {% if interview_session.ended_at %}Completed{% else %}In Progress{% endif %}
+                        </span>
+                        {% if interview_session.interview_email %}
+                            <span class="application-interview-session-status">
+                                {{ interview_session.interview_email.subject|default:"Interview Request" }}
+                            </span>
+                        {% endif %}
+                        <a href="{% url 'interview_practice_session' interview_session.pk %}">Open Session</a>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No interview practice sessions yet.</p>
+        {% endif %}
+    </section>
+
     <section class="application-emails-section" aria-labelledby="application-emails-title">
         <div class="application-cover-letter-heading">
             <h2 id="application-emails-title">Emails</h2>
@@ -410,6 +464,24 @@
     </section>
 </section>
 
+<div id="application-interview-session-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-interview-session-title">
+    <div class="modal-content application-submit-modal-content">
+        <button id="application-interview-session-modal-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="application-interview-session-title">Start Interview Practice</h2>
+        <form class="application-interview-form" method="post">
+            {% csrf_token %}
+            {{ interview_session_form.non_field_errors }}
+            <label for="{{ interview_session_form.interview_type.id_for_label }}">Interview type</label>
+            {{ interview_session_form.interview_type.errors }}
+            {{ interview_session_form.interview_type }}
+            <label for="{{ interview_session_form.interview_email.id_for_label }}">{{ interview_session_form.interview_email.label }}</label>
+            {{ interview_session_form.interview_email.errors }}
+            {{ interview_session_form.interview_email }}
+            <button type="submit" name="start_interview_practice" value="1">Start Interview</button>
+        </form>
+    </div>
+</div>
+
 <div id="application-submit-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="application-submit-title">
     <div class="modal-content application-submit-modal-content">
         <button id="application-submit-modal-close" type="button" aria-label="Close">&times;</button>
@@ -473,6 +545,8 @@
         const portfolioContent = document.getElementById("application-portfolio-content");
         const coverLetterToggle = document.getElementById("application-cover-letter-toggle");
         const coverLetterContent = document.getElementById("application-cover-letter-content");
+        const newInterviewSessionButton = document.getElementById("application-new-interview-session");
+        const interviewSessionModal = document.getElementById("application-interview-session-modal");
         const submitModal = document.getElementById("application-submit-modal");
         const descriptionModal = document.getElementById("application-description-modal");
         const explanationModal = document.getElementById("application-ai-explanation-modal");
@@ -527,8 +601,11 @@
         const openSubmitModal = () => {
             openModal(submitModal);
         };
+        const closeInterviewSessionModal = () => closeModal(interviewSessionModal);
+        const openInterviewSessionModal = () => openModal(interviewSessionModal);
 
         submitButton.addEventListener("click", openSubmitModal);
+        newInterviewSessionButton.addEventListener("click", openInterviewSessionModal);
         reviewToggle.addEventListener("click", () => {
             const isHidden = reviewContent.classList.toggle("hidden");
             reviewToggle.textContent = isHidden ? "Show" : "Hide";
@@ -555,8 +632,15 @@
             "click",
             closeSubmitModal
         );
+        document.getElementById("application-interview-session-modal-close").addEventListener(
+            "click",
+            closeInterviewSessionModal
+        );
         submitModal.addEventListener("click", event => {
             if (event.target === submitModal) closeSubmitModal();
+        });
+        interviewSessionModal.addEventListener("click", event => {
+            if (event.target === interviewSessionModal) closeInterviewSessionModal();
         });
         document.getElementById("application-description-button").addEventListener("click", () => {
             descriptionContent.innerHTML = renderMarkdown(
@@ -607,13 +691,14 @@
         });
         document.addEventListener("keydown", event => {
             if (event.key === "Escape") {
-                [submitModal, descriptionModal, explanationModal, emailModal, portfolioModal].forEach(modal => {
+                [submitModal, interviewSessionModal, descriptionModal, explanationModal, emailModal, portfolioModal].forEach(modal => {
                     if (!modal.classList.contains("hidden")) closeModal(modal);
                 });
             }
         });
 
         if ({{ show_submit_modal|yesno:"true,false" }}) openSubmitModal();
+        if ({{ show_interview_session_modal|yesno:"true,false" }}) openInterviewSessionModal();
     });
 </script>
 {% endblock %}
