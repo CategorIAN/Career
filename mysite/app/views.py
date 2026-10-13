@@ -119,6 +119,7 @@ from .services.interview_practice import (
     generate_interviewer_response,
     start_interview,
 )
+from .access import is_career_administrator
 
 from freelancersdk.session import Session
 from freelancersdk.resources.projects import search_projects
@@ -3091,6 +3092,7 @@ def save_freelancer_project_view(request):
 
 @xframe_options_sameorigin
 def resume_view(request):
+    is_administrator = is_career_administrator(request.user)
     profile_settings = ProfileSetting.objects.filter(
         key__in=[
             "location",
@@ -3107,6 +3109,9 @@ def resume_view(request):
         for setting in profile_settings
         if setting.value
     }
+    if not is_administrator:
+        for contact_key in ("location", "email", "phone"):
+            profile_by_key.pop(contact_key, None)
 
     roles = (
         Role.objects
@@ -3136,6 +3141,7 @@ def resume_view(request):
         "app/resume.html",
         {
             "profile": profile_by_key,
+            "show_contact_toggle": is_administrator,
             "roles": roles,
             "projects": projects,
             "education": education,
@@ -3168,8 +3174,11 @@ def references_view(request):
 
 @xframe_options_sameorigin
 def experience_view(request):
+    roles = Role.objects
+    if not is_career_administrator(request.user):
+        roles = roles.filter(is_public=True)
     roles = (
-        Role.objects
+        roles
         .select_related(
             "company",
             "company__address",
@@ -3227,8 +3236,11 @@ def residencies_view(request):
 
 @xframe_options_sameorigin
 def projects_view(request):
+    projects = Project.objects
+    if not is_career_administrator(request.user):
+        projects = projects.filter(is_public=True)
     projects = (
-        Project.objects
+        projects
         .prefetch_related(
             Prefetch(
                 "tasks",

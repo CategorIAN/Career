@@ -193,11 +193,13 @@
     &darr;
 </button>
 
-<label class="contact-toggle" for="contact-mode-toggle">
-    <span>Contact</span>
-    <input type="checkbox" id="contact-mode-toggle" aria-label="Toggle contact mode">
-    <span class="contact-toggle-slider" aria-hidden="true"></span>
-</label>
+{% if show_contact_toggle %}
+    <label class="contact-toggle" for="contact-mode-toggle">
+        <span>Contact</span>
+        <input type="checkbox" id="contact-mode-toggle" aria-label="Toggle contact mode">
+        <span class="contact-toggle-slider" aria-hidden="true"></span>
+    </label>
+{% endif %}
 
 <label class="summary-selector" for="summary-view-select">
     <span>View Summary</span>

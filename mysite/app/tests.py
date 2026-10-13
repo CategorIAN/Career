@@ -7,6 +7,8 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.contrib.messages import get_messages
+from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
@@ -35,6 +37,7 @@ from .models import (
     FreelancerSkill,
     JobPosting,
     Platform,
+    ProfileSetting,
     PlatformSkill,
     Professional,
     ProfessionalConnect,
@@ -129,6 +132,207 @@ def make_project(
             "NDA": False,
         },
     }
+
+
+class NavigationTemplateTests(TestCase):
+    def setUp(self):
+        self.administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(self.administrator)
+
+    def test_navigation_groups_every_destination_once_and_marks_active_folder(self):
+        response = self.client.get(reverse("job_postings"))
+
+        self.assertContains(response, "Portfolio")
+        self.assertContains(response, "Management")
+        self.assertContains(response, "Networking")
+        self.assertContains(response, "Finding Work")
+        self.assertContains(response, 'aria-label="Primary navigation"', html=False)
+        self.assertContains(response, 'aria-controls="finding-work-submenu"', html=False)
+        self.assertContains(response, 'aria-current="page" href="/job-postings/"', html=False)
+        self.assertContains(response, "const navigationFolders", html=False)
+        self.assertContains(response, 'event.key !== "Escape"', html=False)
+        self.assertNotContains(response, 'addEventListener("pointerenter"', html=False)
+
+        expected_destinations = (
+            "resume",
+            "references",
+            "experience",
+            "residencies",
+            "projects",
+            "courses",
+            "features",
+            "platforms",
+            "companies",
+            "skills",
+            "professionals",
+            "recruiters",
+            "connections",
+            "search_terms",
+            "job_search",
+            "job_postings",
+            "job_applications",
+            "emails",
+            "freelancer_search",
+        )
+        content = response.content.decode()
+        for destination in expected_destinations:
+            self.assertEqual(content.count(f'href="{reverse(destination)}"'), 1)
+
+
+class CareerAccessTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="another-user",
+            password="test-password",
+        )
+
+    def test_administrator_can_access_management_navigation_and_pages(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.get(reverse("job_postings"))
+
+        self.assertEqual(response.status_code, 200)
+        for folder_name in ("Portfolio", "Management", "Networking", "Finding Work"):
+            self.assertContains(response, folder_name)
+        self.assertEqual(response.content.decode().count(f'href="{reverse("references")}"'), 1)
+
+    def test_anonymous_visitor_only_sees_and_can_access_portfolio(self):
+        response = self.client.get(reverse("resume"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Portfolio")
+        for folder_name in ("Management", "Networking", "Finding Work"):
+            self.assertNotContains(response, folder_name)
+        self.assertEqual(self.client.get(reverse("job_postings")).status_code, 403)
+        self.assertEqual(self.client.post(reverse("job_postings")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("references")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("admin:login")).status_code, 200)
+
+    def test_other_signed_in_user_is_limited_to_portfolio(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.get(reverse("experience"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Management")
+        self.assertEqual(self.client.get(reverse("skills")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("connection_events")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("references")).status_code, 403)
+
+
+class DjangoAdminAccessTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.other_staff_user = user_model.objects.create_user(
+            username="other-staff-user",
+            password="test-password",
+            is_staff=True,
+        )
+
+    def test_anonymous_admin_request_redirects_to_login_without_data(self):
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertRedirects(
+            response,
+            f"{reverse('admin:login')}?next=%2Fadmin%2F",
+            fetch_redirect_response=False,
+        )
+
+    def test_configured_administrator_can_open_admin_and_sees_admin_link(self):
+        self.client.force_login(self.administrator)
+
+        admin_response = self.client.get(reverse("admin:index"))
+        navigation_response = self.client.get(reverse("job_postings"))
+
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertContains(navigation_response, f'href="{reverse("admin:index")}"', html=False)
+
+    def test_other_staff_user_cannot_open_admin_or_see_admin_link(self):
+        self.client.force_login(self.other_staff_user)
+
+        admin_response = self.client.get(reverse("admin:index"))
+        resume_response = self.client.get(reverse("resume"))
+
+        self.assertEqual(admin_response.status_code, 403)
+        self.assertNotContains(resume_response, f'href="{reverse("admin:index")}"', html=False)
+
+    def test_admin_logout_redirects_to_public_home_and_clears_session(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.post(reverse("admin:logout"))
+
+        self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        home_response = self.client.get(reverse("home"))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, "Portfolio")
+        self.assertNotContains(home_response, f'href="{reverse("admin:index")}"', html=False)
+
+
+class ResumeContactAccessTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="resume-visitor",
+            password="test-password",
+        )
+        ProfileSetting.objects.bulk_create(
+            [
+                ProfileSetting(key="location", value="Private Resume Location"),
+                ProfileSetting(key="email", value="private.resume@example.com"),
+                ProfileSetting(key="phone", value="555-0100"),
+            ]
+        )
+
+    def test_administrator_can_use_the_contact_toggle(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.get(reverse("resume"))
+
+        self.assertContains(response, 'id="contact-mode-toggle"', html=False)
+        self.assertContains(response, "Private Resume Location")
+        self.assertContains(response, "private.resume@example.com")
+        self.assertContains(response, "555-0100")
+
+    def test_anonymous_visitor_cannot_receive_contact_information(self):
+        response = self.client.get(f"{reverse('resume')}?contact=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="contact-mode-toggle"', html=False)
+        self.assertNotContains(response, "Private Resume Location")
+        self.assertNotContains(response, "private.resume@example.com")
+        self.assertNotContains(response, "555-0100")
+        self.assertNotIn("location", response.context["profile"])
+        self.assertNotIn("email", response.context["profile"])
+        self.assertNotIn("phone", response.context["profile"])
+
+    def test_other_signed_in_user_cannot_receive_contact_information(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.get(f"{reverse('resume')}?contact=true")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="contact-mode-toggle"', html=False)
+        self.assertNotContains(response, "private.resume@example.com")
+        self.assertNotIn("email", response.context["profile"])
 
 
 class FreelancerSearchViewTests(TestCase):
@@ -2723,7 +2927,6 @@ class JobPostingsPageTests(TestCase):
         job_posting.refresh_from_db()
         self.assertFalse(job_posting.expired)
         self.assertFalse(job_posting.apply_to)
-
 
 class JobApplicationsPageTests(TestCase):
     def test_job_applications_are_grouped_and_sorted_by_submission_status(self):

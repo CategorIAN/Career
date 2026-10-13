@@ -24,30 +24,81 @@
             background: #000000;
         }
 
-        .sidebar:hover {
+        .sidebar:hover,
+        .sidebar:focus-within {
             width: 220px;
         }
 
+        .nav-folder-toggle,
         .nav-link {
             display: block;
+            width: 100%;
             padding: 10px 12px;
+            border: 0;
+            background: transparent;
             color: #ffffff;
+            font: inherit;
             text-decoration: none;
+            text-align: left;
             border-radius: 8px;
             font-weight: 600;
             white-space: nowrap;
             opacity: 0;
             transition: opacity 0.1s ease;
             pointer-events: none;
+            cursor: pointer;
         }
 
-        .sidebar:hover .nav-link {
+        .sidebar:hover .nav-folder-toggle,
+        .sidebar:hover .nav-link,
+        .sidebar:focus-within .nav-folder-toggle,
+        .sidebar:focus-within .nav-link {
             opacity: 1;
             pointer-events: auto;
         }
 
-        .nav-link:hover {
+        .nav-folder-toggle:hover,
+        .nav-folder-toggle:focus-visible,
+        .nav-link:hover,
+        .nav-link:focus-visible {
             background: #374151;
+            outline: none;
+        }
+
+        .nav-folder-toggle::after {
+            content: "▸";
+            float: right;
+        }
+
+        .nav-folder.is-open .nav-folder-toggle::after {
+            content: "▾";
+        }
+
+        .nav-folder-toggle.is-active {
+            background: #1f2937;
+        }
+
+        .nav-submenu {
+            display: grid;
+            max-height: 0;
+            margin: 0;
+            padding-left: 0.75rem;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.2s ease, opacity 0.15s ease;
+        }
+
+        .nav-folder.is-open .nav-submenu {
+            max-height: 24rem;
+            opacity: 1;
+        }
+
+        .nav-submenu .nav-link {
+            font-size: 0.92rem;
+        }
+
+        .nav-link.is-active {
+            background: #4b5563;
         }
 
         .page-content {
@@ -440,26 +491,49 @@
 <body>
     <div class="app-layout">
         {% if not request.GET.embed %}
-        <nav class="sidebar">
-            <a class="nav-link" href="{% url 'skills' %}">Skills</a>
-            <a class="nav-link" href="{% url 'platforms' %}">Platforms</a>
-            <a class="nav-link" href="{% url 'professionals' %}">Professionals</a>
-            <a class="nav-link" href="{% url 'recruiters' %}">Recruiters</a>
-            <a class="nav-link" href="{% url 'companies' %}">Companies</a>
-            <a class="nav-link" href="{% url 'search_terms' %}">Search Terms</a>
-            <a class="nav-link" href="{% url 'job_search' %}">Job Search</a>
-            <a class="nav-link" href="{% url 'job_postings' %}">Job Postings</a>
-            <a class="nav-link" href="{% url 'job_applications' %}">Job Applications</a>
-            <a class="nav-link" href="{% url 'emails' %}">Emails</a>
-            <a class="nav-link" href="{% url 'connections' %}">Connections</a>
-            <a class="nav-link" href="{% url 'features' %}">Features</a>
-            <a class="nav-link" href="{% url 'freelancer_search' %}">Freelancer Search</a>
-            <a class="nav-link" href="{% url 'resume' %}">Resume</a>
-            <a class="nav-link" href="{% url 'references' %}">References</a>
-            <a class="nav-link" href="{% url 'experience' %}">Experience</a>
-            <a class="nav-link" href="{% url 'residencies' %}">Residencies</a>
-            <a class="nav-link" href="{% url 'projects' %}">Projects</a>
-            <a class="nav-link" href="{% url 'courses' %}">Education</a>
+        <nav class="sidebar" aria-label="Primary navigation">
+            <div class="nav-folder">
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'resume' or request.resolver_match.url_name == 'experience' or request.resolver_match.url_name == 'residencies' or request.resolver_match.url_name == 'projects' or request.resolver_match.url_name == 'courses' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="portfolio-submenu">Portfolio</button>
+                <div id="portfolio-submenu" class="nav-submenu">
+                    <a class="nav-link{% if request.resolver_match.url_name == 'resume' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'resume' %} aria-current="page"{% endif %} href="{% url 'resume' %}">Resume</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'experience' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'experience' %} aria-current="page"{% endif %} href="{% url 'experience' %}">Experience</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'residencies' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'residencies' %} aria-current="page"{% endif %} href="{% url 'residencies' %}">Residencies</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'projects' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'projects' %} aria-current="page"{% endif %} href="{% url 'projects' %}">Projects</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'courses' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'courses' %} aria-current="page"{% endif %} href="{% url 'courses' %}">Education</a>
+                </div>
+            </div>
+            {% if career_is_admin %}
+            <div class="nav-folder">
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'features' or request.resolver_match.url_name == 'platforms' or request.resolver_match.url_name == 'companies' or request.resolver_match.url_name == 'skills' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="management-submenu">Management</button>
+                <div id="management-submenu" class="nav-submenu">
+                    <a class="nav-link{% if request.resolver_match.url_name == 'features' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'features' %} aria-current="page"{% endif %} href="{% url 'features' %}">Features</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'platforms' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'platforms' %} aria-current="page"{% endif %} href="{% url 'platforms' %}">Platforms</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'companies' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'companies' %} aria-current="page"{% endif %} href="{% url 'companies' %}">Companies</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'skills' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'skills' %} aria-current="page"{% endif %} href="{% url 'skills' %}">Skills</a>
+                </div>
+            </div>
+            <div class="nav-folder">
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'professionals' or request.resolver_match.url_name == 'recruiters' or request.resolver_match.url_name == 'connections' or request.resolver_match.url_name == 'references' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="networking-submenu">Networking</button>
+                <div id="networking-submenu" class="nav-submenu">
+                    <a class="nav-link{% if request.resolver_match.url_name == 'professionals' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'professionals' %} aria-current="page"{% endif %} href="{% url 'professionals' %}">Professionals</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'recruiters' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'recruiters' %} aria-current="page"{% endif %} href="{% url 'recruiters' %}">Recruiters</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'connections' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'connections' %} aria-current="page"{% endif %} href="{% url 'connections' %}">Connections</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'references' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'references' %} aria-current="page"{% endif %} href="{% url 'references' %}">References</a>
+                </div>
+            </div>
+            <div class="nav-folder">
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'search_terms' or request.resolver_match.url_name == 'job_search' or request.resolver_match.url_name == 'job_postings' or request.resolver_match.url_name == 'job_applications' or request.resolver_match.url_name == 'emails' or request.resolver_match.url_name == 'freelancer_search' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="finding-work-submenu">Finding Work</button>
+                <div id="finding-work-submenu" class="nav-submenu">
+                    <a class="nav-link{% if request.resolver_match.url_name == 'search_terms' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'search_terms' %} aria-current="page"{% endif %} href="{% url 'search_terms' %}">Search Terms</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'job_search' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'job_search' %} aria-current="page"{% endif %} href="{% url 'job_search' %}">Job Search</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'job_postings' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'job_postings' %} aria-current="page"{% endif %} href="{% url 'job_postings' %}">Job Postings</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'job_applications' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'job_applications' %} aria-current="page"{% endif %} href="{% url 'job_applications' %}">Job Applications</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'emails' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'emails' %} aria-current="page"{% endif %} href="{% url 'emails' %}">Emails</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'freelancer_search' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'freelancer_search' %} aria-current="page"{% endif %} href="{% url 'freelancer_search' %}">Freelancer Search</a>
+                </div>
+            </div>
+            <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
+            {% endif %}
         </nav>
         {% endif %}
 
@@ -546,6 +620,59 @@
                 console.error("Clipboard copy failed.", error);
             }
         });
+    });
+
+    const navigationFolders = Array.from(document.querySelectorAll(".nav-folder"));
+
+    const setNavigationFolderOpen = (folder, isOpen) => {
+        const toggle = folder.querySelector(".nav-folder-toggle");
+        folder.classList.toggle("is-open", isOpen);
+        toggle.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    const closeNavigationFolders = (except = null) => {
+        navigationFolders.forEach(folder => {
+            if (folder !== except) {
+                setNavigationFolderOpen(folder, false);
+            }
+        });
+    };
+
+    navigationFolders.forEach(folder => {
+        const toggle = folder.querySelector(".nav-folder-toggle");
+
+        toggle.addEventListener("click", () => {
+            const isOpen = folder.classList.contains("is-open");
+            closeNavigationFolders(folder);
+            setNavigationFolderOpen(folder, !isOpen);
+        });
+
+        folder.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!folder.contains(document.activeElement)) {
+                    setNavigationFolderOpen(folder, false);
+                }
+            });
+        });
+    });
+
+    document.addEventListener("click", event => {
+        if (!event.target.closest(".nav-folder")) {
+            closeNavigationFolders();
+        }
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        const activeFolder = document.activeElement.closest(".nav-folder");
+        if (activeFolder) {
+            event.preventDefault();
+            setNavigationFolderOpen(activeFolder, false);
+            activeFolder.querySelector(".nav-folder-toggle").focus();
+        }
     });
 </script>
 </html>
