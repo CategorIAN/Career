@@ -3,8 +3,247 @@
 {% block title %}Experience{% endblock %}
 
 {% block content %}
+<style>
+    .experience-mode-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0 0 1.5rem;
+    }
+
+    .experience-mode-switch a {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #7d7d7d;
+        background: #f2f2f2;
+        color: #222;
+        text-decoration: none;
+    }
+
+    .experience-mode-switch a.is-active {
+        background: #4b5563;
+        color: #fff;
+    }
+
+    .experience-presentation-list {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .experience-presentation-role {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #b9b9b9;
+    }
+
+    .experience-presentation-role:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+
+    .experience-presentation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.35rem 1rem;
+    }
+
+    .experience-presentation-header h2,
+    .experience-presentation-company,
+    .experience-presentation-dates,
+    .experience-presentation-role h3 {
+        margin: 0;
+    }
+
+    .experience-presentation-company,
+    .experience-presentation-dates {
+        color: #444;
+    }
+
+    .experience-presentation-role h3 {
+        margin-top: 1rem;
+        font-size: 1rem;
+    }
+
+    .experience-presentation-role p,
+    .experience-presentation-role li {
+        line-height: 1.55;
+    }
+
+    @media (max-width: 600px) {
+        .experience-presentation-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+
+    .experience-edit-status {
+        min-height: 1.25rem;
+        margin: 0.5rem 0;
+    }
+
+    .experience-edit-status.is-success {
+        color: #1f6b35;
+    }
+
+    .experience-edit-status.is-error {
+        color: #b42318;
+    }
+
+    .experience-edit-section {
+        margin: 1rem 0;
+        padding: 1rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+    }
+
+    .experience-edit-section h3 {
+        margin-top: 0;
+    }
+
+    .experience-edit-form p {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .experience-edit-form input,
+    .experience-edit-form select,
+    .experience-edit-form textarea {
+        box-sizing: border-box;
+        max-width: 100%;
+    }
+
+    .experience-skill-columns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .experience-skill-column h4 {
+        margin: 0 0 0.5rem;
+    }
+
+    .experience-skill-list {
+        min-height: 8rem;
+        max-height: 18rem;
+        margin: 0;
+        padding: 0.5rem;
+        overflow-y: auto;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+    }
+
+    .experience-skill-list.is-drag-over {
+        border-color: #4b5563;
+        background: #e7e7e7;
+    }
+
+    .experience-skill-item {
+        margin: 0 0 0.4rem;
+        padding: 0.45rem 0.6rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+        cursor: grab;
+    }
+
+    .experience-skill-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .experience-skill-item.dragging {
+        opacity: 0.5;
+    }
+
+    .experience-task-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .experience-task-item {
+        padding: 0.75rem;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+        cursor: grab;
+    }
+
+    .experience-task-item.dragging {
+        opacity: 0.5;
+    }
+
+    .experience-task-list.is-drag-over {
+        outline: 2px solid #4b5563;
+        outline-offset: 0.25rem;
+    }
+
+    .experience-task-fields {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    @media (max-width: 600px) {
+        .experience-skill-columns {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 <section class="utility-page">
     <h1>Work Experience</h1>
+    {% if show_experience_mode_switch %}
+        <nav class="experience-mode-switch" aria-label="Experience display mode">
+            <a href="?mode=presentation"{% if experience_mode == "presentation" %} class="is-active" aria-current="page"{% endif %}>Presentation</a>
+            <a href="?mode=application_tools"{% if experience_mode == "application_tools" %} class="is-active" aria-current="page"{% endif %}>Application Tools</a>
+            <a href="?mode=editing"{% if experience_mode == "editing" %} class="is-active" aria-current="page"{% endif %}>Editing</a>
+        </nav>
+    {% endif %}
+
+    {% if experience_mode == "presentation" %}
+        <div class="experience-presentation-list">
+            {% for role in roles %}
+                <article class="experience-presentation-role">
+                    <div class="experience-presentation-header">
+                        <h2>{{ role.title }}</h2>
+                        <p class="experience-presentation-dates">
+                            {{ role.start_date|date:"M Y" }}
+                            {% if role.current %}
+                                &ndash; Present
+                            {% elif role.end_date %}
+                                &ndash; {{ role.end_date|date:"M Y" }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <p class="experience-presentation-company">
+                        {% if role.company.website %}
+                            <a href="{{ role.company.website }}" target="_blank" rel="noopener noreferrer">{{ role.company.name }}</a>
+                        {% else %}
+                            {{ role.company.name }}
+                        {% endif %}
+                        {% if role.company.address and role.company.address.city %}
+                            &middot; {{ role.company.address.city.name }}{% if role.company.address.city.state %}, {{ role.company.address.city.state.abbreviation }}{% endif %}
+                        {% endif %}
+                    </p>
+
+                    {% if role.description %}
+                        <p>{{ role.description }}</p>
+                    {% endif %}
+
+                    {% if role.tasks.all %}
+                        <h3>Responsibilities</h3>
+                        <ul>
+                            {% for task in role.tasks.all %}
+                                <li>{{ task.description }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if role.skills.all %}
+                        <h3>Relevant Skills</h3>
+                        <p>{% for skill in role.skills.all %}{% if not forloop.first %}, {% endif %}{{ skill.name }}{% endfor %}</p>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <p>No public roles found.</p>
+            {% endfor %}
+        </div>
+    {% elif experience_mode == "application_tools" %}
     <p class="utility-page-intro">Complete stored role history for copying into applications.</p>
 
     {% for role in roles %}
@@ -434,7 +673,108 @@
     {% empty %}
         <p>No roles found.</p>
     {% endfor %}
+    {% else %}
+        <p class="utility-page-intro">Edit individual role sections and save each section independently.</p>
+        {% for role in roles %}
+            <article class="utility-card">
+                <div class="utility-card-header">
+                    <h2>{{ role.title }}</h2>
+                    <button type="button" class="copy-button role-edit-toggle" data-target="role-edit-details-{{ role.pk }}">Show</button>
+                </div>
+                <div id="role-edit-details-{{ role.pk }}" class="hidden">
+                    <section class="experience-edit-section">
+                        <h3>Role Details</h3>
+                        <form class="experience-edit-form" data-save-url="{% url 'save_experience_role_section' role.pk 'core' %}">
+                            {% csrf_token %}
+                            {{ role.core_edit_form.as_p }}
+                            <button type="submit" class="copy-button">Save Role Details</button>
+                            <p class="experience-edit-status" role="status"></p>
+                        </form>
+                    </section>
+
+                    <section class="experience-edit-section">
+                        <h3>Description &amp; Employment Details</h3>
+                        <form class="experience-edit-form" data-save-url="{% url 'save_experience_role_section' role.pk 'details' %}">
+                            {% csrf_token %}
+                            {{ role.details_edit_form.as_p }}
+                            <button type="submit" class="copy-button">Save Employment Details</button>
+                            <p class="experience-edit-status" role="status"></p>
+                        </form>
+                    </section>
+
+                    <section class="experience-edit-section">
+                        <h3>Skills</h3>
+                        <form class="experience-edit-form" data-save-url="{% url 'save_experience_role_section' role.pk 'skills' %}">
+                            {% csrf_token %}
+                            <select name="{{ role.skills_edit_form.skills.html_name }}" multiple hidden>
+                                {% for skill in role.editing_skills %}
+                                    <option value="{{ skill.pk }}" selected>{{ skill.name }}</option>
+                                {% endfor %}
+                                {% for skill in role.editing_available_skills %}
+                                    <option value="{{ skill.pk }}">{{ skill.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="experience-skill-columns">
+                                <div class="experience-skill-column">
+                                    <h4>Skills in Role</h4>
+                                    <div class="experience-skill-list" data-skill-membership="in" aria-label="Skills in role">
+                                        {% for skill in role.editing_skills %}
+                                            <div class="experience-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="experience-skill-column">
+                                    <h4>Skills Not in Role</h4>
+                                    <div class="experience-skill-list" data-skill-membership="out" aria-label="Skills not in role">
+                                        {% for skill in role.editing_available_skills %}
+                                            <div class="experience-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="copy-button">Save Skills</button>
+                            <p class="experience-edit-status" role="status"></p>
+                        </form>
+                    </section>
+
+                    <section class="experience-edit-section">
+                        <h3>Responsibilities</h3>
+                        {% if role.task_edit_formset.forms %}
+                            <form class="experience-edit-form" data-save-url="{% url 'save_experience_role_tasks' role.pk %}">
+                                {% csrf_token %}
+                                {{ role.task_edit_formset.management_form }}
+                                <div class="experience-task-list" aria-label="Role responsibilities">
+                                    {% for task_form in role.task_edit_formset.forms %}
+                                        <div class="experience-task-item" draggable="true" data-task-id="{{ task_form.instance.pk }}">
+                                            {{ task_form.id }}
+                                            {{ task_form.ORDER.as_hidden }}
+                                            <div class="experience-task-fields">
+                                                <div>
+                                                    {{ task_form.description.label_tag }}
+                                                    {{ task_form.description }}
+                                                    {{ task_form.description.errors }}
+                                                </div>
+                                                <label>{{ task_form.resume_ready }} {{ task_form.resume_ready.label }}</label>
+                                                {{ task_form.resume_ready.errors }}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button type="submit" class="copy-button">Save Role Tasks</button>
+                                <p class="experience-edit-status" role="status"></p>
+                            </form>
+                        {% else %}
+                            <p>No responsibilities have been added.</p>
+                        {% endif %}
+                    </section>
+                </div>
+            </article>
+        {% empty %}
+            <p>No roles found.</p>
+        {% endfor %}
+    {% endif %}
 </section>
+{% if experience_mode == "application_tools" %}
 <script>
     document.querySelectorAll(".role-toggle-button").forEach(button => {
         button.addEventListener("click", () => {
@@ -496,4 +836,179 @@
         });
     });
 </script>
+{% elif experience_mode == "editing" %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const editingForms = Array.from(document.querySelectorAll(".experience-edit-form"));
+        const refreshDirtyState = () => {
+            window.experienceHasUnsavedChanges = editingForms.some(form => form.dataset.dirty === "true");
+        };
+        const setStatus = (form, message, isError = false) => {
+            const status = form.querySelector(".experience-edit-status");
+            status.textContent = message;
+            status.classList.toggle("is-error", isError);
+            status.classList.toggle("is-success", !isError && Boolean(message));
+        };
+        const formatErrors = errors => Object.entries(errors)
+            .flatMap(([field, messages]) => messages.map(message => `${field}: ${message.message}`))
+            .join(" ");
+
+        document.querySelectorAll(".role-edit-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const details = document.getElementById(button.dataset.target);
+                const isHidden = details.classList.contains("hidden");
+                details.classList.toggle("hidden");
+                button.textContent = isHidden ? "Hide" : "Show";
+            });
+        });
+
+        editingForms.forEach(form => {
+            form.addEventListener("input", () => {
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            });
+            form.addEventListener("change", () => {
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            });
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                setStatus(form, "Saving...");
+                const response = await fetch(form.dataset.saveUrl, {
+                    method: "POST",
+                    body: new FormData(form),
+                    credentials: "same-origin",
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    setStatus(form, result.error || formatErrors(result.errors || {}), true);
+                    return;
+                }
+                form.dataset.dirty = "false";
+                refreshDirtyState();
+                setStatus(form, result.message || "Changes saved.");
+            });
+        });
+
+        document.querySelectorAll(".experience-edit-form").forEach(form => {
+            const skillSelect = form.querySelector("select[multiple][hidden]");
+            const skillLists = form.querySelectorAll(".experience-skill-list");
+            if (!skillSelect || !skillLists.length) {
+                return;
+            }
+
+            let draggedSkill = null;
+            const syncSkillSelection = () => {
+                const includedSkillIds = new Set(
+                    Array.from(form.querySelectorAll('[data-skill-membership="in"] [data-skill-id]'))
+                        .map(skill => skill.dataset.skillId)
+                );
+                Array.from(skillSelect.options).forEach(option => {
+                    option.selected = includedSkillIds.has(option.value);
+                });
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+
+            form.querySelectorAll(".experience-skill-item").forEach(skill => {
+                skill.addEventListener("dragstart", event => {
+                    draggedSkill = skill;
+                    skill.classList.add("dragging");
+                    event.dataTransfer.effectAllowed = "move";
+                });
+                skill.addEventListener("dragend", () => {
+                    skill.classList.remove("dragging");
+                    draggedSkill = null;
+                    skillLists.forEach(list => list.classList.remove("is-drag-over"));
+                });
+            });
+
+            skillLists.forEach(list => {
+                list.addEventListener("dragover", event => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    list.classList.add("is-drag-over");
+                });
+                list.addEventListener("dragleave", event => {
+                    if (!list.contains(event.relatedTarget)) {
+                        list.classList.remove("is-drag-over");
+                    }
+                });
+                list.addEventListener("drop", event => {
+                    event.preventDefault();
+                    list.classList.remove("is-drag-over");
+                    if (!draggedSkill || draggedSkill.parentElement === list) {
+                        return;
+                    }
+                    list.appendChild(draggedSkill);
+                    syncSkillSelection();
+                });
+            });
+        });
+
+        document.querySelectorAll(".experience-task-list").forEach(taskList => {
+            const form = taskList.closest(".experience-edit-form");
+            let draggedTask = null;
+            const syncTaskOrder = () => {
+                taskList.querySelectorAll(".experience-task-item").forEach((task, index) => {
+                    task.querySelector('input[name$="-ORDER"]').value = index + 1;
+                });
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+
+            taskList.querySelectorAll(".experience-task-item").forEach(task => {
+                task.addEventListener("dragstart", event => {
+                    draggedTask = task;
+                    task.classList.add("dragging");
+                    event.dataTransfer.effectAllowed = "move";
+                });
+                task.addEventListener("dragend", () => {
+                    task.classList.remove("dragging");
+                    draggedTask = null;
+                    taskList.classList.remove("is-drag-over");
+                });
+            });
+
+            taskList.addEventListener("dragover", event => {
+                event.preventDefault();
+                taskList.classList.add("is-drag-over");
+            });
+            taskList.addEventListener("dragleave", event => {
+                if (!taskList.contains(event.relatedTarget)) {
+                    taskList.classList.remove("is-drag-over");
+                }
+            });
+            taskList.addEventListener("drop", event => {
+                event.preventDefault();
+                taskList.classList.remove("is-drag-over");
+                if (!draggedTask) {
+                    return;
+                }
+                const dropTarget = event.target.closest(".experience-task-item");
+                if (dropTarget && dropTarget !== draggedTask) {
+                    taskList.insertBefore(draggedTask, dropTarget);
+                } else {
+                    taskList.appendChild(draggedTask);
+                }
+                syncTaskOrder();
+            });
+        });
+
+        document.querySelectorAll(".experience-mode-switch a").forEach(link => {
+            link.addEventListener("click", event => {
+                if (window.experienceHasUnsavedChanges && !window.confirm("Discard unsaved Experience changes?")) {
+                    event.preventDefault();
+                }
+            });
+        });
+        window.addEventListener("beforeunload", event => {
+            if (window.experienceHasUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

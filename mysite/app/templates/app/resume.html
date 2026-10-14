@@ -119,6 +119,32 @@
         display: block;
     }
 
+    .resume-section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .resume-section-heading h2 {
+        margin: 0;
+    }
+
+    .resume-more-details-button {
+        padding: 0.25rem 0.55rem;
+        border: 1px solid #7d7d7d;
+        border-radius: 4px;
+        background: #f2f2f2;
+        color: #222;
+        font-size: 0.85rem;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .resume-more-details-button:hover {
+        background: #e7e7e7;
+    }
+
     @media print {
         @page {
             size: letter;
@@ -128,7 +154,8 @@
         .sidebar,
         .resume-download-button,
         .contact-toggle,
-        .summary-selector {
+        .summary-selector,
+        .resume-more-details-button {
             display: none !important;
         }
 
@@ -253,7 +280,10 @@
     <hr>
 
     <section>
-        <h2>Work Experience</h2>
+        <div class="resume-section-heading">
+            <h2>Work Experience</h2>
+            <a class="resume-more-details-button" href="{% url 'experience' %}">More Details</a>
+        </div>
 
         {% for role in roles %}
             <article>
@@ -299,7 +329,10 @@
     <hr>
 
     <section>
-        <h2>Projects</h2>
+        <div class="resume-section-heading">
+            <h2>Projects</h2>
+            <a class="resume-more-details-button" href="{% url 'projects' %}">More Details</a>
+        </div>
 
         {% for project in projects %}
             <article>
@@ -360,7 +393,10 @@
     <hr>
 
     <section>
-        <h2>Education</h2>
+        <div class="resume-section-heading">
+            <h2>Education</h2>
+            <a class="resume-more-details-button" href="{% url 'courses' %}">More Details</a>
+        </div>
 
         {% for item in education %}
             <article style="margin-bottom: 0.75rem;">

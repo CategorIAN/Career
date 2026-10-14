@@ -11,7 +11,6 @@ PUBLIC_PORTFOLIO_VIEW_NAMES = frozenset(
         "home",
         "resume",
         "experience",
-        "residencies",
         "projects",
         "courses",
     }

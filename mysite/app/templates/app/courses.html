@@ -3,8 +3,214 @@
 {% block title %}Education{% endblock %}
 
 {% block content %}
+<style>
+    .education-mode-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0 0 1.5rem;
+    }
+
+    .education-mode-switch a {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #7d7d7d;
+        background: #f2f2f2;
+        color: #222;
+        text-decoration: none;
+    }
+
+    .education-mode-switch a.is-active {
+        background: #4b5563;
+        color: #fff;
+    }
+
+    .education-presentation-list {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .education-presentation-card {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #b9b9b9;
+    }
+
+    .education-presentation-card:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+
+    .education-presentation-card h2,
+    .education-presentation-card h3,
+    .education-presentation-card p {
+        margin-top: 0;
+    }
+
+    .education-presentation-meta {
+        color: #444;
+    }
+
+    .education-presentation-card p,
+    .education-presentation-card li {
+        line-height: 1.55;
+    }
+
+    .course-presentation-list-legacy {
+        display: none;
+    }
+
+    .course-presentation-description-button {
+        margin-left: 0.5rem;
+        padding: 0.2rem 0.45rem;
+        border: 1px solid #7d7d7d;
+        background: #f2f2f2;
+        color: #222;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.85rem;
+    }
+
+    .course-presentation-description {
+        margin: 0.5rem 0 0;
+    }
+
+    .education-edit-section {
+        margin: 1rem 0;
+        padding: 1rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+    }
+
+    .education-edit-section h3 {
+        margin-top: 0;
+    }
+
+    .education-edit-form p {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .education-edit-form input,
+    .education-edit-form select,
+    .education-edit-form textarea {
+        box-sizing: border-box;
+        max-width: 100%;
+    }
+
+    .education-edit-status {
+        min-height: 1.25rem;
+        margin: 0.5rem 0;
+    }
+
+    .education-edit-status.is-success {
+        color: #1f6b35;
+    }
+
+    .education-edit-status.is-error {
+        color: #b42318;
+    }
+
+    .course-edit-card {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+    }
+
+    .education-skill-columns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .education-skill-column h4 {
+        margin: 0 0 0.5rem;
+    }
+
+    .education-skill-list {
+        min-height: 8rem;
+        max-height: 18rem;
+        padding: 0.5rem;
+        overflow-y: auto;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+    }
+
+    .education-skill-list.is-drag-over {
+        outline: 2px solid #4b5563;
+        outline-offset: 0.25rem;
+    }
+
+    .education-skill-item {
+        padding: 0.45rem 0.6rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+        cursor: grab;
+    }
+
+    .education-skill-item + .education-skill-item {
+        margin-top: 0.4rem;
+    }
+
+    .education-skill-item.dragging {
+        opacity: 0.5;
+    }
+
+    @media (max-width: 600px) {
+        .education-skill-columns {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 <section class="utility-page">
     <h1>Education</h1>
+    {% if show_education_mode_switch %}
+        <nav class="education-mode-switch" aria-label="Education display mode">
+            <a href="?mode=presentation"{% if education_mode == "presentation" %} class="is-active" aria-current="page"{% endif %}>Presentation</a>
+            <a href="?mode=application_tools"{% if education_mode == "application_tools" %} class="is-active" aria-current="page"{% endif %}>Application Tools</a>
+            <a href="?mode=editing"{% if education_mode == "editing" %} class="is-active" aria-current="page"{% endif %}>Editing</a>
+        </nav>
+    {% endif %}
+
+    {% if education_mode == "presentation" %}
+        <div class="education-presentation-list">
+            {% for course_group in course_groups %}
+                <article class="education-presentation-card">
+                    <h2>{{ course_group.program }}</h2>
+                    <p class="education-presentation-meta">
+                        {{ course_group.education.school.name }}
+                        {% if course_group.education.school.city %}
+                            &middot; {{ course_group.education.school.city.name }}{% if course_group.education.school.city.state %}, {{ course_group.education.school.city.state.abbreviation }}{% endif %}
+                        {% endif %}
+                    </p>
+                    {% if course_group.date_range %}<p class="education-presentation-meta">{{ course_group.date_range }}</p>{% endif %}
+                    {% if course_group.gpa %}<p>GPA: {{ course_group.gpa }}</p>{% endif %}
+                    {% if course_group.honors %}<p>{{ course_group.honors }}</p>{% endif %}
+                    {% if course_group.description %}<p>{{ course_group.description }}</p>{% endif %}
+                    {% if course_group.courses %}
+                        <h3>Relevant Courses</h3>
+                        <ul class="course-presentation-list-legacy" aria-hidden="true">
+                            {% for course in course_group.courses %}
+                                <li>{{ course.title }}{% if course.code %} ({{ course.code }}){% endif %}{% if course.description %} — {{ course.description }}{% endif %}</li>
+                            {% endfor %}
+                        </ul>
+                        <ul>
+                            {% for course in course_group.courses %}
+                                <li>
+                                    {{ course.title }}{% if course.code %} ({{ course.code }}){% endif %}
+                                    {% if course.description %}
+                                        <button type="button" class="course-presentation-description-button" data-target="course-presentation-description-{{ course.pk }}" aria-expanded="false">Show Description</button>
+                                        <p id="course-presentation-description-{{ course.pk }}" class="course-presentation-description hidden">{{ course.description }}</p>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <p>No education records found.</p>
+            {% endfor %}
+        </div>
+    {% elif education_mode == "application_tools" %}
     <p class="utility-page-intro">Complete stored course details for copying into applications.</p>
 
     {% for course_group in course_groups %}
@@ -344,7 +550,97 @@
     {% empty %}
         <p>No courses found.</p>
     {% endfor %}
+    {% else %}
+        <p class="utility-page-intro">Edit education and course details without changing shared school or skill records.</p>
+        {% for course_group in course_groups %}
+            <section class="utility-card">
+                <div class="utility-card-header">
+                    <h2>{{ course_group.program }}</h2>
+                    <button type="button" class="copy-button education-edit-toggle" data-target="education-edit-details-{{ course_group.education.pk }}">Show</button>
+                </div>
+                <div id="education-edit-details-{{ course_group.education.pk }}" class="hidden">
+                    <section class="education-edit-section">
+                        <h3>Education</h3>
+                        <form class="education-edit-form" data-save-url="{% url 'save_education' course_group.education.pk %}">
+                            {% csrf_token %}
+                            {{ course_group.education_edit_form.as_p }}
+                            <button type="submit" class="copy-button">Save Education</button>
+                            <p class="education-edit-status" role="status"></p>
+                        </form>
+                    </section>
+                    <section class="education-edit-section">
+                        <h3>Courses</h3>
+                        {% for course in course_group.courses %}
+                            <article class="course-edit-card">
+                                <h4>{{ course.title }}</h4>
+                                <form class="education-edit-form" data-save-url="{% url 'save_course_section' course.pk 'details' %}">
+                                    {% csrf_token %}
+                                    {{ course.edit_form.as_p }}
+                                    <button type="submit" class="copy-button">Save Course</button>
+                                    <p class="education-edit-status" role="status"></p>
+                                </form>
+                                <form class="education-edit-form" data-save-url="{% url 'save_course_section' course.pk 'skills' %}">
+                                    {% csrf_token %}
+                                    <select name="{{ course.skills_edit_form.skills.html_name }}" multiple hidden>
+                                        {% for skill in course.editing_skills %}<option value="{{ skill.pk }}" selected>{{ skill.name }}</option>{% endfor %}
+                                        {% for skill in course.editing_available_skills %}<option value="{{ skill.pk }}">{{ skill.name }}</option>{% endfor %}
+                                    </select>
+                                    <div class="education-skill-columns">
+                                        <div class="education-skill-column">
+                                            <h4>Skills in Course</h4>
+                                            <div class="education-skill-list" data-skill-membership="in" aria-label="Skills in course">
+                                                {% for skill in course.editing_skills %}<div class="education-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>{% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="education-skill-column">
+                                            <h4>Skills Not in Course</h4>
+                                            <div class="education-skill-list" data-skill-membership="out" aria-label="Skills not in course">
+                                                {% for skill in course.editing_available_skills %}<div class="education-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>{% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="copy-button">Save Course Skills</button>
+                                    <p class="education-edit-status" role="status"></p>
+                                </form>
+                            </article>
+                        {% empty %}
+                            <p>No courses have been added.</p>
+                        {% endfor %}
+                    </section>
+                </div>
+            </section>
+        {% empty %}
+            <p>No courses found.</p>
+        {% endfor %}
+    {% endif %}
 </section>
+{% if education_mode == "presentation" %}
+<script>
+    document.querySelectorAll(".course-presentation-description-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const target = document.getElementById(button.dataset.target);
+            if (!target) {
+                return;
+            }
+
+            const shouldShow = target.classList.contains("hidden");
+            document.querySelectorAll(".course-presentation-description").forEach(description => {
+                description.classList.add("hidden");
+            });
+            document.querySelectorAll(".course-presentation-description-button").forEach(descriptionButton => {
+                descriptionButton.textContent = "Show Description";
+                descriptionButton.setAttribute("aria-expanded", "false");
+            });
+
+            if (shouldShow) {
+                target.classList.remove("hidden");
+                button.textContent = "Hide Description";
+                button.setAttribute("aria-expanded", "true");
+            }
+        });
+    });
+</script>
+{% elif education_mode == "application_tools" %}
 <script>
     document.querySelectorAll(".course-group-toggle-button").forEach(button => {
         button.addEventListener("click", () => {
@@ -406,4 +702,90 @@
         });
     });
 </script>
+{% elif education_mode == "editing" %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const editingForms = Array.from(document.querySelectorAll(".education-edit-form"));
+        const refreshDirtyState = () => {
+            window.educationHasUnsavedChanges = editingForms.some(form => form.dataset.dirty === "true");
+        };
+        const setStatus = (form, message, isError = false) => {
+            const status = form.querySelector(".education-edit-status");
+            status.textContent = message;
+            status.classList.toggle("is-error", isError);
+            status.classList.toggle("is-success", !isError && Boolean(message));
+        };
+        const formatErrors = errors => Object.entries(errors)
+            .flatMap(([field, messages]) => messages.map(message => `${field}: ${message.message}`))
+            .join(" ");
+
+        document.querySelectorAll(".education-edit-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const details = document.getElementById(button.dataset.target);
+                const isHidden = details.classList.contains("hidden");
+                details.classList.toggle("hidden");
+                button.textContent = isHidden ? "Hide" : "Show";
+            });
+        });
+
+        editingForms.forEach(form => {
+            form.addEventListener("input", () => { form.dataset.dirty = "true"; refreshDirtyState(); });
+            form.addEventListener("change", () => { form.dataset.dirty = "true"; refreshDirtyState(); });
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                setStatus(form, "Saving...");
+                const response = await fetch(form.dataset.saveUrl, { method: "POST", body: new FormData(form), credentials: "same-origin" });
+                const result = await response.json();
+                if (!response.ok) {
+                    setStatus(form, result.error || formatErrors(result.errors || {}), true);
+                    return;
+                }
+                form.dataset.dirty = "false";
+                refreshDirtyState();
+                setStatus(form, result.message || "Changes saved.");
+            });
+        });
+
+        document.querySelectorAll(".education-edit-form").forEach(form => {
+            const skillSelect = form.querySelector("select[multiple][hidden]");
+            const skillLists = form.querySelectorAll(".education-skill-list");
+            if (!skillSelect || !skillLists.length) return;
+            let draggedSkill = null;
+            const syncSkillSelection = () => {
+                const includedSkillIds = new Set(Array.from(form.querySelectorAll('[data-skill-membership="in"] [data-skill-id]')).map(skill => skill.dataset.skillId));
+                Array.from(skillSelect.options).forEach(option => { option.selected = includedSkillIds.has(option.value); });
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+            form.querySelectorAll(".education-skill-item").forEach(skill => {
+                skill.addEventListener("dragstart", event => { draggedSkill = skill; skill.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; });
+                skill.addEventListener("dragend", () => { skill.classList.remove("dragging"); draggedSkill = null; skillLists.forEach(list => list.classList.remove("is-drag-over")); });
+            });
+            skillLists.forEach(list => {
+                list.addEventListener("dragover", event => { event.preventDefault(); list.classList.add("is-drag-over"); });
+                list.addEventListener("dragleave", event => { if (!list.contains(event.relatedTarget)) list.classList.remove("is-drag-over"); });
+                list.addEventListener("drop", event => {
+                    event.preventDefault();
+                    list.classList.remove("is-drag-over");
+                    if (!draggedSkill || draggedSkill.parentElement === list) return;
+                    list.appendChild(draggedSkill);
+                    syncSkillSelection();
+                });
+            });
+        });
+
+        document.querySelectorAll(".education-mode-switch a").forEach(link => {
+            link.addEventListener("click", event => {
+                if (window.educationHasUnsavedChanges && !window.confirm("Discard unsaved Education changes?")) event.preventDefault();
+            });
+        });
+        window.addEventListener("beforeunload", event => {
+            if (window.educationHasUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

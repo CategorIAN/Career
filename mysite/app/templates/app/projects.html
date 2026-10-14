@@ -3,8 +3,235 @@
 {% block title %}Projects{% endblock %}
 
 {% block content %}
+<style>
+    .projects-mode-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0 0 1.5rem;
+    }
+
+    .projects-mode-switch a {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #7d7d7d;
+        background: #f2f2f2;
+        color: #222;
+        text-decoration: none;
+    }
+
+    .projects-mode-switch a.is-active {
+        background: #4b5563;
+        color: #fff;
+    }
+
+    .project-presentation-list {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .project-presentation-card {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #b9b9b9;
+    }
+
+    .project-presentation-card:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+
+    .project-presentation-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.35rem 1rem;
+    }
+
+    .project-presentation-header h2,
+    .project-presentation-header p,
+    .project-presentation-card h3 {
+        margin: 0;
+    }
+
+    .project-presentation-dates {
+        color: #444;
+    }
+
+    .project-presentation-card h3 {
+        margin-top: 1rem;
+        font-size: 1rem;
+    }
+
+    .project-presentation-card p,
+    .project-presentation-card li {
+        line-height: 1.55;
+    }
+
+    .project-edit-section {
+        margin: 1rem 0;
+        padding: 1rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+    }
+
+    .project-edit-section h3 {
+        margin-top: 0;
+    }
+
+    .project-edit-form p,
+    .project-edit-fields {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .project-edit-form input,
+    .project-edit-form select,
+    .project-edit-form textarea {
+        box-sizing: border-box;
+        max-width: 100%;
+    }
+
+    .project-edit-status {
+        min-height: 1.25rem;
+        margin: 0.5rem 0;
+    }
+
+    .project-edit-status.is-success {
+        color: #1f6b35;
+    }
+
+    .project-edit-status.is-error {
+        color: #b42318;
+    }
+
+    .project-skill-columns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .project-skill-column h4 {
+        margin: 0 0 0.5rem;
+    }
+
+    .project-skill-list {
+        min-height: 8rem;
+        max-height: 18rem;
+        padding: 0.5rem;
+        overflow-y: auto;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+    }
+
+    .project-skill-list.is-drag-over,
+    .project-task-list.is-drag-over {
+        outline: 2px solid #4b5563;
+        outline-offset: 0.25rem;
+    }
+
+    .project-skill-item,
+    .project-task-item {
+        padding: 0.55rem 0.65rem;
+        border: 1px solid #d2d2d2;
+        background: #fff;
+        cursor: grab;
+    }
+
+    .project-skill-item + .project-skill-item,
+    .project-task-item + .project-task-item {
+        margin-top: 0.4rem;
+    }
+
+    .project-skill-item.dragging,
+    .project-task-item.dragging {
+        opacity: 0.5;
+    }
+
+    .project-task-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .project-task-item {
+        background: #f7f7f7;
+    }
+
+    .project-edit-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .project-edit-card.is-drag-over {
+        outline: 2px solid #4b5563;
+        outline-offset: 0.25rem;
+    }
+
+    .project-order-handle {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #7d7d7d;
+        background: #f2f2f2;
+        cursor: grab;
+        font-size: 0.85rem;
+    }
+
+    @media (max-width: 600px) {
+        .project-presentation-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .project-skill-columns {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 <section class="utility-page">
     <h1>Projects</h1>
+    {% if show_projects_mode_switch %}
+        <nav class="projects-mode-switch" aria-label="Projects display mode">
+            <a href="?mode=presentation"{% if projects_mode == "presentation" %} class="is-active" aria-current="page"{% endif %}>Presentation</a>
+            <a href="?mode=application_tools"{% if projects_mode == "application_tools" %} class="is-active" aria-current="page"{% endif %}>Application Tools</a>
+            <a href="?mode=editing"{% if projects_mode == "editing" %} class="is-active" aria-current="page"{% endif %}>Editing</a>
+        </nav>
+    {% endif %}
+
+    {% if projects_mode == "presentation" %}
+        <div class="project-presentation-list">
+            {% for project in projects %}
+                <article class="project-presentation-card">
+                    <div class="project-presentation-header">
+                        <h2>{{ project.title }}</h2>
+                        {% if project.start_date or project.end_date %}
+                            <p class="project-presentation-dates">
+                                {% if project.start_date %}{{ project.start_date|date:"M Y" }}{% endif %}
+                                {% if project.start_date and project.end_date %}&ndash;{% endif %}
+                                {% if project.end_date %}{{ project.end_date|date:"M Y" }}{% endif %}
+                            </p>
+                        {% endif %}
+                    </div>
+                    {% if project.short_description %}<p>{{ project.short_description }}</p>{% endif %}
+                    {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+                    {% if project.github_url or project.live_url %}
+                        <h3>Links</h3>
+                        <ul>
+                            {% if project.github_url %}<li><a href="{{ project.github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a></li>{% endif %}
+                            {% if project.live_url %}<li><a href="{{ project.live_url }}" target="_blank" rel="noopener noreferrer">Live Project</a></li>{% endif %}
+                        </ul>
+                    {% endif %}
+                    {% if project.tasks.all %}
+                        <h3>Responsibilities</h3>
+                        <ul>{% for task in project.tasks.all %}<li>{{ task.description }}</li>{% endfor %}</ul>
+                    {% endif %}
+                    {% if project.skills.all %}
+                        <h3>Relevant Skills</h3>
+                        <p>{% for skill in project.skills.all %}{% if not forloop.first %}, {% endif %}{{ skill.name }}{% endfor %}</p>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <p>No public projects found.</p>
+            {% endfor %}
+        </div>
+    {% elif projects_mode == "application_tools" %}
     <p class="utility-page-intro">Complete stored project details for copying into applications.</p>
 
     {% for project in projects %}
@@ -233,7 +460,102 @@
     {% empty %}
         <p>No projects found.</p>
     {% endfor %}
+    {% else %}
+        <p class="utility-page-intro">Edit individual project sections and save each section independently.</p>
+        <form class="project-order-form" data-save-url="{% url 'save_project_order' %}">
+            {% csrf_token %}
+            <button type="submit" class="copy-button">Save Project Order</button>
+            <p class="project-edit-status" role="status"></p>
+        </form>
+        <div class="project-edit-list" aria-label="Project order">
+        {% for project in projects %}
+            <article class="utility-card project-edit-card" data-project-id="{{ project.pk }}">
+                <div class="utility-card-header">
+                    <h2>{{ project.title }}</h2>
+                    <div class="utility-copy-actions">
+                        <span class="project-order-handle" draggable="true">Drag to reorder</span>
+                        <button type="button" class="copy-button project-edit-toggle" data-target="project-edit-details-{{ project.pk }}">Show</button>
+                    </div>
+                </div>
+                <div id="project-edit-details-{{ project.pk }}" class="hidden">
+                    <section class="project-edit-section">
+                        <h3>Project Details</h3>
+                        <form class="project-edit-form" data-save-url="{% url 'save_project_section' project.pk 'core' %}">
+                            {% csrf_token %}
+                            {{ project.core_edit_form.as_p }}
+                            <button type="submit" class="copy-button">Save Project Details</button>
+                            <p class="project-edit-status" role="status"></p>
+                        </form>
+                    </section>
+                    <section class="project-edit-section">
+                        <h3>Description &amp; Links</h3>
+                        <form class="project-edit-form" data-save-url="{% url 'save_project_section' project.pk 'details' %}">
+                            {% csrf_token %}
+                            {{ project.details_edit_form.as_p }}
+                            <button type="submit" class="copy-button">Save Description &amp; Links</button>
+                            <p class="project-edit-status" role="status"></p>
+                        </form>
+                    </section>
+                    <section class="project-edit-section">
+                        <h3>Skills</h3>
+                        <form class="project-edit-form" data-save-url="{% url 'save_project_section' project.pk 'skills' %}">
+                            {% csrf_token %}
+                            <select name="{{ project.skills_edit_form.skills.html_name }}" multiple hidden>
+                                {% for skill in project.editing_skills %}<option value="{{ skill.pk }}" selected>{{ skill.name }}</option>{% endfor %}
+                                {% for skill in project.editing_available_skills %}<option value="{{ skill.pk }}">{{ skill.name }}</option>{% endfor %}
+                            </select>
+                            <div class="project-skill-columns">
+                                <div class="project-skill-column">
+                                    <h4>Skills in Project</h4>
+                                    <div class="project-skill-list" data-skill-membership="in" aria-label="Skills in project">
+                                        {% for skill in project.editing_skills %}<div class="project-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="project-skill-column">
+                                    <h4>Skills Not in Project</h4>
+                                    <div class="project-skill-list" data-skill-membership="out" aria-label="Skills not in project">
+                                        {% for skill in project.editing_available_skills %}<div class="project-skill-item" draggable="true" data-skill-id="{{ skill.pk }}">{{ skill.name }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="copy-button">Save Skills</button>
+                            <p class="project-edit-status" role="status"></p>
+                        </form>
+                    </section>
+                    <section class="project-edit-section">
+                        <h3>Tasks</h3>
+                        {% if project.task_edit_formset.forms %}
+                            <form class="project-edit-form" data-save-url="{% url 'save_project_tasks' project.pk %}">
+                                {% csrf_token %}
+                                {{ project.task_edit_formset.management_form }}
+                                <div class="project-task-list" aria-label="Project tasks">
+                                    {% for task_form in project.task_edit_formset.forms %}
+                                        <div class="project-task-item" draggable="true" data-task-id="{{ task_form.instance.pk }}">
+                                            {{ task_form.id }}{{ task_form.ORDER.as_hidden }}
+                                            <div class="project-edit-fields">
+                                                <div>{{ task_form.description.label_tag }}{{ task_form.description }}{{ task_form.description.errors }}</div>
+                                                <label>{{ task_form.resume_ready }} {{ task_form.resume_ready.label }}</label>
+                                                {{ task_form.resume_ready.errors }}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button type="submit" class="copy-button">Save Project Tasks</button>
+                                <p class="project-edit-status" role="status"></p>
+                            </form>
+                        {% else %}
+                            <p>No tasks have been added.</p>
+                        {% endif %}
+                    </section>
+                </div>
+            </article>
+        {% empty %}
+            <p>No projects found.</p>
+        {% endfor %}
+        </div>
+    {% endif %}
 </section>
+{% if projects_mode == "application_tools" %}
 <script>
     document.querySelectorAll(".project-toggle-button").forEach(button => {
         button.addEventListener("click", () => {
@@ -265,4 +587,181 @@
         });
     });
 </script>
+{% elif projects_mode == "editing" %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const editingForms = Array.from(document.querySelectorAll(".project-edit-form"));
+        const projectOrderForm = document.querySelector(".project-order-form");
+        const refreshDirtyState = () => {
+            window.projectsHaveUnsavedChanges = (
+                editingForms.some(form => form.dataset.dirty === "true")
+                || projectOrderForm?.dataset.dirty === "true"
+            );
+        };
+        const setStatus = (form, message, isError = false) => {
+            const status = form.querySelector(".project-edit-status");
+            status.textContent = message;
+            status.classList.toggle("is-error", isError);
+            status.classList.toggle("is-success", !isError && Boolean(message));
+        };
+        const formatErrors = errors => Object.entries(errors)
+            .flatMap(([field, messages]) => messages.map(message => `${field}: ${message.message}`))
+            .join(" ");
+
+        document.querySelectorAll(".project-edit-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const details = document.getElementById(button.dataset.target);
+                const isHidden = details.classList.contains("hidden");
+                details.classList.toggle("hidden");
+                button.textContent = isHidden ? "Hide" : "Show";
+            });
+        });
+
+        editingForms.forEach(form => {
+            form.addEventListener("input", () => { form.dataset.dirty = "true"; refreshDirtyState(); });
+            form.addEventListener("change", () => { form.dataset.dirty = "true"; refreshDirtyState(); });
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                setStatus(form, "Saving...");
+                const response = await fetch(form.dataset.saveUrl, { method: "POST", body: new FormData(form), credentials: "same-origin" });
+                const result = await response.json();
+                if (!response.ok) {
+                    setStatus(form, result.error || formatErrors(result.errors || {}), true);
+                    return;
+                }
+                form.dataset.dirty = "false";
+                refreshDirtyState();
+                setStatus(form, result.message || "Changes saved.");
+            });
+        });
+
+        if (projectOrderForm) {
+            const projectList = document.querySelector(".project-edit-list");
+            let draggedProject = null;
+            const syncProjectOrder = () => {
+                projectOrderForm.querySelectorAll('input[name="project_ids"]').forEach(input => input.remove());
+                projectList.querySelectorAll(".project-edit-card").forEach(project => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "project_ids";
+                    input.value = project.dataset.projectId;
+                    projectOrderForm.appendChild(input);
+                });
+                projectOrderForm.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+
+            document.querySelectorAll(".project-edit-card").forEach(project => {
+                const handle = project.querySelector(".project-order-handle");
+                handle.addEventListener("dragstart", event => {
+                    draggedProject = project;
+                    project.classList.add("dragging");
+                    event.dataTransfer.effectAllowed = "move";
+                });
+                handle.addEventListener("dragend", () => {
+                    project.classList.remove("dragging");
+                    draggedProject = null;
+                    document.querySelectorAll(".project-edit-card").forEach(card => card.classList.remove("is-drag-over"));
+                });
+                project.addEventListener("dragover", event => {
+                    event.preventDefault();
+                    if (draggedProject && draggedProject !== project) project.classList.add("is-drag-over");
+                });
+                project.addEventListener("dragleave", () => project.classList.remove("is-drag-over"));
+                project.addEventListener("drop", event => {
+                    event.preventDefault();
+                    project.classList.remove("is-drag-over");
+                    if (!draggedProject || draggedProject === project) return;
+                    projectList.insertBefore(draggedProject, project);
+                    syncProjectOrder();
+                });
+            });
+
+            projectOrderForm.addEventListener("submit", async event => {
+                event.preventDefault();
+                syncProjectOrder();
+                setStatus(projectOrderForm, "Saving...");
+                const response = await fetch(projectOrderForm.dataset.saveUrl, {
+                    method: "POST",
+                    body: new FormData(projectOrderForm),
+                    credentials: "same-origin",
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    setStatus(projectOrderForm, result.error || formatErrors(result.errors || {}), true);
+                    return;
+                }
+                projectOrderForm.dataset.dirty = "false";
+                refreshDirtyState();
+                setStatus(projectOrderForm, result.message || "Project order saved.");
+            });
+        }
+
+        document.querySelectorAll(".project-edit-form").forEach(form => {
+            const skillSelect = form.querySelector("select[multiple][hidden]");
+            const skillLists = form.querySelectorAll(".project-skill-list");
+            if (!skillSelect || !skillLists.length) return;
+            let draggedSkill = null;
+            const syncSkillSelection = () => {
+                const includedSkillIds = new Set(Array.from(form.querySelectorAll('[data-skill-membership="in"] [data-skill-id]')).map(skill => skill.dataset.skillId));
+                Array.from(skillSelect.options).forEach(option => { option.selected = includedSkillIds.has(option.value); });
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+            form.querySelectorAll(".project-skill-item").forEach(skill => {
+                skill.addEventListener("dragstart", event => { draggedSkill = skill; skill.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; });
+                skill.addEventListener("dragend", () => { skill.classList.remove("dragging"); draggedSkill = null; skillLists.forEach(list => list.classList.remove("is-drag-over")); });
+            });
+            skillLists.forEach(list => {
+                list.addEventListener("dragover", event => { event.preventDefault(); list.classList.add("is-drag-over"); });
+                list.addEventListener("dragleave", event => { if (!list.contains(event.relatedTarget)) list.classList.remove("is-drag-over"); });
+                list.addEventListener("drop", event => {
+                    event.preventDefault();
+                    list.classList.remove("is-drag-over");
+                    if (!draggedSkill || draggedSkill.parentElement === list) return;
+                    list.appendChild(draggedSkill);
+                    syncSkillSelection();
+                });
+            });
+        });
+
+        document.querySelectorAll(".project-task-list").forEach(taskList => {
+            const form = taskList.closest(".project-edit-form");
+            let draggedTask = null;
+            const syncTaskOrder = () => {
+                taskList.querySelectorAll(".project-task-item").forEach((task, index) => { task.querySelector('input[name$="-ORDER"]').value = index + 1; });
+                form.dataset.dirty = "true";
+                refreshDirtyState();
+            };
+            taskList.querySelectorAll(".project-task-item").forEach(task => {
+                task.addEventListener("dragstart", event => { draggedTask = task; task.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; });
+                task.addEventListener("dragend", () => { task.classList.remove("dragging"); draggedTask = null; taskList.classList.remove("is-drag-over"); });
+            });
+            taskList.addEventListener("dragover", event => { event.preventDefault(); taskList.classList.add("is-drag-over"); });
+            taskList.addEventListener("dragleave", event => { if (!taskList.contains(event.relatedTarget)) taskList.classList.remove("is-drag-over"); });
+            taskList.addEventListener("drop", event => {
+                event.preventDefault();
+                taskList.classList.remove("is-drag-over");
+                if (!draggedTask) return;
+                const dropTarget = event.target.closest(".project-task-item");
+                if (dropTarget && dropTarget !== draggedTask) taskList.insertBefore(draggedTask, dropTarget);
+                else taskList.appendChild(draggedTask);
+                syncTaskOrder();
+            });
+        });
+
+        document.querySelectorAll(".projects-mode-switch a").forEach(link => {
+            link.addEventListener("click", event => {
+                if (window.projectsHaveUnsavedChanges && !window.confirm("Discard unsaved Project changes?")) event.preventDefault();
+            });
+        });
+        window.addEventListener("beforeunload", event => {
+            if (window.projectsHaveUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

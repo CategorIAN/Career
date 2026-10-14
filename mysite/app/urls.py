@@ -101,7 +101,42 @@ urlpatterns = [
     path("resume/", views.resume_view, name="resume"),
     path("references/", views.references_view, name="references"),
     path("experience/", views.experience_view, name="experience"),
+    path(
+        "experience/roles/<int:role_id>/tasks/save/",
+        views.save_experience_role_tasks_view,
+        name="save_experience_role_tasks",
+    ),
+    path(
+        "experience/roles/<int:role_id>/<str:section>/save/",
+        views.save_experience_role_section_view,
+        name="save_experience_role_section",
+    ),
     path("residencies/", views.residencies_view, name="residencies"),
+    path(
+        "projects/order/save/",
+        views.save_project_order_view,
+        name="save_project_order",
+    ),
+    path(
+        "projects/<int:project_id>/tasks/save/",
+        views.save_project_tasks_view,
+        name="save_project_tasks",
+    ),
+    path(
+        "projects/<int:project_id>/<str:section>/save/",
+        views.save_project_section_view,
+        name="save_project_section",
+    ),
     path("projects/", views.projects_view, name="projects"),
+    path(
+        "education/<int:education_id>/save/",
+        views.save_education_view,
+        name="save_education",
+    ),
+    path(
+        "education/courses/<int:course_id>/<str:section>/save/",
+        views.save_course_section_view,
+        name="save_course_section",
+    ),
     path("education/", views.courses_view, name="courses"),
 ]

@@ -203,18 +203,33 @@ class CareerAccessTests(TestCase):
         for folder_name in ("Portfolio", "Management", "Networking", "Finding Work"):
             self.assertContains(response, folder_name)
         self.assertEqual(response.content.decode().count(f'href="{reverse("references")}"'), 1)
+        self.assertEqual(response.content.decode().count(f'href="{reverse("residencies")}"'), 1)
+        self.assertEqual(self.client.get(reverse("residencies")).status_code, 200)
 
     def test_anonymous_visitor_only_sees_and_can_access_portfolio(self):
-        response = self.client.get(reverse("resume"))
+        response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Portfolio")
+        self.assertTemplateUsed(response, "app/resume.html")
+        self.assertNotContains(response, "Portfolio")
+        for destination in ("resume", "experience", "projects", "courses"):
+            self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 1)
         for folder_name in ("Management", "Networking", "Finding Work"):
             self.assertNotContains(response, folder_name)
         self.assertEqual(self.client.get(reverse("job_postings")).status_code, 403)
         self.assertEqual(self.client.post(reverse("job_postings")).status_code, 403)
         self.assertEqual(self.client.get(reverse("references")).status_code, 403)
+        self.assertNotContains(response, "Residencies")
+        self.assertEqual(self.client.get(reverse("residencies")).status_code, 403)
         self.assertEqual(self.client.get(reverse("admin:login")).status_code, 200)
+
+    def test_administrator_keeps_the_home_view(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "app/home.html")
 
     def test_other_signed_in_user_is_limited_to_portfolio(self):
         self.client.force_login(self.other_user)
@@ -222,10 +237,15 @@ class CareerAccessTests(TestCase):
         response = self.client.get(reverse("experience"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Portfolio")
+        for destination in ("resume", "experience", "projects", "courses"):
+            self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 1)
         self.assertNotContains(response, "Management")
         self.assertEqual(self.client.get(reverse("skills")).status_code, 403)
         self.assertEqual(self.client.get(reverse("connection_events")).status_code, 403)
         self.assertEqual(self.client.get(reverse("references")).status_code, 403)
+        self.assertNotContains(response, "Residencies")
+        self.assertEqual(self.client.get(reverse("residencies")).status_code, 403)
 
 
 class DjangoAdminAccessTests(TestCase):
@@ -279,7 +299,9 @@ class DjangoAdminAccessTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         home_response = self.client.get(reverse("home"))
         self.assertEqual(home_response.status_code, 200)
-        self.assertContains(home_response, "Portfolio")
+        self.assertNotContains(home_response, "Portfolio")
+        for destination in ("resume", "experience", "projects", "courses"):
+            self.assertEqual(home_response.content.decode().count(f'href="{reverse(destination)}"'), 1)
         self.assertNotContains(home_response, f'href="{reverse("admin:index")}"', html=False)
 
 
@@ -323,6 +345,10 @@ class ResumeContactAccessTests(TestCase):
         self.assertNotIn("location", response.context["profile"])
         self.assertNotIn("email", response.context["profile"])
         self.assertNotIn("phone", response.context["profile"])
+        for destination in ("experience", "projects", "courses"):
+            self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 2)
+        self.assertEqual(response.content.decode().count("More Details"), 3)
+        self.assertContains(response, ".resume-more-details-button", html=False)
 
     def test_other_signed_in_user_cannot_receive_contact_information(self):
         self.client.force_login(self.other_user)
@@ -333,6 +359,497 @@ class ResumeContactAccessTests(TestCase):
         self.assertNotContains(response, 'id="contact-mode-toggle"', html=False)
         self.assertNotContains(response, "private.resume@example.com")
         self.assertNotIn("email", response.context["profile"])
+
+
+class ExperienceDisplayModeTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="experience-visitor",
+            password="test-password",
+        )
+        company = Company.objects.create(
+            name="Public Company",
+            website="https://public-company.example.com",
+        )
+        self.public_role = Role.objects.create(
+            company=company,
+            title="Public Engineer",
+            start_date=date(2024, 1, 1),
+            end_date=date(2025, 1, 1),
+            description="Built reliable systems.",
+            is_public=True,
+        )
+        RoleTask.objects.create(
+            role=self.public_role,
+            description="Delivered a public accomplishment.",
+        )
+        self.private_role = Role.objects.create(
+            company=company,
+            title="Private Role",
+            start_date=date(2023, 1, 1),
+            is_public=False,
+        )
+
+    def test_administrator_can_switch_and_remember_application_tools_mode(self):
+        self.client.force_login(self.administrator)
+
+        presentation_response = self.client.get(reverse("experience"))
+        tools_response = self.client.get(
+            reverse("experience"),
+            {"mode": "application_tools"},
+        )
+        remembered_response = self.client.get(reverse("experience"))
+
+        self.assertEqual(presentation_response.context["experience_mode"], "presentation")
+        self.assertContains(presentation_response, "Responsibilities")
+        self.assertContains(
+            presentation_response,
+            'href="https://public-company.example.com"',
+            html=False,
+        )
+        self.assertNotContains(presentation_response, "Copy All")
+        self.assertContains(presentation_response, "Presentation")
+        self.assertContains(presentation_response, "Application Tools")
+        self.assertEqual(tools_response.context["experience_mode"], "application_tools")
+        self.assertContains(tools_response, "Copy All")
+        self.assertTrue(hasattr(list(tools_response.context["roles"])[0], "copy_payload"))
+        self.assertEqual(remembered_response.context["experience_mode"], "application_tools")
+
+    def test_anonymous_visitor_is_forced_to_public_presentation_mode(self):
+        response = self.client.get(
+            reverse("experience"),
+            {"mode": "application_tools"},
+        )
+
+        self.assertEqual(response.context["experience_mode"], "presentation")
+        self.assertContains(response, "Public Engineer")
+        self.assertNotContains(response, "Private Role")
+        self.assertNotContains(response, "Application Tools")
+        self.assertNotContains(response, "Copy All")
+        self.assertFalse(hasattr(list(response.context["roles"])[0], "copy_payload"))
+
+    def test_other_signed_in_user_is_forced_to_public_presentation_mode(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.get(
+            reverse("experience"),
+            {"mode": "application_tools"},
+        )
+
+        self.assertEqual(response.context["experience_mode"], "presentation")
+        self.assertContains(response, "Public Engineer")
+        self.assertNotContains(response, "Private Role")
+        self.assertNotContains(response, "Application Tools")
+        self.assertNotContains(response, "role-all-", html=False)
+
+
+class ExperienceEditingTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="experience-editor-visitor",
+            password="test-password",
+        )
+        self.company = Company.objects.create(name="Editing Company")
+        self.role = Role.objects.create(
+            company=self.company,
+            title="Original Title",
+            start_date=date(2024, 1, 1),
+            description="Original description.",
+            is_public=True,
+        )
+        self.task = RoleTask.objects.create(
+            role=self.role,
+            description="Original responsibility.",
+        )
+        self.other_task = RoleTask.objects.create(
+            role=self.role,
+            description="Second responsibility.",
+            sort_order=1,
+        )
+        self.skill = Skill.objects.create(name="Python", type="Language")
+        self.other_skill = Skill.objects.create(name="SQL", type="Language")
+        self.role.skills.add(self.skill)
+
+    def test_administrator_can_edit_and_save_individual_sections(self):
+        self.client.force_login(self.administrator)
+
+        editing_response = self.client.get(reverse("experience"), {"mode": "editing"})
+        core_response = self.client.post(
+            reverse("save_experience_role_section", args=[self.role.pk, "core"]),
+            {
+                f"role-{self.role.pk}-core-title": "Updated Title",
+                f"role-{self.role.pk}-core-company": self.company.pk,
+                f"role-{self.role.pk}-core-start_date": "2024-01-01",
+                f"role-{self.role.pk}-core-end_date": "",
+                f"role-{self.role.pk}-core-is_public": "on",
+            },
+        )
+        skills_response = self.client.post(
+            reverse("save_experience_role_section", args=[self.role.pk, "skills"]),
+            {f"role-{self.role.pk}-skills-skills": [self.other_skill.pk]},
+        )
+        task_response = self.client.post(
+            reverse("save_experience_role_tasks", args=[self.role.pk]),
+            {
+                f"role-{self.role.pk}-tasks-TOTAL_FORMS": "2",
+                f"role-{self.role.pk}-tasks-INITIAL_FORMS": "2",
+                f"role-{self.role.pk}-tasks-MIN_NUM_FORMS": "0",
+                f"role-{self.role.pk}-tasks-MAX_NUM_FORMS": "1000",
+                f"role-{self.role.pk}-tasks-0-id": self.task.pk,
+                f"role-{self.role.pk}-tasks-0-description": "Updated responsibility.",
+                f"role-{self.role.pk}-tasks-0-resume_ready": "on",
+                f"role-{self.role.pk}-tasks-0-ORDER": "2",
+                f"role-{self.role.pk}-tasks-1-id": self.other_task.pk,
+                f"role-{self.role.pk}-tasks-1-description": "Second responsibility.",
+                f"role-{self.role.pk}-tasks-1-ORDER": "1",
+            },
+        )
+
+        self.assertEqual(editing_response.context["experience_mode"], "editing")
+        self.assertContains(editing_response, "Save Role Details")
+        self.assertContains(editing_response, "Save Role Tasks")
+        self.assertNotContains(editing_response, "Save Responsibility")
+        self.assertContains(editing_response, "Skills in Role")
+        self.assertContains(editing_response, "Skills Not in Role")
+        self.assertContains(editing_response, 'draggable="true"', html=False)
+        self.assertContains(editing_response, self.skill.name)
+        self.assertContains(editing_response, self.other_skill.name)
+        self.assertContains(editing_response, "Discard unsaved Experience changes?")
+        self.assertJSONEqual(core_response.content, {"message": "Changes saved."})
+        self.assertJSONEqual(skills_response.content, {"message": "Changes saved."})
+        self.assertJSONEqual(task_response.content, {"message": "Role tasks saved."})
+        self.role.refresh_from_db()
+        self.task.refresh_from_db()
+        self.assertEqual(self.role.title, "Updated Title")
+        self.assertEqual(self.role.description, "Original description.")
+        self.assertEqual(list(self.role.skills.all()), [self.other_skill])
+        self.assertEqual(self.task.description, "Updated responsibility.")
+        self.assertTrue(self.task.resume_ready)
+        self.assertEqual(self.task.sort_order, 1)
+        self.assertEqual(
+            list(self.role.tasks.order_by("sort_order", "pk")),
+            [self.other_task, self.task],
+        )
+
+    def test_invalid_role_section_returns_errors_without_saving(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.post(
+            reverse("save_experience_role_section", args=[self.role.pk, "core"]),
+            {
+                f"role-{self.role.pk}-core-title": "Invalid Update",
+                f"role-{self.role.pk}-core-company": self.company.pk,
+                f"role-{self.role.pk}-core-start_date": "2024-01-01",
+                f"role-{self.role.pk}-core-end_date": "2023-01-01",
+                f"role-{self.role.pk}-core-is_public": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("end_date", response.json()["errors"])
+        self.role.refresh_from_db()
+        self.assertEqual(self.role.title, "Original Title")
+
+    def test_non_owner_cannot_enable_or_save_editing_mode(self):
+        self.client.force_login(self.other_user)
+
+        page_response = self.client.get(reverse("experience"), {"mode": "editing"})
+        save_response = self.client.post(
+            reverse("save_experience_role_section", args=[self.role.pk, "core"]),
+            {},
+        )
+
+        self.assertEqual(page_response.context["experience_mode"], "presentation")
+        self.assertNotContains(page_response, "Save Role Details")
+        self.assertEqual(save_response.status_code, 403)
+
+    def test_edit_endpoint_requires_csrf_token(self):
+        secure_client = Client(enforce_csrf_checks=True)
+        secure_client.force_login(self.administrator)
+
+        response = secure_client.post(
+            reverse("save_experience_role_section", args=[self.role.pk, "core"]),
+            {},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+
+class ProjectDisplayModeTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="project-visitor",
+            password="test-password",
+        )
+        self.public_project = Project.objects.create(
+            title="Public Project",
+            short_description="A public project summary.",
+            start_date=date(2025, 1, 1),
+            is_public=True,
+        )
+        self.private_project = Project.objects.create(
+            title="Private Project",
+            is_public=False,
+        )
+        self.skill = Skill.objects.create(name="Python", type="Language")
+        self.other_skill = Skill.objects.create(name="SQL", type="Language")
+        self.public_project.skills.add(self.skill)
+        self.first_task = ProjectTask.objects.create(
+            project=self.public_project,
+            description="First project task.",
+        )
+        self.second_task = ProjectTask.objects.create(
+            project=self.public_project,
+            description="Second project task.",
+            sort_order=1,
+        )
+
+    def test_administrator_defaults_to_tools_and_can_switch_modes(self):
+        self.client.force_login(self.administrator)
+
+        tools_response = self.client.get(reverse("projects"))
+        presentation_response = self.client.get(
+            reverse("projects"),
+            {"mode": "presentation"},
+        )
+        editing_response = self.client.get(
+            reverse("projects"),
+            {"mode": "editing"},
+        )
+
+        self.assertEqual(tools_response.context["projects_mode"], "application_tools")
+        self.assertContains(tools_response, "Copy All")
+        self.assertEqual(presentation_response.context["projects_mode"], "presentation")
+        self.assertNotContains(presentation_response, "Copy All")
+        self.assertEqual(editing_response.context["projects_mode"], "editing")
+        self.assertContains(editing_response, "Save Project Details")
+        self.assertContains(editing_response, "Save Project Tasks")
+        self.assertContains(editing_response, "Save Project Order")
+        self.assertContains(editing_response, "Drag to reorder")
+        self.assertContains(editing_response, "Skills in Project")
+        self.assertContains(editing_response, 'draggable="true"', html=False)
+        self.assertNotContains(editing_response, "Sort order")
+
+    def test_public_users_are_forced_to_presentation_mode(self):
+        anonymous_response = self.client.get(
+            reverse("projects"),
+            {"mode": "editing"},
+        )
+        self.client.force_login(self.other_user)
+        signed_in_response = self.client.get(
+            reverse("projects"),
+            {"mode": "application_tools"},
+        )
+
+        for response in (anonymous_response, signed_in_response):
+            self.assertEqual(response.context["projects_mode"], "presentation")
+            self.assertContains(response, "Public Project")
+            self.assertNotContains(response, "Private Project")
+            self.assertNotContains(response, "Application Tools")
+            self.assertNotContains(response, "Save Project Details")
+
+    def test_owner_can_save_project_sections_and_reordered_tasks(self):
+        self.client.force_login(self.administrator)
+
+        core_response = self.client.post(
+            reverse("save_project_section", args=[self.public_project.pk, "core"]),
+            {
+                f"project-{self.public_project.pk}-core-title": "Updated Project",
+                f"project-{self.public_project.pk}-core-start_date": "2025-01-01",
+                f"project-{self.public_project.pk}-core-end_date": "",
+                f"project-{self.public_project.pk}-core-resume_ready": "on",
+                f"project-{self.public_project.pk}-core-is_public": "on",
+            },
+        )
+        skills_response = self.client.post(
+            reverse("save_project_section", args=[self.public_project.pk, "skills"]),
+            {f"project-{self.public_project.pk}-skills-skills": [self.other_skill.pk]},
+        )
+        tasks_response = self.client.post(
+            reverse("save_project_tasks", args=[self.public_project.pk]),
+            {
+                f"project-{self.public_project.pk}-tasks-TOTAL_FORMS": "2",
+                f"project-{self.public_project.pk}-tasks-INITIAL_FORMS": "2",
+                f"project-{self.public_project.pk}-tasks-MIN_NUM_FORMS": "0",
+                f"project-{self.public_project.pk}-tasks-MAX_NUM_FORMS": "1000",
+                f"project-{self.public_project.pk}-tasks-0-id": self.first_task.pk,
+                f"project-{self.public_project.pk}-tasks-0-description": "Updated first task.",
+                f"project-{self.public_project.pk}-tasks-0-ORDER": "2",
+                f"project-{self.public_project.pk}-tasks-1-id": self.second_task.pk,
+                f"project-{self.public_project.pk}-tasks-1-description": "Second project task.",
+                f"project-{self.public_project.pk}-tasks-1-ORDER": "1",
+            },
+        )
+        invalid_order_response = self.client.post(
+            reverse("save_project_order"),
+            {"project_ids": [self.public_project.pk]},
+        )
+        order_response = self.client.post(
+            reverse("save_project_order"),
+            {"project_ids": [self.private_project.pk, self.public_project.pk]},
+        )
+
+        self.assertJSONEqual(core_response.content, {"message": "Changes saved."})
+        self.assertJSONEqual(skills_response.content, {"message": "Changes saved."})
+        self.assertJSONEqual(tasks_response.content, {"message": "Project tasks saved."})
+        self.assertEqual(invalid_order_response.status_code, 400)
+        self.assertJSONEqual(order_response.content, {"message": "Project order saved."})
+        self.public_project.refresh_from_db()
+        self.first_task.refresh_from_db()
+        self.assertEqual(self.public_project.title, "Updated Project")
+        self.assertEqual(self.public_project.sort_order, 1)
+        self.private_project.refresh_from_db()
+        self.assertEqual(self.private_project.sort_order, 0)
+        self.assertEqual(list(self.public_project.skills.all()), [self.other_skill])
+        self.assertEqual(self.first_task.sort_order, 1)
+        self.assertEqual(
+            list(self.public_project.tasks.order_by("sort_order", "pk")),
+            [self.second_task, self.first_task],
+        )
+
+
+class EducationDisplayModeTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="education-visitor",
+            password="test-password",
+        )
+        country = Country.objects.create(name="United States", code="USA")
+        state = State.objects.create(name="Colorado", abbreviation="CO", country=country)
+        city = City.objects.create(name="Denver", state=state)
+        self.school = School.objects.create(name="Example University", city=city)
+        self.education = Education.objects.create(
+            school=self.school,
+            degree="Master of Science",
+            field_of_study="Data Science",
+            start_date=date(2023, 8, 1),
+            end_date=date(2025, 5, 1),
+            gpa="3.90",
+            description="Advanced data science study.",
+        )
+        self.course = Course.objects.create(
+            education=self.education,
+            title="Data Engineering",
+            code="DS 600",
+            description="Data pipeline course.",
+            grade="A",
+        )
+        self.skill = Skill.objects.create(name="Python", type="Language")
+        self.other_skill = Skill.objects.create(name="SQL", type="Language")
+        self.course.skills.add(self.skill)
+
+    def test_administrator_defaults_to_tools_and_can_switch_modes(self):
+        self.client.force_login(self.administrator)
+
+        tools_response = self.client.get(reverse("courses"))
+        presentation_response = self.client.get(
+            reverse("courses"),
+            {"mode": "presentation"},
+        )
+        editing_response = self.client.get(
+            reverse("courses"),
+            {"mode": "editing"},
+        )
+
+        self.assertEqual(tools_response.context["education_mode"], "application_tools")
+        self.assertContains(tools_response, "Copy All")
+        self.assertEqual(presentation_response.context["education_mode"], "presentation")
+        self.assertNotContains(presentation_response, "Copy All")
+        self.assertContains(presentation_response, "Relevant Courses")
+        self.assertContains(presentation_response, "Show Description")
+        self.assertContains(
+            presentation_response,
+            'id="course-presentation-description-',
+            html=False,
+        )
+        self.assertContains(
+            presentation_response,
+            "course-presentation-description-button",
+        )
+        self.assertEqual(editing_response.context["education_mode"], "editing")
+        self.assertContains(editing_response, "Save Education")
+        self.assertContains(editing_response, "Save Course")
+        self.assertContains(editing_response, "Skills in Course")
+        self.assertContains(editing_response, 'draggable="true"', html=False)
+
+    def test_public_users_are_forced_to_presentation_mode(self):
+        anonymous_response = self.client.get(
+            reverse("courses"),
+            {"mode": "editing"},
+        )
+        self.client.force_login(self.other_user)
+        signed_in_response = self.client.get(
+            reverse("courses"),
+            {"mode": "application_tools"},
+        )
+
+        for response in (anonymous_response, signed_in_response):
+            self.assertEqual(response.context["education_mode"], "presentation")
+            self.assertContains(response, "Example University")
+            self.assertNotContains(response, "Application Tools")
+            self.assertNotContains(response, "Save Education")
+
+    def test_owner_can_save_education_and_course_sections(self):
+        self.client.force_login(self.administrator)
+
+        education_response = self.client.post(
+            reverse("save_education", args=[self.education.pk]),
+            {
+                f"education-{self.education.pk}-school": self.school.pk,
+                f"education-{self.education.pk}-degree": "Master of Science",
+                f"education-{self.education.pk}-field_of_study": "Analytics",
+                f"education-{self.education.pk}-start_date": "2023-08-01",
+                f"education-{self.education.pk}-end_date": "2025-05-01",
+                f"education-{self.education.pk}-graduated": "on",
+                f"education-{self.education.pk}-gpa": "3.95",
+                f"education-{self.education.pk}-honors": "Honors",
+                f"education-{self.education.pk}-description": "Updated education description.",
+            },
+        )
+        course_response = self.client.post(
+            reverse("save_course_section", args=[self.course.pk, "details"]),
+            {
+                f"course-{self.course.pk}-details-title": "Updated Course",
+                f"course-{self.course.pk}-details-code": "DS 610",
+                f"course-{self.course.pk}-details-description": "Updated course description.",
+                f"course-{self.course.pk}-details-grade": "A",
+                f"course-{self.course.pk}-details-resume_ready": "on",
+            },
+        )
+        skills_response = self.client.post(
+            reverse("save_course_section", args=[self.course.pk, "skills"]),
+            {f"course-{self.course.pk}-skills-skills": [self.other_skill.pk]},
+        )
+
+        self.assertJSONEqual(education_response.content, {"message": "Education saved."})
+        self.assertJSONEqual(course_response.content, {"message": "Course saved."})
+        self.assertJSONEqual(skills_response.content, {"message": "Course saved."})
+        self.education.refresh_from_db()
+        self.course.refresh_from_db()
+        self.assertEqual(self.education.field_of_study, "Analytics")
+        self.assertEqual(self.course.title, "Updated Course")
+        self.assertTrue(self.course.resume_ready)
+        self.assertEqual(list(self.course.skills.all()), [self.other_skill])
 
 
 class FreelancerSearchViewTests(TestCase):

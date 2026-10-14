@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
@@ -43,6 +43,9 @@ from .forms import (
     InterviewPracticeSessionForm,
     ApplicationSubmittedForm,
     CompanyForm,
+    CourseEditForm,
+    CourseSkillsEditForm,
+    EducationEditForm,
     FeatureForm,
     FeatureFormSet,
     FeatureLinkForm,
@@ -55,8 +58,16 @@ from .forms import (
     PlatformSkillFormSet,
     ProfessionalConnectForm,
     ProfessionalForm,
+    ProjectCoreEditForm,
+    ProjectDetailsEditForm,
+    ProjectSkillsEditForm,
+    ProjectTaskEditFormSet,
     RecruiterConnectForm,
     RecruiterForm,
+    RoleCoreEditForm,
+    RoleDetailsEditForm,
+    RoleSkillsEditForm,
+    RoleTaskEditFormSet,
     SearchPathFormSet,
     SearchTermForm,
     SkillForm,
@@ -552,6 +563,8 @@ def _build_course_copy_payload(course):
 
 
 def home_view(request):
+    if not is_career_administrator(request.user):
+        return resume_view(request)
     return render(request, "app/home.html")
 
 
@@ -3174,9 +3187,38 @@ def references_view(request):
 
 @xframe_options_sameorigin
 def experience_view(request):
+    is_administrator = is_career_administrator(request.user)
+    if is_administrator:
+        requested_mode = request.GET.get("mode")
+        if requested_mode in {"presentation", "application_tools", "editing"}:
+            request.session["experience_display_mode"] = requested_mode
+        experience_mode = request.session.get(
+            "experience_display_mode",
+            "presentation",
+        )
+    else:
+        experience_mode = "presentation"
+
     roles = Role.objects
-    if not is_career_administrator(request.user):
+    if not is_administrator:
         roles = roles.filter(is_public=True)
+    role_prefetches = [
+        Prefetch(
+            "tasks",
+            queryset=RoleTask.objects.order_by("sort_order", "id"),
+        ),
+        Prefetch(
+            "skills",
+            queryset=Skill.objects.order_by("name"),
+        ),
+    ]
+    if experience_mode == "application_tools":
+        role_prefetches.append(
+            Prefetch(
+                "supervisors",
+                queryset=Supervisor.objects.order_by("id"),
+            )
+        )
     roles = (
         roles
         .select_related(
@@ -3185,35 +3227,115 @@ def experience_view(request):
             "company__address__city",
             "company__address__city__state",
         )
-        .prefetch_related(
-            Prefetch(
-                "tasks",
-                queryset=RoleTask.objects.order_by("sort_order", "id"),
-            ),
-            Prefetch(
-                "skills",
-                queryset=Skill.objects.order_by("name"),
-            ),
-            Prefetch(
-                "supervisors",
-                queryset=Supervisor.objects.order_by("id"),
-            ),
-        )
+        .prefetch_related(*role_prefetches)
         .order_by("-start_date", "-id")
     )
 
-    for role in roles:
-        role.copy_payload = _build_role_copy_payload(role)
+    if experience_mode == "application_tools":
+        for role in roles:
+            role.copy_payload = _build_role_copy_payload(role)
+    elif experience_mode == "editing":
+        all_skills = list(Skill.objects.order_by("name", "pk"))
+        for role in roles:
+            role.core_edit_form = RoleCoreEditForm(
+                instance=role,
+                prefix=f"role-{role.pk}-core",
+            )
+            role.details_edit_form = RoleDetailsEditForm(
+                instance=role,
+                prefix=f"role-{role.pk}-details",
+            )
+            role.skills_edit_form = RoleSkillsEditForm(
+                instance=role,
+                prefix=f"role-{role.pk}-skills",
+            )
+            role.task_edit_formset = RoleTaskEditFormSet(
+                instance=role,
+                prefix=f"role-{role.pk}-tasks",
+            )
+            role_skill_ids = {skill.pk for skill in role.skills.all()}
+            role.editing_skills = [
+                skill for skill in all_skills if skill.pk in role_skill_ids
+            ]
+            role.editing_available_skills = [
+                skill for skill in all_skills if skill.pk not in role_skill_ids
+            ]
 
     return render(
         request,
         "app/experience.html",
-        {"roles": roles},
+        {
+            "roles": roles,
+            "experience_mode": experience_mode,
+            "show_experience_mode_switch": is_administrator,
+        },
     )
+
+
+@require_POST
+def save_experience_role_section_view(request, role_id, section):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    role = get_object_or_404(Role, pk=role_id)
+    form_classes = {
+        "core": RoleCoreEditForm,
+        "details": RoleDetailsEditForm,
+        "skills": RoleSkillsEditForm,
+    }
+    form_class = form_classes.get(section)
+    if form_class is None:
+        return JsonResponse({"error": "Unknown role section."}, status=404)
+
+    form = form_class(
+        request.POST,
+        instance=role,
+        prefix=f"role-{role.pk}-{section}",
+    )
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
+
+    form.save()
+    return JsonResponse({"message": "Changes saved."})
+
+
+@require_POST
+def save_experience_role_tasks_view(request, role_id):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    role = get_object_or_404(Role, pk=role_id)
+    formset = RoleTaskEditFormSet(
+        request.POST,
+        instance=role,
+        prefix=f"role-{role.pk}-tasks",
+    )
+    if not formset.is_valid():
+        errors = {}
+        for index, form in enumerate(formset.forms, start=1):
+            for field, messages in form.errors.get_json_data().items():
+                errors[f"Task {index}: {field}"] = messages
+        if formset.non_form_errors():
+            errors["tasks"] = [
+                {"message": message}
+                for message in formset.non_form_errors()
+            ]
+        return JsonResponse({"errors": errors}, status=400)
+
+    with transaction.atomic():
+        for sort_order, form in enumerate(formset.ordered_forms):
+            task = form.save(commit=False)
+            task.sort_order = sort_order
+            task.save(update_fields=["description", "resume_ready", "sort_order"])
+
+    return JsonResponse({"message": "Role tasks saved."})
 
 
 @xframe_options_sameorigin
 def residencies_view(request):
+    if not is_career_administrator(request.user):
+        raise PermissionDenied("This page is only available to the Career administrator.")
+
     residencies = (
         Residency.objects
         .select_related(
@@ -3236,8 +3358,20 @@ def residencies_view(request):
 
 @xframe_options_sameorigin
 def projects_view(request):
+    is_administrator = is_career_administrator(request.user)
+    if is_administrator:
+        requested_mode = request.GET.get("mode")
+        if requested_mode in {"presentation", "application_tools", "editing"}:
+            request.session["projects_display_mode"] = requested_mode
+        projects_mode = request.session.get(
+            "projects_display_mode",
+            "application_tools",
+        )
+    else:
+        projects_mode = "presentation"
+
     projects = Project.objects
-    if not is_career_administrator(request.user):
+    if not is_administrator:
         projects = projects.filter(is_public=True)
     projects = (
         projects
@@ -3254,18 +3388,147 @@ def projects_view(request):
         .order_by("sort_order", "-start_date", "title")
     )
 
-    for project in projects:
-        project.copy_payload = _build_project_copy_payload(project)
+    if projects_mode == "application_tools":
+        for project in projects:
+            project.copy_payload = _build_project_copy_payload(project)
+    elif projects_mode == "editing":
+        all_skills = list(Skill.objects.order_by("name", "pk"))
+        for project in projects:
+            project.core_edit_form = ProjectCoreEditForm(
+                instance=project,
+                prefix=f"project-{project.pk}-core",
+            )
+            project.details_edit_form = ProjectDetailsEditForm(
+                instance=project,
+                prefix=f"project-{project.pk}-details",
+            )
+            project.skills_edit_form = ProjectSkillsEditForm(
+                instance=project,
+                prefix=f"project-{project.pk}-skills",
+            )
+            project.task_edit_formset = ProjectTaskEditFormSet(
+                instance=project,
+                prefix=f"project-{project.pk}-tasks",
+            )
+            project_skill_ids = {skill.pk for skill in project.skills.all()}
+            project.editing_skills = [
+                skill for skill in all_skills if skill.pk in project_skill_ids
+            ]
+            project.editing_available_skills = [
+                skill for skill in all_skills if skill.pk not in project_skill_ids
+            ]
 
     return render(
         request,
         "app/projects.html",
-        {"projects": projects},
+        {
+            "projects": projects,
+            "projects_mode": projects_mode,
+            "show_projects_mode_switch": is_administrator,
+        },
     )
+
+
+@require_POST
+def save_project_section_view(request, project_id, section):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    project = get_object_or_404(Project, pk=project_id)
+    form_classes = {
+        "core": ProjectCoreEditForm,
+        "details": ProjectDetailsEditForm,
+        "skills": ProjectSkillsEditForm,
+    }
+    form_class = form_classes.get(section)
+    if form_class is None:
+        return JsonResponse({"error": "Unknown project section."}, status=404)
+
+    form = form_class(
+        request.POST,
+        instance=project,
+        prefix=f"project-{project.pk}-{section}",
+    )
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
+
+    form.save()
+    return JsonResponse({"message": "Changes saved."})
+
+
+@require_POST
+def save_project_tasks_view(request, project_id):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    project = get_object_or_404(Project, pk=project_id)
+    formset = ProjectTaskEditFormSet(
+        request.POST,
+        instance=project,
+        prefix=f"project-{project.pk}-tasks",
+    )
+    if not formset.is_valid():
+        errors = {}
+        for index, form in enumerate(formset.forms, start=1):
+            for field, messages in form.errors.get_json_data().items():
+                errors[f"Task {index}: {field}"] = messages
+        if formset.non_form_errors():
+            errors["tasks"] = [
+                {"message": message}
+                for message in formset.non_form_errors()
+            ]
+        return JsonResponse({"errors": errors}, status=400)
+
+    with transaction.atomic():
+        for sort_order, form in enumerate(formset.ordered_forms):
+            task = form.save(commit=False)
+            task.sort_order = sort_order
+            task.save(update_fields=["description", "resume_ready", "sort_order"])
+
+    return JsonResponse({"message": "Project tasks saved."})
+
+
+@require_POST
+def save_project_order_view(request):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    try:
+        project_ids = [int(project_id) for project_id in request.POST.getlist("project_ids")]
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid project order."}, status=400)
+
+    if len(project_ids) != len(set(project_ids)):
+        return JsonResponse({"error": "Invalid project order."}, status=400)
+
+    projects = list(Project.objects.filter(pk__in=project_ids))
+    if len(projects) != len(project_ids) or len(project_ids) != Project.objects.count():
+        return JsonResponse({"error": "Invalid project order."}, status=400)
+
+    projects_by_id = {project.pk: project for project in projects}
+    with transaction.atomic():
+        for sort_order, project_id in enumerate(project_ids):
+            project = projects_by_id[project_id]
+            project.sort_order = sort_order
+            project.save(update_fields=["sort_order"])
+
+    return JsonResponse({"message": "Project order saved."})
 
 
 @xframe_options_sameorigin
 def courses_view(request):
+    is_administrator = is_career_administrator(request.user)
+    if is_administrator:
+        requested_mode = request.GET.get("mode")
+        if requested_mode in {"presentation", "application_tools", "editing"}:
+            request.session["education_display_mode"] = requested_mode
+        education_mode = request.session.get(
+            "education_display_mode",
+            "application_tools",
+        )
+    else:
+        education_mode = "presentation"
+
     courses = (
         Course.objects
         .select_related(
@@ -3283,14 +3546,19 @@ def courses_view(request):
         .order_by("sort_order", "title")
     )
 
-    for course in courses:
-        course.copy_payload = _build_course_copy_payload(course)
+    if education_mode == "application_tools":
+        for course in courses:
+            course.copy_payload = _build_course_copy_payload(course)
 
     grouped_courses_by_program = {}
     program_order = []
 
     for course in courses:
-        program_name = course.copy_payload["program"] or "Other"
+        program_name = ", ".join(
+            part
+            for part in [course.education.degree, course.education.field_of_study]
+            if part
+        ) or "Other"
         if program_name not in grouped_courses_by_program:
             grouped_courses_by_program[program_name] = []
             program_order.append(program_name)
@@ -3345,14 +3613,85 @@ def courses_view(request):
         group["end_year"] = "" if not group["education"].end_date else group["end_date_payload"]["year"]
     grouped_courses.sort(key=lambda group: group["sort_date"], reverse=True)
 
+    if education_mode == "editing":
+        all_skills = list(Skill.objects.order_by("name", "pk"))
+        for group in grouped_courses:
+            education = group["education"]
+            group["education_edit_form"] = EducationEditForm(
+                instance=education,
+                prefix=f"education-{education.pk}",
+            )
+            for course in group["courses"]:
+                course.edit_form = CourseEditForm(
+                    instance=course,
+                    prefix=f"course-{course.pk}-details",
+                )
+                course.skills_edit_form = CourseSkillsEditForm(
+                    instance=course,
+                    prefix=f"course-{course.pk}-skills",
+                )
+                course_skill_ids = {skill.pk for skill in course.skills.all()}
+                course.editing_skills = [
+                    skill for skill in all_skills if skill.pk in course_skill_ids
+                ]
+                course.editing_available_skills = [
+                    skill for skill in all_skills if skill.pk not in course_skill_ids
+                ]
+
     return render(
         request,
         "app/courses.html",
         {
             "courses": courses,
             "course_groups": grouped_courses,
+            "education_mode": education_mode,
+            "show_education_mode_switch": is_administrator,
         },
     )
+
+
+@require_POST
+def save_education_view(request, education_id):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    education = get_object_or_404(Education, pk=education_id)
+    form = EducationEditForm(
+        request.POST,
+        instance=education,
+        prefix=f"education-{education.pk}",
+    )
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
+
+    form.save()
+    return JsonResponse({"message": "Education saved."})
+
+
+@require_POST
+def save_course_section_view(request, course_id, section):
+    if not is_career_administrator(request.user):
+        return JsonResponse({"error": "Unauthorized."}, status=403)
+
+    course = get_object_or_404(Course, pk=course_id)
+    form_classes = {
+        "details": CourseEditForm,
+        "skills": CourseSkillsEditForm,
+    }
+    form_class = form_classes.get(section)
+    if form_class is None:
+        return JsonResponse({"error": "Unknown course section."}, status=404)
+
+    form = form_class(
+        request.POST,
+        instance=course,
+        prefix=f"course-{course.pk}-{section}",
+    )
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
+
+    form.save()
+    return JsonResponse({"message": "Course saved."})
 
 
 @ensure_csrf_cookie

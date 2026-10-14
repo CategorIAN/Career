@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms import modelformset_factory
+from django.forms import inlineformset_factory, modelformset_factory
 from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
@@ -12,6 +12,8 @@ from .models import (
     ApplicationEmail,
     InterviewPracticeSession,
     Company,
+    Course,
+    Education,
     Feature,
     FeatureLink,
     JobPosting,
@@ -19,7 +21,11 @@ from .models import (
     PlatformFeature,
     PlatformSkill,
     Professional,
+    Project,
+    ProjectTask,
     Recruiter,
+    Role,
+    RoleTask,
     SearchPath,
     SearchTerm,
     Connect,
@@ -92,6 +98,176 @@ class CompanyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+class RoleCoreEditForm(forms.ModelForm):
+    class Meta:
+        model = Role
+        fields = ["title", "company", "start_date", "end_date", "current", "is_public"]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date cannot be before the start date.")
+        return cleaned_data
+
+
+class RoleDetailsEditForm(forms.ModelForm):
+    class Meta:
+        model = Role
+        fields = [
+            "description",
+            "reason_for_leaving",
+            "starting_pay",
+            "ending_pay",
+            "pay_frequency",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 5}),
+        }
+
+
+class RoleSkillsEditForm(forms.ModelForm):
+    class Meta:
+        model = Role
+        fields = ["skills"]
+        widgets = {
+            "skills": forms.SelectMultiple(attrs={"size": 8}),
+        }
+
+
+class RoleTaskEditForm(forms.ModelForm):
+    class Meta:
+        model = RoleTask
+        fields = ["description", "resume_ready"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+RoleTaskEditFormSet = inlineformset_factory(
+    Role,
+    RoleTask,
+    form=RoleTaskEditForm,
+    extra=0,
+    can_delete=False,
+    can_order=True,
+)
+
+
+class ProjectCoreEditForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = [
+            "title",
+            "start_date",
+            "end_date",
+            "resume_ready",
+            "is_public",
+        ]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date cannot be before the start date.")
+        return cleaned_data
+
+
+class ProjectDetailsEditForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ["short_description", "description", "github_url", "live_url"]
+        widgets = {
+            "short_description": forms.Textarea(attrs={"rows": 3}),
+            "description": forms.Textarea(attrs={"rows": 6}),
+        }
+
+
+class ProjectSkillsEditForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ["skills"]
+        widgets = {
+            "skills": forms.SelectMultiple(attrs={"size": 8}),
+        }
+
+
+class ProjectTaskEditForm(forms.ModelForm):
+    class Meta:
+        model = ProjectTask
+        fields = ["description", "resume_ready"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+ProjectTaskEditFormSet = inlineformset_factory(
+    Project,
+    ProjectTask,
+    form=ProjectTaskEditForm,
+    extra=0,
+    can_delete=False,
+    can_order=True,
+)
+
+
+class EducationEditForm(forms.ModelForm):
+    class Meta:
+        model = Education
+        fields = [
+            "school",
+            "degree",
+            "field_of_study",
+            "start_date",
+            "end_date",
+            "graduated",
+            "gpa",
+            "honors",
+            "description",
+        ]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.Textarea(attrs={"rows": 5}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date cannot be before the start date.")
+        return cleaned_data
+
+
+class CourseEditForm(forms.ModelForm):
+    class Meta:
+        model = Course
+        fields = ["title", "code", "description", "grade", "resume_ready"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+
+class CourseSkillsEditForm(forms.ModelForm):
+    class Meta:
+        model = Course
+        fields = ["skills"]
+        widgets = {
+            "skills": forms.SelectMultiple(attrs={"size": 8}),
+        }
 
 
 class SearchTermForm(forms.ModelForm):
