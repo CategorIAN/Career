@@ -395,6 +395,7 @@
                         <th>LinkedIn</th>
                         <th>Email</th>
                         <th>Phone</th>
+                        <th>Remove</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -414,10 +415,19 @@
                             </td>
                             <td>{{ company.email }}</td>
                             <td>{{ company.phone }}</td>
+                            <td>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="page" value="{{ current_page }}">
+                                    <input type="hidden" name="professional_id" value="{{ displayed_professional.pk }}">
+                                    <input type="hidden" name="company_id" value="{{ company.pk }}">
+                                    <button type="submit" class="copy-button" name="remove_company" value="{{ displayed_professional.pk }}">Remove</button>
+                                </form>
+                            </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4">No companies found.</td>
+                            <td colspan="5">No companies found.</td>
                         </tr>
                     {% endfor %}
                 </tbody>

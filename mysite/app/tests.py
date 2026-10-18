@@ -1799,6 +1799,13 @@ class PlatformPageTests(TestCase):
 
 
 class ProfessionalPageTests(TestCase):
+    def setUp(self):
+        self.administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(self.administrator)
+
     def test_professional_reverse_connections_use_professional_relation(self):
         professional = Professional.objects.create(name="Ada Lovelace")
         connection = ProfessionalConnect.objects.create(
@@ -1982,6 +1989,34 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertContains(response, company.email)
         self.assertContains(response, company.phone)
+        self.assertContains(response, "<th>Remove</th>", html=False)
+        self.assertContains(
+            response,
+            f'name="remove_company" value="{professional.pk}"',
+            html=False,
+        )
+
+    def test_professionals_page_removes_company_from_current_professional(self):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        company = Company.objects.create(name="Analytical Engines")
+        professional.companies.add(company)
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "professional_id": str(professional.pk),
+                "company_id": str(company.pk),
+                "remove_company": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('professionals')}?page=1&professional_id={professional.pk}",
+        )
+        self.assertFalse(professional.companies.filter(pk=company.pk).exists())
+        self.assertTrue(Company.objects.filter(pk=company.pk).exists())
 
     def test_professionals_page_adds_company_to_current_professional(self):
         professional = Professional.objects.create(name="Ada Lovelace")

@@ -1157,6 +1157,7 @@ def professional_formset_view(request):
         delete_professional_id = request.POST.get("delete_professional", "").strip()
         add_company_professional_id = request.POST.get("add_company", "").strip()
         add_new_company_professional_id = request.POST.get("add_new_company", "").strip()
+        remove_company_professional_id = request.POST.get("remove_company", "").strip()
         add_referral_professional_id = request.POST.get("add_referral", "").strip()
         add_new_referral_professional_id = request.POST.get(
             "add_new_referral", ""
@@ -1196,6 +1197,14 @@ def professional_formset_view(request):
                 professional.companies.add(company)
                 return redirect(f"{request.path}{redirect_params}")
             show_add_company_modal = True
+        elif remove_company_professional_id:
+            professional = Professional.objects.filter(
+                pk=remove_company_professional_id
+            ).first()
+            company = Company.objects.filter(pk=company_id).first()
+            if professional is not None and company is not None:
+                professional.companies.remove(company)
+            return redirect(f"{request.path}{redirect_params}")
         elif add_referral_professional_id:
             professional = Professional.objects.filter(pk=add_referral_professional_id).first()
             referral = Professional.objects.filter(pk=referral_id).first()
