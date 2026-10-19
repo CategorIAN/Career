@@ -2221,6 +2221,7 @@ def job_search_view(request):
         if request.method == "POST"
         else request.GET.get("search", "").strip()
     )
+    recent_application_cutoff = timezone.now() - timedelta(days=30)
     last_observation_source = (
         SearchObservation.objects.filter(complete=True)
         .order_by("-created")
@@ -2260,6 +2261,12 @@ def job_search_view(request):
         SearchPath.objects.filter(active=True)
         .select_related("company", "platform", "search_term")
         .annotate(
+            page_has_recent_company_application=Exists(
+                Application.objects.filter(
+                    company_id=OuterRef("company_id"),
+                    submitted__gte=recent_application_cutoff,
+                )
+            ),
             pending=Exists(
                 SearchObservation.objects.filter(
                     search_path_id=OuterRef("pk"),
@@ -2300,24 +2307,26 @@ def job_search_view(request):
             for search_path in all_search_paths
             if normalized_search_text in str(search_path).casefold()
         ]
-    elif last_observation_source is not None:
-        last_platform_id, last_company_id = last_observation_source
-        if last_platform_id is not None:
-            visible_search_paths = [
-                search_path
-                for search_path in all_search_paths
-                if search_path.platform_id is None
-            ]
-        elif last_company_id is not None:
-            visible_search_paths = [
-                search_path
-                for search_path in all_search_paths
-                if search_path.company_id is None
-            ]
-        else:
-            visible_search_paths = all_search_paths
     else:
-        visible_search_paths = all_search_paths
+        visible_search_paths = [
+            search_path
+            for search_path in all_search_paths
+            if not search_path.page_has_recent_company_application
+        ]
+        if last_observation_source is not None:
+            last_platform_id, last_company_id = last_observation_source
+            if last_platform_id is not None:
+                visible_search_paths = [
+                    search_path
+                    for search_path in visible_search_paths
+                    if search_path.platform_id is None
+                ]
+            elif last_company_id is not None:
+                visible_search_paths = [
+                    search_path
+                    for search_path in visible_search_paths
+                    if search_path.company_id is None
+                ]
 
     paginator = Paginator(visible_search_paths, 1)
     page_obj = paginator.get_page(page_number)

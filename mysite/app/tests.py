@@ -4686,6 +4686,40 @@ class InterviewPracticeTests(TestCase):
 
 
 class JobSearchPageTests(TestCase):
+    def setUp(self):
+        self.administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(self.administrator)
+
+    def test_job_search_hides_recently_applied_company_paths_without_a_search(self):
+        company = Company.objects.create(name="Recently Applied Co")
+        search_path = SearchPath.objects.create(company=company)
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name=company.name,
+        )
+        Application.objects.create(
+            company=company,
+            job_posting=job_posting,
+            submitted=timezone.now() - timedelta(days=1),
+        )
+
+        response = self.client.get(reverse("job_search"))
+
+        self.assertEqual(list(response.context["page_obj"].object_list), [])
+
+        search_response = self.client.get(
+            reverse("job_search"),
+            {"search": str(search_path)},
+        )
+
+        self.assertEqual(
+            list(search_response.context["page_obj"].object_list),
+            [search_path],
+        )
+
     def test_job_search_shows_pending_observations_for_current_search_path(self):
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")

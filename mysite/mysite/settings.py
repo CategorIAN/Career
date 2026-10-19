@@ -25,7 +25,7 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)byphiz0s2oa@44x#)=r#cq*7584nqvlpx5@(_l04ctmvs342%'
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 FREELANCER_TOKEN = os.environ.get('FREELANCER_TOKEN')
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -37,9 +37,13 @@ CAREER_ADMIN_USERNAME = os.environ.get("CAREER_ADMIN_USERNAME", "ian")
 LOGOUT_REDIRECT_URL = reverse_lazy("home")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False").strip().lower() == "true"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -56,6 +60,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # ==============================
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # For Render
+    # ==============================
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -142,6 +149,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
