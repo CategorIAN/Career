@@ -14,7 +14,7 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 from app.models import Application
 
 
-SIGNATURE_IMAGE_PATH = Path(settings.BASE_DIR) / "app" / "static" / "app" / "images" / "signature.jpg"
+SIGNATURE_IMAGE_PATH = Path(settings.SIGNATURE_IMAGE_PATH)
 
 
 class CoverLetterPDFError(Exception):

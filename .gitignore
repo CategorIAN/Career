@@ -208,4 +208,6 @@ __marimo__/
 
 
 mysite/credentials.json
+mysite/token.json
 token.json
+mysite/private/

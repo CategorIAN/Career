@@ -164,3 +164,20 @@ STORAGES = {
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SIGNATURE_IMAGE_PATH = os.environ.get(
+    "SIGNATURE_IMAGE_PATH",
+    str(BASE_DIR / "private" / "signature.jpg"),
+)
+
+GOOGLE_CREDENTIALS_PATH = os.environ.get(
+    "GOOGLE_CREDENTIALS_PATH",
+    str(BASE_DIR / "credentials.json"),
+)
+GOOGLE_TOKEN_PATH = os.environ.get(
+    "GOOGLE_TOKEN_PATH",
+    str(BASE_DIR / "token.json"),
+)
+GOOGLE_TOKEN_WRITABLE = (
+    os.environ.get("GOOGLE_TOKEN_WRITABLE", "False").lower() == "true"
+)

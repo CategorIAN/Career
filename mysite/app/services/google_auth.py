@@ -34,9 +34,10 @@ class GoogleInsufficientScopesError(GoogleAuthError):
 
 
 def credential_paths():
-    """Return the project-local OAuth client and user-token file paths."""
-    base_dir = Path(settings.BASE_DIR)
-    return base_dir / "credentials.json", base_dir / "token.json"
+    return (
+        Path(settings.GOOGLE_CREDENTIALS_PATH),
+        Path(settings.GOOGLE_TOKEN_PATH),
+    )
 
 
 def _scope_set(scopes):
@@ -116,7 +117,11 @@ def get_google_credentials():
             if credentials is not None and credentials.valid:
                 token_path.write_text(credentials.to_json(), encoding="utf-8")
                 return credentials
-
+    if not settings.DEBUG:
+        raise GoogleTokenError(
+            "Google authorization is required. Authorize locally, then "
+            "replace the production token."
+        )
     credentials = _authorize(credentials_path)
     token_path.write_text(credentials.to_json(), encoding="utf-8")
     return credentials
