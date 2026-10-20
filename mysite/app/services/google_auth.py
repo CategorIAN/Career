@@ -115,7 +115,8 @@ def get_google_credentials():
                 credentials = None
 
             if credentials is not None and credentials.valid:
-                token_path.write_text(credentials.to_json(), encoding="utf-8")
+                if settings.GOOGLE_TOKEN_WRITABLE:
+                    token_path.write_text(credentials.to_json(), encoding="utf-8")
                 return credentials
     if not settings.DEBUG:
         raise GoogleTokenError(
@@ -123,5 +124,6 @@ def get_google_credentials():
             "replace the production token."
         )
     credentials = _authorize(credentials_path)
-    token_path.write_text(credentials.to_json(), encoding="utf-8")
+    if settings.GOOGLE_TOKEN_WRITABLE:
+        token_path.write_text(credentials.to_json(), encoding="utf-8")
     return credentials
