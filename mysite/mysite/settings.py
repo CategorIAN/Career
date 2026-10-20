@@ -184,3 +184,20 @@ GOOGLE_TOKEN_PATH = os.environ.get(
 GOOGLE_TOKEN_WRITABLE = (
     os.environ.get("GOOGLE_TOKEN_WRITABLE", "False").lower() == "true"
 )
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
