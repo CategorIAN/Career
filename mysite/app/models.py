@@ -317,6 +317,10 @@ class Role(models.Model):
 
     skills = models.ManyToManyField("Skill", blank=True)
 
+    github_url = models.URLField(blank=True)
+
+    live_url = models.URLField(blank=True)
+
     def __str__(self):
         return self.title
 

@@ -262,6 +262,8 @@
                 {% if profile.location or profile.email or profile.phone or profile.linkedin_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
                 <span><a href="{{ profile.github_url }}">GitHub</a></span>
             {% endif %}
+            {% if profile.location or profile.email or profile.phone or profile.linkedin_url or profile.github_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
+            <span><a href="https://ian-kessler-career.onrender.com/">Website</a></span>
         </p>
     </header>
 
@@ -288,7 +290,15 @@
         {% for role in roles %}
             <article>
                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
-                    <h3 style="margin: 0;">{{ role.title }}</h3>
+                    <div style="display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
+                        <h3 style="margin: 0;">{{ role.title }}</h3>
+                        {% if role.github_url %}
+                            <a href="{{ role.github_url }}">[GitHub]</a>
+                        {% endif %}
+                        {% if role.live_url %}
+                            <a href="{{ role.live_url }}">[Live]</a>
+                        {% endif %}
+                    </div>
                     <p style="margin: 0; text-align: right; white-space: nowrap;">
                         {{ role.start_date|date:"M Y" }}
                         &ndash;
@@ -310,10 +320,6 @@
                         {% endif %}
                     </p>
                 </div>
-
-                {% if role.description %}
-                    <p>{{ role.description }}</p>
-                {% endif %}
 
                 <ul>
                     {% for task in role.tasks.all %}

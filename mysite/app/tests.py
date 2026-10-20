@@ -361,6 +361,34 @@ class ResumeContactAccessTests(TestCase):
         self.assertNotIn("email", response.context["profile"])
 
 
+class ResumeRoleDisplayTests(TestCase):
+    def test_resume_hides_role_descriptions_but_shows_responsibilities(self):
+        role = Role.objects.create(
+            company=Company.objects.create(name="Example Co"),
+            title="Data Engineer",
+            start_date=date(2024, 1, 1),
+            description="Hidden role description.",
+            github_url="https://github.com/example/role",
+            live_url="https://role.example.com",
+        )
+        RoleTask.objects.create(
+            role=role,
+            description="Visible responsibility.",
+        )
+
+        response = self.client.get(reverse("resume"))
+
+        self.assertNotContains(response, "Hidden role description.")
+        self.assertContains(response, "Visible responsibility.")
+        self.assertContains(
+            response,
+            'href="https://ian-kessler-career.onrender.com/">Website</a>',
+            html=False,
+        )
+        self.assertContains(response, 'href="https://github.com/example/role">[GitHub]</a>', html=False)
+        self.assertContains(response, 'href="https://role.example.com">[Live]</a>', html=False)
+
+
 class ExperienceDisplayModeTests(TestCase):
     def setUp(self):
         user_model = get_user_model()
