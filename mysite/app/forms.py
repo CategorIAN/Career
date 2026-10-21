@@ -22,6 +22,8 @@ from .models import (
     PlatformSkill,
     Professional,
     Project,
+    ProjectActionItem,
+    ProjectChecklist,
     ProjectTask,
     Recruiter,
     Role,
@@ -210,7 +212,35 @@ class ProjectTaskEditForm(forms.ModelForm):
         fields = ["description", "resume_ready"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
+    }
+
+
+class ProjectManagementForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ["allocation_weight", "is_active", "toggl_tag_name"]
+        labels = {
+            "allocation_weight": "Weight",
+            "is_active": "Active",
+            "toggl_tag_name": "Tag Name",
         }
+        widgets = {
+            "allocation_weight": forms.NumberInput(attrs={"style": "width: 5rem;"}),
+        }
+
+
+class ProjectChecklistForm(forms.ModelForm):
+    class Meta:
+        model = ProjectChecklist
+        fields = ["status", "notes", "evidence_url"]
+        widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+
+
+class ProjectActionItemForm(forms.ModelForm):
+    class Meta:
+        model = ProjectActionItem
+        fields = ["description"]
+        widgets = {"description": forms.Textarea(attrs={"rows": 2})}
 
 
 ProjectTaskEditFormSet = inlineformset_factory(

@@ -504,12 +504,13 @@
                 </div>
             </div>
             <div class="nav-folder">
-                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'features' or request.resolver_match.url_name == 'platforms' or request.resolver_match.url_name == 'companies' or request.resolver_match.url_name == 'skills' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="management-submenu">Management</button>
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'features' or request.resolver_match.url_name == 'platforms' or request.resolver_match.url_name == 'companies' or request.resolver_match.url_name == 'skills' or request.resolver_match.url_name == 'project_management' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="management-submenu">Management</button>
                 <div id="management-submenu" class="nav-submenu">
                     <a class="nav-link{% if request.resolver_match.url_name == 'features' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'features' %} aria-current="page"{% endif %} href="{% url 'features' %}">Features</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'platforms' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'platforms' %} aria-current="page"{% endif %} href="{% url 'platforms' %}">Platforms</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'companies' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'companies' %} aria-current="page"{% endif %} href="{% url 'companies' %}">Companies</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'skills' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'skills' %} aria-current="page"{% endif %} href="{% url 'skills' %}">Skills</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'project_management' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'project_management' %} aria-current="page"{% endif %} href="{% url 'project_management' %}">Project Management</a>
                 </div>
             </div>
             <div class="nav-folder">

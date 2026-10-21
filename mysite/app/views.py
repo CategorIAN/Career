@@ -60,7 +60,10 @@ from .forms import (
     ProfessionalForm,
     ProjectCoreEditForm,
     ProjectDetailsEditForm,
+    ProjectActionItemForm,
+    ProjectChecklistForm,
     ProjectSkillsEditForm,
+    ProjectManagementForm,
     ProjectTaskEditFormSet,
     RecruiterConnectForm,
     RecruiterForm,
@@ -96,6 +99,11 @@ from .models import (
     Role,
     ProfileSetting,
     Project,
+    ProjectActionItem,
+    ProjectChecklist,
+    ChecklistItem,
+    TogglSyncStatus,
+    TogglTimeEntry,
     Reference,
     FreelancerProject,
     FreelancerSkill,
@@ -123,6 +131,8 @@ from .services.gmail import (
     search_emails,
 )
 from .services.search_paths import create_company_search_paths
+from .services.project_management import review_is_due, seed_default_checklist_items
+from .services.toggl import TogglSyncError, sync_toggl_time_entries, toggl_is_configured
 from .services.interview_practice import (
     InterviewPracticeError,
     build_interview_context,
@@ -3445,6 +3455,218 @@ def projects_view(request):
             "show_projects_mode_switch": is_administrator,
         },
     )
+
+
+def _project_management_redirect(include_inactive, selected_project_id=""):
+    query_params = {}
+    if include_inactive:
+        query_params["inactive"] = "1"
+    if selected_project_id:
+        query_params["project_id"] = selected_project_id
+    suffix = f"?{urlencode(query_params)}" if query_params else ""
+    return redirect(f"{reverse('project_management')}{suffix}")
+
+
+def _project_management_access_denied(request):
+    if not is_career_administrator(request.user):
+        raise PermissionDenied("This page is only available to the Career administrator.")
+
+
+def project_management_view(request):
+    _project_management_access_denied(request)
+    seed_default_checklist_items()
+    include_inactive = request.GET.get("inactive") == "1" or request.POST.get("inactive") == "1"
+    selected_project_id = (
+        request.POST.get("selected_project_id")
+        or request.GET.get("project_id", "")
+    ).strip()
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        project_id = request.POST.get("project_id", "")
+        project = get_object_or_404(Project, pk=project_id) if project_id else None
+        if action == "save_project" and project is not None:
+            form = ProjectManagementForm(request.POST, instance=project, prefix=f"project-{project.pk}")
+            if form.is_valid():
+                form.save()
+                messages.success(request, f"Saved management settings for {project.title}.")
+            else:
+                messages.error(request, "Project settings were not saved. Please correct the errors.")
+        elif action in {"save_checklist", "verify_checklist"} and project is not None:
+            item = get_object_or_404(ChecklistItem, pk=request.POST.get("checklist_item_id"))
+            response, _ = ProjectChecklist.objects.get_or_create(
+                project=project,
+                checklist_item=item,
+            )
+            form = ProjectChecklistForm(request.POST, instance=response, prefix=f"checklist-{item.pk}")
+            if form.is_valid():
+                response = form.save(commit=False)
+                if action == "verify_checklist":
+                    response.last_verified_at = timezone.now()
+                response.save()
+                messages.success(request, f"Saved {item.name}.")
+            else:
+                messages.error(request, f"{item.name} was not saved. Please correct the errors.")
+        elif action == "add_action_item" and project is not None:
+            form = ProjectActionItemForm(request.POST, prefix=f"new-action-{project.pk}")
+            if form.is_valid():
+                item = form.save(commit=False)
+                item.project = project
+                item.sort_order = project.action_items.count()
+                item.save()
+                messages.success(request, "Action item added.")
+            else:
+                messages.error(request, "Action item was not added.")
+        elif action == "save_action_item":
+            item = get_object_or_404(ProjectActionItem, pk=request.POST.get("action_item_id"))
+            form = ProjectActionItemForm(request.POST, instance=item, prefix=f"action-{item.pk}")
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Action item saved.")
+            else:
+                messages.error(request, "Action item was not saved.")
+        elif action in {"complete_action_item", "reopen_action_item", "delete_action_item"}:
+            item = get_object_or_404(ProjectActionItem, pk=request.POST.get("action_item_id"))
+            if action == "delete_action_item":
+                item.delete()
+                messages.success(request, "Action item deleted.")
+            else:
+                item.completed_at = timezone.now() if action == "complete_action_item" else None
+                item.save(update_fields=["completed_at"])
+                messages.success(request, "Action item updated.")
+        else:
+            messages.error(request, "Unknown Project Management action.")
+        return _project_management_redirect(include_inactive, selected_project_id)
+
+    all_projects = list(Project.objects.order_by("sort_order", "title", "pk"))
+    search_projects = [
+        project for project in all_projects if project.is_active or include_inactive
+    ]
+    selected_project = next(
+        (project for project in search_projects if str(project.pk) == selected_project_id),
+        None,
+    )
+    if selected_project is not None:
+        selected_project = (
+            Project.objects.filter(pk=selected_project.pk)
+            .prefetch_related(
+                Prefetch(
+                    "checklist_responses",
+                    queryset=ProjectChecklist.objects.select_related("checklist_item"),
+                ),
+                Prefetch(
+                    "action_items",
+                    queryset=ProjectActionItem.objects.order_by(
+                        "completed_at", "sort_order", "pk"
+                    ),
+                ),
+            )
+            .get()
+        )
+    projects = [selected_project] if selected_project is not None else []
+    checklist_items = list(ChecklistItem.objects.filter(is_active=True))
+    for project in projects:
+        response_by_item = {response.checklist_item_id: response for response in project.checklist_responses.all()}
+        project.management_form = ProjectManagementForm(instance=project, prefix=f"project-{project.pk}")
+        project.management_checklist = []
+        for item in checklist_items:
+            response = response_by_item.get(item.pk) or ProjectChecklist(project=project, checklist_item=item)
+            project.management_checklist.append(
+                {
+                    "item": item,
+                    "response": response,
+                    "form": ProjectChecklistForm(instance=response, prefix=f"checklist-{item.pk}"),
+                    "review_due": review_is_due(response),
+                }
+            )
+        project.open_action_items = [item for item in project.action_items.all() if item.completed_at is None]
+        project.completed_action_items = [item for item in project.action_items.all() if item.completed_at is not None]
+        project.new_action_item_form = ProjectActionItemForm(prefix=f"new-action-{project.pk}")
+        for item in project.action_items.all():
+            item.management_form = ProjectActionItemForm(instance=item, prefix=f"action-{item.pk}")
+
+    now = timezone.localtime()
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    four_weeks_start = week_start - timedelta(weeks=3)
+    entries = list(
+        TogglTimeEntry.objects.filter(is_deleted_at_source=False, is_running=False).select_related("project")
+    )
+    active_projects = [project for project in all_projects if project.is_active]
+    project_ids_for_totals = {project.pk for project in active_projects}
+    if selected_project is not None:
+        project_ids_for_totals.add(selected_project.pk)
+    totals_by_project = {
+        project_id: {"week": 0, "four_weeks": 0, "total": 0}
+        for project_id in project_ids_for_totals
+    }
+    activity_totals = {}
+    for entry in entries:
+        if entry.project_id in totals_by_project:
+            totals = totals_by_project[entry.project_id]
+            totals["total"] += entry.duration_seconds
+            if entry.started_at >= week_start:
+                totals["week"] += entry.duration_seconds
+            if entry.started_at >= four_weeks_start:
+                totals["four_weeks"] += entry.duration_seconds
+        if entry.started_at >= four_weeks_start:
+            activity = entry.source_project_name or "No Toggl project"
+            activity_totals[activity] = activity_totals.get(activity, 0) + entry.duration_seconds
+    total_weight = sum(project.allocation_weight for project in active_projects)
+    total_active_four_week_seconds = sum(totals_by_project[project.pk]["four_weeks"] for project in active_projects)
+    for project in projects:
+        totals = totals_by_project[project.pk]
+        project.time_totals = {
+            key: value / 3600 for key, value in totals.items()
+        }
+        project.target_share = (
+            100 * project.allocation_weight / total_weight
+            if project.is_active and total_weight
+            else 0
+        )
+        project.actual_share = (
+            100 * totals["four_weeks"] / total_active_four_week_seconds
+            if project.is_active and total_active_four_week_seconds
+            else 0
+        )
+    sync_status = TogglSyncStatus.objects.filter(pk=1).first()
+    return render(
+        request,
+        "app/project_management.html",
+        {
+            "projects": projects,
+            "all_projects": all_projects,
+            "search_projects": search_projects,
+            "selected_project": selected_project,
+            "selected_project_id": selected_project_id,
+            "include_inactive": include_inactive,
+            "activity_totals": sorted(
+                (name, seconds / 3600) for name, seconds in activity_totals.items()
+            ),
+            "sync_status": sync_status,
+            "toggl_is_configured": toggl_is_configured(),
+            "toggl_activity_categories": [
+                "Career Search", "Portfolio/Marketing", "Technical Articles", "Tech Training",
+                "Volunteer", "Freelance Search", "Freelancing", "Software Projects", "Work",
+            ],
+        },
+    )
+
+
+@require_POST
+def sync_toggl_view(request):
+    _project_management_access_denied(request)
+    try:
+        result = sync_toggl_time_entries()
+    except TogglSyncError as error:
+        messages.error(request, f"Toggl sync failed: {error}")
+    else:
+        messages.success(
+            request,
+            "Toggl synced: "
+            f"{result.created} created, {result.updated} updated, "
+            f"{result.ambiguous} ambiguous, {result.running} running skipped from totals.",
+        )
+    return _project_management_redirect(request.POST.get("inactive") == "1")
 
 
 @require_POST

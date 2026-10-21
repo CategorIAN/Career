@@ -128,6 +128,8 @@ urlpatterns = [
         name="save_project_section",
     ),
     path("projects/", views.projects_view, name="projects"),
+    path("project-management/", views.project_management_view, name="project_management"),
+    path("project-management/toggl/sync/", views.sync_toggl_view, name="sync_toggl"),
     path(
         "education/<int:education_id>/save/",
         views.save_education_view,

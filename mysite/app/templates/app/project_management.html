@@ -1,0 +1,136 @@
+{% extends "app/base.html" %}
+
+{% block title %}Project Management{% endblock %}
+
+{% block content %}
+<style>
+    .project-management-card { margin: 1.5rem 0; padding: 1rem; border: 1px solid #c7c7c7; border-radius: 0.4rem; background: #fff; }
+    .project-management-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; align-items: end; }
+    .project-management-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+    .project-management-table th, .project-management-table td { padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; }
+    .project-management-table textarea { width: 100%; box-sizing: border-box; }
+    .muted { color: #666; }
+    .status-needs-work { color: #a33; font-weight: 600; }
+    .review-due { color: #a33; font-weight: 600; }
+    .completed-item { color: #666; }
+    .project-management-section-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+    .project-management-section-header h3 { margin: 0; }
+</style>
+<section class="utility-page">
+    <h1>Project Management</h1>
+    <p class="utility-page-intro">Private project planning, quality review, and imported Toggl activity. Public portfolio pages do not expose this information.</p>
+
+    {% if messages %}
+        {% for message in messages %}<p{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>{% endfor %}
+    {% endif %}
+
+    <form method="get" style="margin: 1rem 0;">
+        <label for="project-management-search">Search Project</label>
+        <input id="project-management-search" type="text" list="project-management-options" value="{% if selected_project %}{{ selected_project.title }}{% endif %}" autocomplete="off" style="width: 20rem;">
+        <datalist id="project-management-options">
+            {% for project in search_projects %}<option value="{{ project.title }}" data-project-id="{{ project.pk }}"></option>{% endfor %}
+        </datalist>
+        <input id="project-management-id" type="hidden" name="project_id" value="{{ selected_project_id }}">
+        {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'project_management' %}{% if include_inactive %}?inactive=1{% endif %}'">Clear</button>
+        {% if include_inactive %}<a href="{% url 'project_management' %}{% if selected_project_id %}?project_id={{ selected_project_id }}{% endif %}">Hide inactive projects</a>{% else %}<a href="{% url 'project_management' %}?inactive=1{% if selected_project_id %}&amp;project_id={{ selected_project_id }}{% endif %}">Show inactive projects</a>{% endif %}
+    </form>
+
+    {% for project in projects %}
+        <article class="project-management-card">
+            <h2>{{ project.title }} {% if not project.is_active %}<span class="muted">(Inactive)</span>{% endif %}</h2>
+            <div class="project-management-section-header">
+                <h3>Toggl Track</h3>
+                <button type="button" class="project-management-toggle" data-target="toggl-track-{{ project.pk }}" aria-expanded="false">Show</button>
+            </div>
+            <section id="toggl-track-{{ project.pk }}" hidden>
+                <form method="post" class="project-management-grid">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_project">
+                    <input type="hidden" name="project_id" value="{{ project.pk }}">
+                    <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                    {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                    {% for field in project.management_form %}<label>{{ field.label }} {{ field }}</label>{% endfor %}
+                    <button type="submit">Save</button>
+                </form>
+                <div class="project-management-grid" style="margin-top: 1rem;">
+                    <p><strong>Target share:</strong> {{ project.target_share|floatformat:1 }}%</p>
+                    <p><strong>This week:</strong> {{ project.time_totals.week|floatformat:1 }} hours</p>
+                    <p><strong>Last four weeks:</strong> {{ project.time_totals.four_weeks|floatformat:1 }} hours ({{ project.actual_share|floatformat:1 }}% actual)</p>
+                </div>
+                <p><strong>Toggl tag:</strong> {{ project.toggl_tag_name|default:"Not configured" }}</p>
+                {% if toggl_is_configured %}
+                    <form method="post" action="{% url 'sync_toggl' %}">
+                        {% csrf_token %}
+                        {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                        <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                        <button type="submit">Sync Toggl</button>
+                    </form>
+                    <p class="muted">Imports the configured {{ sync_status.coverage_start_date|default:"selected" }} to {{ sync_status.coverage_end_date|default:"current" }} window. Edits, deletions, and tag changes inside each sync window are reconciled; running timers are stored but excluded from totals.</p>
+                {% else %}
+                    <p>Toggl is not configured. Set <code>TOGGL_API_TOKEN</code> to enable read-only imports.</p>
+                {% endif %}
+                {% if sync_status.last_successful_sync_at %}<p>Last successful sync: {{ sync_status.last_successful_sync_at|date:"Y-m-d g:i A" }}</p>{% endif %}
+                {% if sync_status.last_error %}<p class="status-needs-work">Last error: {{ sync_status.last_error }}</p>{% endif %}
+                <p class="muted">Activity categories: {{ toggl_activity_categories|join:", " }}.</p>
+                <h4>Four-Week Activity Breakdown</h4>
+                <table class="project-management-table"><thead><tr><th>Activity project</th><th>Hours</th></tr></thead><tbody>{% for name, hours in activity_totals %}<tr><td>{{ name }}</td><td>{{ hours|floatformat:1 }}</td></tr>{% empty %}<tr><td colspan="2">No imported activity in the last four weeks.</td></tr>{% endfor %}</tbody></table>
+            </section>
+
+            <div class="project-management-section-header">
+                <h3>Checklist</h3>
+                <button type="button" class="project-management-toggle" data-target="checklist-{{ project.pk }}" aria-expanded="false">Show</button>
+            </div>
+            <section id="checklist-{{ project.pk }}" hidden>
+            <table class="project-management-table"><thead><tr><th>Standard</th><th>Status</th><th>Notes / evidence</th><th>Verification</th><th></th></tr></thead><tbody>
+            {% for checklist in project.management_checklist %}
+                <tr><form method="post">{% csrf_token %}
+                    <td><strong>{{ checklist.item.name }}</strong>{% if checklist.item.guidance %}<br><span class="muted">{{ checklist.item.guidance }}</span>{% endif %}</td>
+                    <td>{{ checklist.form.status }}</td>
+                    <td>{{ checklist.form.notes }}{{ checklist.form.evidence_url }}</td>
+                    <td>{% if checklist.response.last_verified_at %}{{ checklist.response.last_verified_at|date:"Y-m-d" }}{% else %}Not verified{% endif %}{% if checklist.review_due %}<br><span class="review-due">Review due</span>{% endif %}</td>
+                    <td><input type="hidden" name="project_id" value="{{ project.pk }}"><input type="hidden" name="selected_project_id" value="{{ selected_project_id }}"><input type="hidden" name="checklist_item_id" value="{{ checklist.item.pk }}">{% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}<button name="action" value="save_checklist">Save</button> <button name="action" value="verify_checklist">Verify now</button></td>
+                </form></tr>
+            {% endfor %}
+            </tbody></table>
+            </section>
+
+            <div class="project-management-section-header">
+                <h3>Action Items</h3>
+                <button type="button" class="project-management-toggle" data-target="action-items-{{ project.pk }}" aria-expanded="false">Show</button>
+            </div>
+            <section id="action-items-{{ project.pk }}" hidden>
+            <form method="post"><input type="hidden" name="action" value="add_action_item"><input type="hidden" name="project_id" value="{{ project.pk }}"><input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">{% csrf_token %}{% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}{{ project.new_action_item_form.description }} <button type="submit">Add Action Item</button></form>
+            <h4>Open</h4>
+            {% for item in project.open_action_items %}
+                <form method="post" style="margin: 0.5rem 0;">{% csrf_token %}<input type="hidden" name="action_item_id" value="{{ item.pk }}"><input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">{% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}{{ item.management_form.description }} <button name="action" value="save_action_item">Save</button> <button name="action" value="complete_action_item">Complete</button> <button name="action" value="delete_action_item">Delete</button></form>
+            {% empty %}<p class="muted">No open action items.</p>{% endfor %}
+            <h4>Completed</h4>
+            {% for item in project.completed_action_items %}
+                <form method="post" class="completed-item" style="margin: 0.5rem 0;">{% csrf_token %}<input type="hidden" name="action_item_id" value="{{ item.pk }}"><input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">{% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}{{ item.management_form.description }} <span>Completed {{ item.completed_at|date:"Y-m-d" }}</span> <button name="action" value="save_action_item">Save</button> <button name="action" value="reopen_action_item">Reopen</button> <button name="action" value="delete_action_item">Delete</button></form>
+            {% empty %}<p class="muted">No completed action items.</p>{% endfor %}
+            </section>
+        </article>
+    {% empty %}<p class="muted">Select a project to view its management details.</p>{% endfor %}
+</section>
+<script>
+    (() => {
+        const input = document.getElementById("project-management-search");
+        const hiddenId = document.getElementById("project-management-id");
+        const options = Array.from(document.querySelectorAll("#project-management-options option"));
+        if (!input || !hiddenId) return;
+        const idByTitle = new Map(options.map(option => [option.value, option.dataset.projectId]));
+        input.addEventListener("input", () => { hiddenId.value = idByTitle.get(input.value) || ""; });
+        document.querySelectorAll(".project-management-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const section = document.getElementById(button.dataset.target);
+                const isHidden = section.hidden;
+                section.hidden = !isHidden;
+                button.textContent = isHidden ? "Hide" : "Show";
+                button.setAttribute("aria-expanded", String(isHidden));
+            });
+        });
+    })();
+</script>
+{% endblock %}

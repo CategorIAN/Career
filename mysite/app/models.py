@@ -414,10 +414,23 @@ class Project(models.Model):
 
     sort_order = models.PositiveIntegerField(default=0)
 
+    allocation_weight = models.PositiveIntegerField(default=1)
+
+    is_active = models.BooleanField(default=True)
+
+    toggl_tag_name = models.CharField(max_length=200, blank=True)
+
     skills = models.ManyToManyField(
         "Skill",
         blank=True,
         related_name="projects",
+    )
+
+    checklist_items = models.ManyToManyField(
+        "ChecklistItem",
+        through="ProjectChecklist",
+        related_name="projects",
+        blank=True,
     )
 
     def __str__(self):
@@ -436,6 +449,102 @@ class ProjectTask(models.Model):
     resume_ready = models.BooleanField(default=False)
 
     sort_order = models.PositiveIntegerField(default=0)
+
+
+class ChecklistItem(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    guidance = models.TextField(blank=True)
+    review_interval_days = models.PositiveIntegerField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "id")
+
+    def __str__(self):
+        return self.name
+
+
+class ProjectChecklist(models.Model):
+    class Status(models.TextChoices):
+        NOT_REVIEWED = "not_reviewed", "Not reviewed"
+        NEEDS_WORK = "needs_work", "Needs work"
+        SATISFIED = "satisfied", "Satisfied"
+        NOT_APPLICABLE = "not_applicable", "Not applicable"
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="checklist_responses",
+    )
+    checklist_item = models.ForeignKey(
+        ChecklistItem,
+        on_delete=models.PROTECT,
+        related_name="project_responses",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NOT_REVIEWED,
+    )
+    notes = models.TextField(blank=True)
+    evidence_url = models.URLField(blank=True)
+    last_verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("project", "checklist_item"),
+                name="unique_project_checklist_response",
+            )
+        ]
+
+
+class ProjectActionItem(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="action_items",
+    )
+    description = models.TextField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("completed_at", "sort_order", "id")
+
+
+class TogglTimeEntry(models.Model):
+    external_id = models.CharField(max_length=100, unique=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.SET_NULL,
+        related_name="toggl_time_entries",
+        null=True,
+        blank=True,
+    )
+    source_project_id = models.CharField(max_length=100, blank=True)
+    source_project_name = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    started_at = models.DateTimeField()
+    stopped_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.PositiveIntegerField(default=0)
+    is_running = models.BooleanField(default=False)
+    is_ambiguous = models.BooleanField(default=False)
+    is_deleted_at_source = models.BooleanField(default=False)
+    imported_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+
+
+class TogglSyncStatus(models.Model):
+    last_successful_sync_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    coverage_start_date = models.DateField(null=True, blank=True)
+    coverage_end_date = models.DateField(null=True, blank=True)
 
 
 class Course(models.Model):

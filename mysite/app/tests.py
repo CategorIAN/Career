@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, TestCase, override_settings
@@ -29,6 +30,7 @@ from .models import (
     Company,
     Country,
     Course,
+    ChecklistItem,
     Direction,
     Education,
     Feature,
@@ -44,6 +46,8 @@ from .models import (
     Recruiter,
     Connect,
     Project,
+    ProjectActionItem,
+    ProjectChecklist,
     ProjectTask,
     Residency,
     Role,
@@ -55,6 +59,7 @@ from .models import (
     Skill,
     State,
     Supervisor,
+    TogglTimeEntry,
     PlatformFeature,
 )
 from .views import (
@@ -89,6 +94,8 @@ from .services.job_evaluation import (
     evaluate_job_posting,
 )
 from .services.search_paths import create_company_search_paths
+from .services.project_management import review_is_due
+from .services.toggl import import_time_entries
 from .services.interview_practice import (
     InterviewPracticeAPIError,
     build_interview_context,
@@ -167,6 +174,7 @@ class NavigationTemplateTests(TestCase):
             "platforms",
             "companies",
             "skills",
+            "project_management",
             "professionals",
             "recruiters",
             "connections",
@@ -749,6 +757,166 @@ class ProjectDisplayModeTests(TestCase):
             list(self.public_project.tasks.order_by("sort_order", "pk")),
             [self.second_task, self.first_task],
         )
+
+
+class ProjectManagementTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.administrator = user_model.objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.other_user = user_model.objects.create_user(
+            username="project-manager-visitor",
+            password="test-password",
+        )
+        self.project = Project.objects.create(title="Career App", toggl_tag_name="Career App")
+
+    def test_management_endpoints_require_career_administrator(self):
+        for client in (self.client, Client()):
+            self.assertEqual(client.get(reverse("project_management")).status_code, 403)
+            self.assertEqual(client.post(reverse("sync_toggl")).status_code, 403)
+        self.client.force_login(self.other_user)
+        self.assertEqual(self.client.get(reverse("project_management")).status_code, 403)
+        self.assertEqual(self.client.post(reverse("sync_toggl")).status_code, 403)
+        self.client.force_login(self.administrator)
+        response = self.client.get(reverse("project_management"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Project Management")
+        self.assertContains(response, "Search Project")
+        self.assertNotContains(response, 'name="project-')
+        self.assertNotContains(self.client.get(reverse("projects")), "Toggl Sync")
+
+        selected_response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+        self.assertContains(selected_response, "Career App")
+        self.assertContains(selected_response, ">Save</button>", html=False)
+        self.assertContains(selected_response, "Weight")
+        self.assertContains(selected_response, "Active")
+        self.assertContains(selected_response, "Tag Name")
+        self.assertNotContains(selected_response, "Total imported")
+        self.assertContains(selected_response, "Toggl Track")
+        self.assertContains(selected_response, "Checklist")
+        self.assertContains(selected_response, "Action Items")
+        self.assertContains(
+            selected_response,
+            f'id="toggl-track-{self.project.pk}" hidden',
+            html=False,
+        )
+        content = selected_response.content.decode()
+        toggl_section_index = content.index(f'id="toggl-track-{self.project.pk}"')
+        allocation_weight_index = content.index(
+            f'name="project-{self.project.pk}-allocation_weight"'
+        )
+        is_active_index = content.index(f'name="project-{self.project.pk}-is_active"')
+        tag_name_index = content.index(f'name="project-{self.project.pk}-toggl_tag_name"')
+        checklist_section_index = content.index(f'id="checklist-{self.project.pk}"')
+        self.assertLess(toggl_section_index, allocation_weight_index)
+        self.assertLess(toggl_section_index, is_active_index)
+        self.assertLess(toggl_section_index, tag_name_index)
+        self.assertLess(tag_name_index, checklist_section_index)
+
+    def test_checklist_response_is_created_on_save_and_only_verification_sets_date(self):
+        self.client.force_login(self.administrator)
+        item = ChecklistItem.objects.create(name="Custom Standard")
+        response = self.client.post(
+            reverse("project_management"),
+            {
+                "action": "save_checklist",
+                "project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+                f"checklist-{item.pk}-status": ProjectChecklist.Status.NEEDS_WORK,
+                f"checklist-{item.pk}-notes": "Needs a README.",
+                f"checklist-{item.pk}-evidence_url": "",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        checklist = ProjectChecklist.objects.get(project=self.project, checklist_item=item)
+        self.assertIsNone(checklist.last_verified_at)
+        self.client.post(
+            reverse("project_management"),
+            {
+                "action": "verify_checklist",
+                "project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+                f"checklist-{item.pk}-status": ProjectChecklist.Status.SATISFIED,
+                f"checklist-{item.pk}-notes": "Verified.",
+                f"checklist-{item.pk}-evidence_url": "",
+            },
+        )
+        checklist.refresh_from_db()
+        self.assertIsNotNone(checklist.last_verified_at)
+        self.assertFalse(review_is_due(checklist))
+        checklist.last_verified_at = timezone.now() - timedelta(days=1)
+        checklist_item = checklist.checklist_item
+        checklist_item.review_interval_days = 1
+        checklist_item.save(update_fields=["review_interval_days"])
+        checklist.save(update_fields=["last_verified_at"])
+        self.assertTrue(review_is_due(checklist))
+        with self.assertRaises(IntegrityError):
+            ProjectChecklist.objects.create(project=self.project, checklist_item=item)
+
+    def test_zero_allocation_weights_and_action_lifecycle(self):
+        self.client.force_login(self.administrator)
+        self.project.allocation_weight = 0
+        self.project.save(update_fields=["allocation_weight"])
+        response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+        displayed_project = response.context["projects"][0]
+        self.assertEqual(displayed_project.target_share, 0)
+        self.client.post(
+            reverse("project_management"),
+            {
+                "action": "add_action_item",
+                "project_id": self.project.pk,
+                f"new-action-{self.project.pk}-description": "Write the README.",
+            },
+        )
+        item = ProjectActionItem.objects.get(project=self.project)
+        self.client.post(reverse("project_management"), {"action": "complete_action_item", "action_item_id": item.pk})
+        item.refresh_from_db()
+        self.assertIsNotNone(item.completed_at)
+        self.client.post(reverse("project_management"), {"action": "reopen_action_item", "action_item_id": item.pk})
+        item.refresh_from_db()
+        self.assertIsNone(item.completed_at)
+
+    def test_toggl_import_is_idempotent_and_flags_multiple_tag_matches(self):
+        other_project = Project.objects.create(title="Event Planning", toggl_tag_name="Event Planning App")
+        start = timezone.now() - timedelta(days=2)
+        end = timezone.now()
+        entries = [
+            {
+                "id": 101,
+                "start": start.isoformat(),
+                "stop": (start + timedelta(hours=1)).isoformat(),
+                "duration": 3600,
+                "project_id": 9,
+                "project_name": "Software Projects",
+                "description": "Implemented sync.",
+                "tags": ["Career App"],
+            },
+            {
+                "id": 102,
+                "start": start.isoformat(),
+                "stop": (start + timedelta(hours=1)).isoformat(),
+                "duration": 3600,
+                "tags": ["Career App", "Event Planning App"],
+            },
+        ]
+        first = import_time_entries(entries, start=start, end=end)
+        second = import_time_entries(entries, start=start, end=end)
+        self.assertEqual(first.created, 2)
+        self.assertEqual(second.created, 0)
+        self.assertEqual(TogglTimeEntry.objects.count(), 2)
+        self.assertEqual(TogglTimeEntry.objects.get(external_id="101").project, self.project)
+        ambiguous = TogglTimeEntry.objects.get(external_id="102")
+        self.assertTrue(ambiguous.is_ambiguous)
+        self.assertIsNone(ambiguous.project)
+        self.assertEqual(other_project.toggl_time_entries.count(), 0)
 
 
 class EducationDisplayModeTests(TestCase):

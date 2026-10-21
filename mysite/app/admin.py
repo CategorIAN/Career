@@ -4,7 +4,8 @@ from .models import (Company, Role, RoleTask, Address, City,
                      Project, ProjectTask, Skill, Course, Supervisor, Reference,
                      Residency, ProfileSetting, SearchObservation, SearchPath,
                      JobPosting, Application, Professional, Recruiter, InterviewPracticeSession,
-                     InterviewPracticeMessage)
+                     InterviewPracticeMessage, ChecklistItem, ProjectChecklist,
+                     ProjectActionItem, TogglTimeEntry, TogglSyncStatus)
 
 
 class RoleTaskInline(admin.TabularInline):
@@ -117,6 +118,16 @@ class ProjectTaskInline(admin.TabularInline):
     extra = 1
 
 
+class ProjectChecklistInline(admin.TabularInline):
+    model = ProjectChecklist
+    extra = 0
+
+
+class ProjectActionItemInline(admin.TabularInline):
+    model = ProjectActionItem
+    extra = 0
+
+
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
     list_display = ("name",)
@@ -129,7 +140,37 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ("resume_ready", "is_public")
     search_fields = ("title", "short_description", "description")
     filter_horizontal = ("skills",)
-    inlines = [ProjectTaskInline]
+    inlines = [ProjectTaskInline, ProjectChecklistInline, ProjectActionItemInline]
+
+
+@admin.register(ChecklistItem)
+class ChecklistItemAdmin(admin.ModelAdmin):
+    list_display = ("name", "review_interval_days", "is_active", "sort_order")
+    list_filter = ("is_active",)
+    ordering = ("sort_order", "id")
+
+
+@admin.register(ProjectActionItem)
+class ProjectActionItemAdmin(admin.ModelAdmin):
+    list_display = ("project", "short_description", "completed_at", "sort_order")
+    list_filter = ("completed_at", "project")
+
+    @staticmethod
+    def short_description(obj):
+        return obj.description[:80]
+
+
+@admin.register(TogglTimeEntry)
+class TogglTimeEntryAdmin(admin.ModelAdmin):
+    list_display = ("external_id", "project", "source_project_name", "started_at", "duration_seconds", "is_running", "is_ambiguous", "is_deleted_at_source")
+    list_filter = ("is_running", "is_ambiguous", "is_deleted_at_source", "project")
+    search_fields = ("external_id", "description", "source_project_name")
+    readonly_fields = ("imported_at", "updated_at")
+
+
+@admin.register(TogglSyncStatus)
+class TogglSyncStatusAdmin(admin.ModelAdmin):
+    list_display = ("last_successful_sync_at", "coverage_start_date", "coverage_end_date")
 
 
 @admin.register(ProjectTask)
