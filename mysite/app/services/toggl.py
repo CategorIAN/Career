@@ -60,7 +60,10 @@ def fetch_time_entries(start, end):
         with urlopen(request, timeout=30) as response:
             entries = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
-        raise TogglSyncError(f"Toggl rejected the import ({error.code}).") from error
+        detail = error.read().decode("utf-8", errors="replace")
+        raise TogglSyncError(
+            f"Toggl rejected the import ({error.code}): {detail}"
+        ) from error
     except (URLError, TimeoutError, json.JSONDecodeError) as error:
         raise TogglSyncError("Could not retrieve Toggl time entries.") from error
     if not isinstance(entries, list):

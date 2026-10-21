@@ -3644,10 +3644,6 @@ def project_management_view(request):
             ),
             "sync_status": sync_status,
             "toggl_is_configured": toggl_is_configured(),
-            "toggl_activity_categories": [
-                "Career Search", "Portfolio/Marketing", "Technical Articles", "Tech Training",
-                "Volunteer", "Freelance Search", "Freelancing", "Software Projects", "Work",
-            ],
         },
     )
 
@@ -3666,7 +3662,10 @@ def sync_toggl_view(request):
             f"{result.created} created, {result.updated} updated, "
             f"{result.ambiguous} ambiguous, {result.running} running skipped from totals.",
         )
-    return _project_management_redirect(request.POST.get("inactive") == "1")
+    return _project_management_redirect(
+        request.POST.get("inactive") == "1",
+        request.POST.get("selected_project_id", "").strip(),
+    )
 
 
 @require_POST

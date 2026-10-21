@@ -800,6 +800,8 @@ class ProjectManagementTests(TestCase):
         self.assertContains(selected_response, "Toggl Track")
         self.assertContains(selected_response, "Checklist")
         self.assertContains(selected_response, "Action Items")
+        self.assertNotContains(selected_response, "Activity categories:")
+        self.assertContains(selected_response, "Toggl activity")
         self.assertContains(
             selected_response,
             f'id="toggl-track-{self.project.pk}" hidden',
@@ -817,6 +819,20 @@ class ProjectManagementTests(TestCase):
         self.assertLess(toggl_section_index, is_active_index)
         self.assertLess(toggl_section_index, tag_name_index)
         self.assertLess(tag_name_index, checklist_section_index)
+
+        with patch(
+            "app.views.sync_toggl_time_entries",
+            return_value=SimpleNamespace(created=0, updated=0, ambiguous=0, running=0),
+        ):
+            sync_response = self.client.post(
+                reverse("sync_toggl"),
+                {"inactive": "1", "selected_project_id": self.project.pk},
+            )
+        self.assertRedirects(
+            sync_response,
+            f"{reverse('project_management')}?inactive=1&project_id={self.project.pk}",
+            fetch_redirect_response=False,
+        )
 
     def test_checklist_response_is_created_on_save_and_only_verification_sets_date(self):
         self.client.force_login(self.administrator)
