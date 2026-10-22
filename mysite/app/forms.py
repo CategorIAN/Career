@@ -12,6 +12,7 @@ from .models import (
     ApplicationEmail,
     InterviewPracticeSession,
     Company,
+    ChecklistItem,
     Course,
     Education,
     Feature,
@@ -226,14 +227,56 @@ class ProjectManagementForm(forms.ModelForm):
         }
         widgets = {
             "allocation_weight": forms.NumberInput(attrs={"style": "width: 5rem;"}),
+            "toggl_tag_name": forms.TextInput(
+                attrs={
+                    "style": "width: 10rem;",
+                    "autocomplete": "off",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                    "data-dashlane-ignore": "true",
+                    "data-dashlane-autofill": "false",
+                    "data-dashlane-disabled-on-field": "true",
+                    "data-form-type": "other",
+                }
+            ),
         }
 
 
 class ProjectChecklistForm(forms.ModelForm):
     class Meta:
         model = ProjectChecklist
-        fields = ["status", "notes", "evidence_url"]
-        widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+        fields = ["notes", "updated_at"]
+        labels = {"updated_at": "Updated date"}
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 4}),
+            "updated_at": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"type": "date"},
+            ),
+        }
+
+
+class ChecklistItemForm(forms.ModelForm):
+    class Meta:
+        model = ChecklistItem
+        fields = [
+            "name",
+            "guidance",
+            "review_interval_days",
+        ]
+        widgets = {
+            "guidance": forms.Textarea(attrs={"rows": 2}),
+            "review_interval_days": forms.NumberInput(attrs={"min": 0}),
+        }
+
+
+ChecklistItemFormSet = modelformset_factory(
+    ChecklistItem,
+    form=ChecklistItemForm,
+    extra=0,
+    can_delete=True,
+)
 
 
 class ProjectActionItemForm(forms.ModelForm):

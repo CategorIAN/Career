@@ -6,7 +6,7 @@ from django.utils.functional import cached_property
 from calendar import monthrange
 from datetime import timedelta
 from zoneinfo import ZoneInfo
-from django.db.models import Max, Q
+from django.db.models import Max, Q, Sum
 
 MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
@@ -436,6 +436,22 @@ class Project(models.Model):
     def __str__(self):
         return self.title
 
+    @property
+    def alpha(self):
+        if not self.allocation_weight:
+            return None
+
+        if hasattr(self, "_alpha_total_seconds"):
+            total_seconds = self._alpha_total_seconds
+        else:
+            total_seconds = self.toggl_time_entries.filter(
+                is_deleted_at_source=False,
+                is_running=False,
+                is_ambiguous=False,
+            ).aggregate(total_seconds=Sum("duration_seconds"))["total_seconds"] or 0
+
+        return total_seconds / 3600 / self.allocation_weight
+
 
 class ProjectTask(models.Model):
     project = models.ForeignKey(
@@ -455,23 +471,12 @@ class ChecklistItem(models.Model):
     name = models.CharField(max_length=200, unique=True)
     guidance = models.TextField(blank=True)
     review_interval_days = models.PositiveIntegerField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    sort_order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ("sort_order", "id")
 
     def __str__(self):
         return self.name
 
 
 class ProjectChecklist(models.Model):
-    class Status(models.TextChoices):
-        NOT_REVIEWED = "not_reviewed", "Not reviewed"
-        NEEDS_WORK = "needs_work", "Needs work"
-        SATISFIED = "satisfied", "Satisfied"
-        NOT_APPLICABLE = "not_applicable", "Not applicable"
-
     project = models.ForeignKey(
         Project,
         on_delete=models.CASCADE,
@@ -482,14 +487,9 @@ class ProjectChecklist(models.Model):
         on_delete=models.PROTECT,
         related_name="project_responses",
     )
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.NOT_REVIEWED,
-    )
     notes = models.TextField(blank=True)
-    evidence_url = models.URLField(blank=True)
-    last_verified_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateField(null=True, blank=True)
+    archived = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -498,6 +498,17 @@ class ProjectChecklist(models.Model):
                 name="unique_project_checklist_response",
             )
         ]
+
+    @property
+    def update_due(self):
+        if (
+            self.updated_at is None
+            or self.checklist_item.review_interval_days is None
+        ):
+            return None
+        return self.updated_at + timedelta(
+            days=self.checklist_item.review_interval_days
+        )
 
 
 class ProjectActionItem(models.Model):

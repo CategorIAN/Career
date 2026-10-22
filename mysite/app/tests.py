@@ -59,6 +59,7 @@ from .models import (
     Skill,
     State,
     Supervisor,
+    TogglSyncStatus,
     TogglTimeEntry,
     PlatformFeature,
 )
@@ -95,7 +96,12 @@ from .services.job_evaluation import (
 )
 from .services.search_paths import create_company_search_paths
 from .services.project_management import review_is_due
-from .services.toggl import import_time_entries
+from .services.toggl import (
+    TogglSyncError,
+    import_time_entries,
+    sync_toggl_time_entries,
+    validate_import_days,
+)
 from .services.interview_practice import (
     InterviewPracticeAPIError,
     build_interview_context,
@@ -775,9 +781,17 @@ class ProjectManagementTests(TestCase):
     def test_management_endpoints_require_career_administrator(self):
         for client in (self.client, Client()):
             self.assertEqual(client.get(reverse("project_management")).status_code, 403)
+            self.assertEqual(
+                client.post(reverse("project_management"), {"action": "save_checklist"}).status_code,
+                403,
+            )
             self.assertEqual(client.post(reverse("sync_toggl")).status_code, 403)
         self.client.force_login(self.other_user)
         self.assertEqual(self.client.get(reverse("project_management")).status_code, 403)
+        self.assertEqual(
+            self.client.post(reverse("project_management"), {"action": "save_checklist"}).status_code,
+            403,
+        )
         self.assertEqual(self.client.post(reverse("sync_toggl")).status_code, 403)
         self.client.force_login(self.administrator)
         response = self.client.get(reverse("project_management"))
@@ -792,19 +806,68 @@ class ProjectManagementTests(TestCase):
             {"project_id": self.project.pk},
         )
         self.assertContains(selected_response, "Career App")
+        self.assertEqual(selected_response.content.decode().count(">Sync Toggl</button>"), 1)
+        self.assertContains(
+            selected_response,
+            f'name="days_back" type="number" min="1" step="1" value="{settings.TOGGL_IMPORT_DAYS}"',
+            html=False,
+        )
+        self.assertContains(selected_response, 'class="project-management-edit"', html=False)
+        self.assertContains(selected_response, "Edit Career App")
+        self.assertContains(
+            selected_response,
+            f'id="project-management-edit-modal-{self.project.pk}"',
+            html=False,
+        )
         self.assertContains(selected_response, ">Save</button>", html=False)
         self.assertContains(selected_response, "Weight")
         self.assertContains(selected_response, "Active")
         self.assertContains(selected_response, "Tag Name")
-        self.assertNotContains(selected_response, "Total imported")
+        self.assertContains(selected_response, 'style="width: 10rem;"', html=False)
+        self.assertNotContains(selected_response, ">Cancel</button>", html=False)
+        self.assertContains(selected_response, 'autocomplete="off"', html=False)
+        self.assertContains(selected_response, 'data-lpignore="true"', html=False)
+        self.assertContains(selected_response, 'data-dashlane-ignore="true"', html=False)
+        self.assertContains(selected_response, 'data-dashlane-autofill="false"', html=False)
+        self.assertContains(
+            selected_response,
+            'data-dashlane-disabled-on-field="true"',
+            html=False,
+        )
+        self.assertNotContains(selected_response, "Toggl tag:")
+        self.assertContains(selected_response, "Total:")
+        self.assertNotContains(selected_response, "Target share:")
         self.assertContains(selected_response, "Toggl Track")
         self.assertContains(selected_response, "Checklist")
+        self.assertContains(selected_response, "<th>Name</th>", html=False)
+        self.assertContains(selected_response, "<th>Notes</th>", html=False)
+        self.assertContains(selected_response, "<th>Updated</th>", html=False)
+        self.assertContains(selected_response, "<th>Update Due</th>", html=False)
+        self.assertContains(selected_response, "<th>Archive</th>", html=False)
+        self.assertNotContains(selected_response, "<th>Guidance</th>", html=False)
+        self.assertNotContains(selected_response, "<th>Update</th>", html=False)
+        self.assertContains(selected_response, 'class="project-checklist-modal-open"', html=False)
+        self.assertContains(selected_response, 'class="project-checklist-archive-toggle"', html=False)
+        self.assertContains(selected_response, 'name="archived"', html=False)
+        self.assertNotContains(selected_response, "<tr><form", html=False)
+        self.assertContains(selected_response, "Notes")
+        self.assertContains(selected_response, "Updated")
+        self.assertContains(selected_response, "Not completed yet")
+        self.assertContains(selected_response, "Save notes")
+        self.assertNotContains(selected_response, "Update now")
+        self.assertNotContains(selected_response, "Evidence URL")
         self.assertContains(selected_response, "Action Items")
         self.assertNotContains(selected_response, "Activity categories:")
-        self.assertContains(selected_response, "Toggl activity")
+        self.assertNotContains(selected_response, "Four-Week Activity Breakdown")
+        self.assertNotContains(selected_response, "No Toggl project")
         self.assertContains(
             selected_response,
             f'id="toggl-track-{self.project.pk}" hidden',
+            html=False,
+        )
+        self.assertContains(
+            selected_response,
+            f'id="checklist-{self.project.pk}" hidden',
             html=False,
         )
         content = selected_response.content.decode()
@@ -823,18 +886,39 @@ class ProjectManagementTests(TestCase):
         with patch(
             "app.views.sync_toggl_time_entries",
             return_value=SimpleNamespace(created=0, updated=0, ambiguous=0, running=0),
-        ):
+        ) as sync_toggl_time_entries_mock:
             sync_response = self.client.post(
                 reverse("sync_toggl"),
-                {"inactive": "1", "selected_project_id": self.project.pk},
+                {
+                    "inactive": "1",
+                    "selected_project_id": self.project.pk,
+                    "days_back": "30",
+                },
             )
+        sync_toggl_time_entries_mock.assert_called_once_with(days_back=30)
         self.assertRedirects(
             sync_response,
             f"{reverse('project_management')}?inactive=1&project_id={self.project.pk}",
             fetch_redirect_response=False,
         )
 
-    def test_checklist_response_is_created_on_save_and_only_verification_sets_date(self):
+        with patch("app.views.sync_toggl_time_entries") as invalid_sync_mock:
+            invalid_sync_response = self.client.post(
+                reverse("sync_toggl"),
+                {
+                    "inactive": "1",
+                    "selected_project_id": self.project.pk,
+                    "days_back": "0",
+                },
+                follow=True,
+            )
+        invalid_sync_mock.assert_not_called()
+        self.assertContains(
+            invalid_sync_response,
+            "Days back must be a positive whole number.",
+        )
+
+    def test_checklist_response_save_and_clear_completion_date(self):
         self.client.force_login(self.administrator)
         item = ChecklistItem.objects.create(name="Custom Standard")
         response = self.client.post(
@@ -843,36 +927,155 @@ class ProjectManagementTests(TestCase):
                 "action": "save_checklist",
                 "project_id": self.project.pk,
                 "checklist_item_id": item.pk,
-                f"checklist-{item.pk}-status": ProjectChecklist.Status.NEEDS_WORK,
                 f"checklist-{item.pk}-notes": "Needs a README.",
-                f"checklist-{item.pk}-evidence_url": "",
+                f"checklist-{item.pk}-updated_at": "",
             },
         )
         self.assertEqual(response.status_code, 302)
         checklist = ProjectChecklist.objects.get(project=self.project, checklist_item=item)
-        self.assertIsNone(checklist.last_verified_at)
+        self.assertIsNone(checklist.updated_at)
         self.client.post(
             reverse("project_management"),
             {
-                "action": "verify_checklist",
+                "action": "save_checklist",
                 "project_id": self.project.pk,
                 "checklist_item_id": item.pk,
-                f"checklist-{item.pk}-status": ProjectChecklist.Status.SATISFIED,
                 f"checklist-{item.pk}-notes": "Verified.",
-                f"checklist-{item.pk}-evidence_url": "",
+                f"checklist-{item.pk}-updated_at": timezone.localdate().isoformat(),
             },
         )
         checklist.refresh_from_db()
-        self.assertIsNotNone(checklist.last_verified_at)
+        self.assertEqual(checklist.updated_at, timezone.localdate())
         self.assertFalse(review_is_due(checklist))
-        checklist.last_verified_at = timezone.now() - timedelta(days=1)
+        checklist.updated_at = timezone.localdate() - timedelta(days=1)
         checklist_item = checklist.checklist_item
         checklist_item.review_interval_days = 1
         checklist_item.save(update_fields=["review_interval_days"])
-        checklist.save(update_fields=["last_verified_at"])
+        checklist.save(update_fields=["updated_at"])
         self.assertTrue(review_is_due(checklist))
+        self.client.post(
+            reverse("project_management"),
+            {
+                "action": "save_checklist",
+                "project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+                f"checklist-{item.pk}-notes": "Cleared completion date.",
+                f"checklist-{item.pk}-updated_at": "",
+            },
+        )
+        checklist.refresh_from_db()
+        self.assertIsNone(checklist.updated_at)
+        self.assertEqual(checklist.notes, "Cleared completion date.")
         with self.assertRaises(IntegrityError):
             ProjectChecklist.objects.create(project=self.project, checklist_item=item)
+
+    def test_checklist_archive_state_is_project_specific(self):
+        self.client.force_login(self.administrator)
+        item = ChecklistItem.objects.create(name="Archived Standard")
+
+        response = self.client.post(
+            reverse("project_management"),
+            {
+                "action": "set_checklist_archived",
+                "project_id": self.project.pk,
+                "selected_project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+                "archived": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        checklist = ProjectChecklist.objects.get(project=self.project, checklist_item=item)
+        self.assertTrue(checklist.archived)
+        response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+        self.assertContains(
+            response,
+            'data-archived="true" hidden',
+            html=False,
+        )
+
+        self.client.post(
+            reverse("project_management"),
+            {
+                "action": "set_checklist_archived",
+                "project_id": self.project.pk,
+                "selected_project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+            },
+        )
+        checklist.refresh_from_db()
+        self.assertFalse(checklist.archived)
+
+    def test_checklist_items_sort_by_update_due_date_with_nulls_first(self):
+        self.client.force_login(self.administrator)
+        undated_item = ChecklistItem.objects.create(
+            name="Undated Standard",
+            review_interval_days=1,
+        )
+        later_due_item = ChecklistItem.objects.create(
+            name="Later Due Standard",
+            review_interval_days=60,
+        )
+        sooner_due_item = ChecklistItem.objects.create(
+            name="Sooner Due Standard",
+            review_interval_days=1,
+        )
+        ProjectChecklist.objects.create(
+            project=self.project,
+            checklist_item=later_due_item,
+            updated_at=date(2026, 1, 1),
+        )
+        sooner_due = ProjectChecklist.objects.create(
+            project=self.project,
+            checklist_item=sooner_due_item,
+            updated_at=date(2026, 2, 1),
+        )
+        self.assertEqual(sooner_due.update_due, date(2026, 2, 2))
+
+        response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+
+        ordered_names = [
+            checklist["item"].name
+            for checklist in response.context["projects"][0].management_checklist
+            if checklist["item"].pk
+            in {undated_item.pk, later_due_item.pk, sooner_due_item.pk}
+        ]
+        self.assertEqual(
+            ordered_names,
+            [undated_item.name, sooner_due_item.name, later_due_item.name],
+        )
+
+    def test_checklist_validation_renders_bound_card_without_saving(self):
+        self.client.force_login(self.administrator)
+        item = ChecklistItem.objects.create(name="Validation Standard")
+
+        response = self.client.post(
+            reverse("project_management"),
+            {
+                "action": "save_checklist",
+                "project_id": self.project.pk,
+                "selected_project_id": self.project.pk,
+                "checklist_item_id": item.pk,
+                f"checklist-{item.pk}-notes": "Keep these notes visible.",
+                f"checklist-{item.pk}-updated_at": "not-a-date",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid date.")
+        self.assertContains(response, "Keep these notes visible.")
+        self.assertFalse(
+            ProjectChecklist.objects.filter(
+                project=self.project,
+                checklist_item=item,
+            ).exists()
+        )
 
     def test_zero_allocation_weights_and_action_lifecycle(self):
         self.client.force_login(self.administrator)
@@ -883,7 +1086,7 @@ class ProjectManagementTests(TestCase):
             {"project_id": self.project.pk},
         )
         displayed_project = response.context["projects"][0]
-        self.assertEqual(displayed_project.target_share, 0)
+        self.assertEqual(displayed_project.time_totals["total"], 0)
         self.client.post(
             reverse("project_management"),
             {
@@ -899,6 +1102,446 @@ class ProjectManagementTests(TestCase):
         self.client.post(reverse("project_management"), {"action": "reopen_action_item", "action_item_id": item.pk})
         item.refresh_from_db()
         self.assertIsNone(item.completed_at)
+
+    def test_project_alpha_dropdown_uses_valid_full_history_totals(self):
+        self.client.force_login(self.administrator)
+        no_time_project = Project.objects.create(
+            title="No Time",
+            allocation_weight=2,
+        )
+        low_alpha_project = Project.objects.create(
+            title="Low Alpha",
+            allocation_weight=2,
+        )
+        high_alpha_project = Project.objects.create(
+            title="High Alpha",
+            allocation_weight=1,
+        )
+        no_weight_project = Project.objects.create(
+            title="No Weight",
+            allocation_weight=0,
+        )
+        inactive_project = Project.objects.create(
+            title="Inactive Project",
+            allocation_weight=1,
+            is_active=False,
+        )
+        started_at = timezone.now() - timedelta(days=90)
+
+        def create_entry(external_id, project, duration_seconds, **flags):
+            TogglTimeEntry.objects.create(
+                external_id=external_id,
+                project=project,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
+                **flags,
+            )
+
+        create_entry("low-alpha", low_alpha_project, 7200)
+        create_entry("high-alpha", high_alpha_project, 7200)
+        create_entry("no-weight", no_weight_project, 7200)
+        create_entry("inactive", inactive_project, 3600)
+        create_entry("running-alpha", low_alpha_project, 36000, is_running=True)
+        create_entry("ambiguous-alpha", low_alpha_project, 36000, is_ambiguous=True)
+        create_entry("deleted-alpha", low_alpha_project, 36000, is_deleted_at_source=True)
+
+        self.assertEqual(no_time_project.alpha, 0)
+        self.assertEqual(low_alpha_project.alpha, 1)
+        self.assertEqual(high_alpha_project.alpha, 2)
+        self.assertIsNone(no_weight_project.alpha)
+
+        response = self.client.get(reverse("project_management"))
+        dropdown_projects = response.context["search_projects"]
+        dropdown_projects_by_id = {project.pk: project for project in dropdown_projects}
+        self.assertNotIn(inactive_project.pk, dropdown_projects_by_id)
+        self.assertEqual(
+            [
+                project.pk
+                for project in dropdown_projects
+                if project.pk
+                in {
+                    no_time_project.pk,
+                    low_alpha_project.pk,
+                    high_alpha_project.pk,
+                    no_weight_project.pk,
+                }
+            ],
+            [
+                no_time_project.pk,
+                low_alpha_project.pk,
+                high_alpha_project.pk,
+                no_weight_project.pk,
+            ],
+        )
+        self.assertEqual(
+            dropdown_projects_by_id[low_alpha_project.pk].management_selection_label,
+            "Low Alpha (1.00)",
+        )
+        self.assertEqual(
+            dropdown_projects_by_id[no_weight_project.pk].management_selection_label,
+            "No Weight (N/A)",
+        )
+        self.assertContains(response, 'value="Low Alpha (1.00)"', html=False)
+        self.assertContains(response, 'value="No Weight (N/A)"', html=False)
+
+        inactive_response = self.client.get(reverse("project_management"), {"inactive": "1"})
+        self.assertIn(
+            inactive_project.pk,
+            {project.pk for project in inactive_response.context["search_projects"]},
+        )
+
+    def test_unselected_project_dashboard_groups_valid_time_by_week(self):
+        self.client.force_login(self.administrator)
+        other_project = Project.objects.create(title="Optimization Lab")
+        inactive_project = Project.objects.create(
+            title="Archived Project",
+            is_active=False,
+        )
+        now = timezone.localtime()
+        current_week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+
+        def create_entry(external_id, project, started_at, duration_seconds, **flags):
+            TogglTimeEntry.objects.create(
+                external_id=external_id,
+                project=project,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
+                **flags,
+            )
+
+        create_entry(
+            "dashboard-current",
+            self.project,
+            current_week_start + timedelta(hours=1),
+            7200,
+        )
+        create_entry(
+            "dashboard-previous",
+            other_project,
+            current_week_start - timedelta(weeks=2) + timedelta(hours=1),
+            3600,
+        )
+        create_entry(
+            "dashboard-running",
+            self.project,
+            current_week_start + timedelta(hours=2),
+            36000,
+            is_running=True,
+        )
+        create_entry(
+            "dashboard-ambiguous",
+            self.project,
+            current_week_start + timedelta(hours=3),
+            36000,
+            is_ambiguous=True,
+        )
+        create_entry(
+            "dashboard-deleted",
+            self.project,
+            current_week_start + timedelta(hours=4),
+            36000,
+            is_deleted_at_source=True,
+        )
+        create_entry(
+            "dashboard-inactive",
+            inactive_project,
+            current_week_start + timedelta(hours=5),
+            3600,
+        )
+
+        response = self.client.get(reverse("project_management"))
+        self.assertContains(response, "Project Time Dashboard")
+        self.assertEqual(len(response.context["dashboard_weeks"]), 4)
+        self.assertNotIn(
+            inactive_project.pk,
+            {project.pk for project in response.context["dashboard_projects"]},
+        )
+        hours_by_week_and_project = {
+            (week_index, entry["project"].pk): entry["hours"]
+            for week_index, week in enumerate(response.context["dashboard_weeks"])
+            for entry in week["projects"]
+        }
+        self.assertEqual(hours_by_week_and_project[(3, self.project.pk)], 2)
+        self.assertEqual(hours_by_week_and_project[(1, other_project.pk)], 1)
+
+        selected_response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+        self.assertNotContains(selected_response, "Project Time Dashboard")
+        self.assertEqual(selected_response.context["dashboard_weeks"], [])
+
+        inactive_response = self.client.get(
+            reverse("project_management"),
+            {"inactive": "1"},
+        )
+        self.assertIn(
+            inactive_project.pk,
+            {project.pk for project in inactive_response.context["dashboard_projects"]},
+        )
+
+    def test_dashboard_checklist_item_formset_adds_edits_and_deletes_items(self):
+        self.client.force_login(self.administrator)
+        checklist_item = ChecklistItem.objects.create(
+            name="Editable Standard",
+            guidance="Original guidance",
+            review_interval_days=7,
+        )
+        response = self.client.get(reverse("project_management"))
+        self.assertContains(response, "Checklist Items")
+        self.assertContains(response, "Save Checklist Items")
+        self.assertContains(response, "Add Checklist Item")
+
+        def formset_payload(items, *, delete_ids=()):
+            payload = {
+                "action": "save_checklist_items",
+                "checklist-items-TOTAL_FORMS": str(len(items)),
+                "checklist-items-INITIAL_FORMS": str(len(items)),
+                "checklist-items-MIN_NUM_FORMS": "0",
+                "checklist-items-MAX_NUM_FORMS": "1000",
+            }
+            for index, item in enumerate(items):
+                prefix = f"checklist-items-{index}"
+                payload.update(
+                    {
+                        f"{prefix}-id": str(item.pk),
+                        f"{prefix}-name": (
+                            "Updated Standard"
+                            if item.pk == checklist_item.pk
+                            else item.name
+                        ),
+                        f"{prefix}-guidance": (
+                            "Updated guidance"
+                            if item.pk == checklist_item.pk
+                            else item.guidance
+                        ),
+                        f"{prefix}-review_interval_days": item.review_interval_days or "",
+                    }
+                )
+                if item.pk in delete_ids:
+                    payload[f"{prefix}-DELETE"] = "on"
+            return payload
+
+        create_response = self.client.post(
+            reverse("project_management"),
+            {
+                "action": "add_checklist_item",
+                "new-checklist-item-name": "New Standard",
+                "new-checklist-item-guidance": "New guidance",
+                "new-checklist-item-review_interval_days": "14",
+            },
+        )
+        self.assertRedirects(create_response, reverse("project_management"))
+        new_item = ChecklistItem.objects.get(name="New Standard")
+        self.assertEqual(
+            ProjectChecklist.objects.filter(checklist_item=new_item).count(),
+            Project.objects.count(),
+        )
+
+        items = list(ChecklistItem.objects.order_by("id"))
+        update_response = self.client.post(
+            reverse("project_management"),
+            formset_payload(items),
+        )
+        self.assertRedirects(update_response, reverse("project_management"))
+        checklist_item.refresh_from_db()
+        self.assertEqual(checklist_item.name, "Updated Standard")
+        self.assertEqual(checklist_item.guidance, "Updated guidance")
+
+        deletable_item = ChecklistItem.objects.create(name="Deletable Standard")
+        items = list(ChecklistItem.objects.order_by("id"))
+        delete_response = self.client.post(
+            reverse("project_management"),
+            formset_payload(items, delete_ids={deletable_item.pk}),
+        )
+        self.assertRedirects(delete_response, reverse("project_management"))
+        self.assertFalse(ChecklistItem.objects.filter(pk=deletable_item.pk).exists())
+
+    def test_toggl_totals_include_only_completed_entries_for_selected_project(self):
+        self.client.force_login(self.administrator)
+        other_project = Project.objects.create(title="Event Planning")
+        now = timezone.localtime()
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        four_weeks_start = week_start - timedelta(weeks=3)
+        TogglSyncStatus.objects.create(
+            pk=1,
+            coverage_start_date=(now - timedelta(days=90)).date(),
+            coverage_end_date=now.date(),
+        )
+
+        def create_entry(external_id, *, project, started_at, duration_seconds, **flags):
+            return TogglTimeEntry.objects.create(
+                external_id=external_id,
+                project=project,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
+                **flags,
+            )
+
+        create_entry("selected-week", project=self.project, started_at=week_start + timedelta(hours=1), duration_seconds=3600, source_project_name="Project Development")
+        create_entry("selected-four-week", project=self.project, started_at=four_weeks_start + timedelta(days=1), duration_seconds=7200, source_project_name="Project Communication")
+        create_entry("selected-old", project=self.project, started_at=four_weeks_start - timedelta(days=1), duration_seconds=10800, source_project_name="Project Development")
+        create_entry("other-project", project=other_project, started_at=week_start + timedelta(hours=2), duration_seconds=36000)
+        create_entry("unmatched", project=None, started_at=week_start + timedelta(hours=2), duration_seconds=36000)
+        create_entry("running", project=self.project, started_at=week_start + timedelta(hours=2), duration_seconds=36000, is_running=True)
+        create_entry("ambiguous", project=self.project, started_at=week_start + timedelta(hours=2), duration_seconds=36000, is_ambiguous=True)
+        create_entry("deleted", project=self.project, started_at=week_start + timedelta(hours=2), duration_seconds=36000, is_deleted_at_source=True)
+
+        response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+
+        displayed_project = response.context["projects"][0]
+        self.assertEqual(displayed_project.time_totals, {"week": 1, "four_weeks": 3, "total": 6})
+        self.assertContains(response, "This week:</strong> 1.0 hours", html=False)
+        self.assertContains(response, "Last four weeks:</strong> 3.0 hours", html=False)
+        self.assertContains(response, "Total:</strong> 6.0 hours", html=False)
+        self.assertNotContains(response, "coverage:")
+        self.assertEqual(
+            displayed_project.toggl_project_totals,
+            [
+                {
+                    "name": "Project Communication",
+                    "duration": "2 hours",
+                    "seconds": 7200,
+                },
+                {
+                    "name": "Project Development",
+                    "duration": "4 hours",
+                    "seconds": 14400,
+                },
+            ],
+        )
+        self.assertContains(response, "Time by Toggl Project")
+        self.assertContains(response, "Project Development")
+        self.assertContains(response, "Project Communication")
+        self.assertNotContains(response, "No Toggl project")
+
+    def test_toggl_breakdown_maps_missing_activity_names_and_shows_minutes(self):
+        self.client.force_login(self.administrator)
+        start = timezone.now() - timedelta(days=1)
+        end = timezone.now()
+        import_time_entries(
+            [
+                {
+                    "id": 301,
+                    "start": start.isoformat(),
+                    "stop": (start + timedelta(minutes=4)).isoformat(),
+                    "duration": 240,
+                    "project_id": 55,
+                    "tags": ["Career App"],
+                }
+            ],
+            start=start,
+            end=end,
+            source_project_names={"55": "Project Communication"},
+        )
+
+        response = self.client.get(
+            reverse("project_management"),
+            {"project_id": self.project.pk},
+        )
+
+        entry = TogglTimeEntry.objects.get(external_id="301")
+        self.assertEqual(entry.source_project_name, "Project Communication")
+        self.assertEqual(
+            response.context["projects"][0].toggl_project_totals,
+            [
+                {
+                    "name": "Project Communication",
+                    "duration": "4 minutes",
+                    "seconds": 240,
+                }
+            ],
+        )
+        self.assertContains(response, "Project Communication")
+        self.assertContains(response, "4 minutes")
+
+    @override_settings(TOGGL_API_TOKEN="test-token", TOGGL_IMPORT_DAYS=7)
+    @patch("app.services.toggl.fetch_time_entries", return_value=[])
+    @patch("app.services.toggl.fetch_toggl_projects")
+    def test_toggl_sync_backfills_and_refreshes_activity_names(
+        self,
+        fetch_toggl_projects_mock,
+        fetch_time_entries_mock,
+    ):
+        blank_name_entry = TogglTimeEntry.objects.create(
+            external_id="blank-activity-name",
+            project=self.project,
+            source_project_id="220639472",
+            source_project_name="",
+            started_at=timezone.now() - timedelta(days=1),
+            duration_seconds=240,
+        )
+        stale_name_entry = TogglTimeEntry.objects.create(
+            external_id="stale-activity-name",
+            project=self.project,
+            source_project_id="220639472",
+            source_project_name="Old Project Communication",
+            started_at=timezone.now() - timedelta(days=1),
+            duration_seconds=240,
+        )
+        fetch_toggl_projects_mock.side_effect = [
+            {"220639472": "Project Communication"},
+            {"220639472": "Renamed Project Communication"},
+        ]
+
+        sync_toggl_time_entries()
+        blank_name_entry.refresh_from_db()
+        stale_name_entry.refresh_from_db()
+        self.assertEqual(blank_name_entry.source_project_name, "Project Communication")
+        self.assertEqual(stale_name_entry.source_project_name, "Project Communication")
+
+        sync_toggl_time_entries()
+        blank_name_entry.refresh_from_db()
+        self.assertEqual(
+            blank_name_entry.source_project_name,
+            "Renamed Project Communication",
+        )
+        self.assertEqual(fetch_toggl_projects_mock.call_count, 2)
+        self.assertEqual(fetch_time_entries_mock.call_count, 2)
+
+    def test_toggl_import_does_not_replace_a_known_name_with_blank(self):
+        start = timezone.now() - timedelta(days=1)
+        end = timezone.now()
+        entry = TogglTimeEntry.objects.create(
+            external_id="preserve-known-activity-name",
+            project=self.project,
+            source_project_id="220639472",
+            source_project_name="Project Communication",
+            started_at=start,
+            duration_seconds=240,
+        )
+
+        import_time_entries(
+            [
+                {
+                    "id": entry.external_id,
+                    "start": start.isoformat(),
+                    "stop": (start + timedelta(minutes=4)).isoformat(),
+                    "duration": 240,
+                    "project_id": 220639472,
+                    "tags": ["Career App"],
+                }
+            ],
+            start=start,
+            end=end,
+            source_project_names={},
+        )
+
+        entry.refresh_from_db()
+        self.assertEqual(entry.source_project_name, "Project Communication")
 
     def test_toggl_import_is_idempotent_and_flags_multiple_tag_matches(self):
         other_project = Project.objects.create(title="Event Planning", toggl_tag_name="Event Planning App")
@@ -933,6 +1576,43 @@ class ProjectManagementTests(TestCase):
         self.assertTrue(ambiguous.is_ambiguous)
         self.assertIsNone(ambiguous.project)
         self.assertEqual(other_project.toggl_time_entries.count(), 0)
+
+    def test_toggl_reconciliation_only_marks_entries_inside_exact_window(self):
+        end = timezone.now()
+        start = end - timedelta(days=30)
+        inside_entry = TogglTimeEntry.objects.create(
+            external_id="inside-window",
+            project=self.project,
+            started_at=start + timedelta(seconds=1),
+            duration_seconds=60,
+        )
+        outside_entry = TogglTimeEntry.objects.create(
+            external_id="outside-window",
+            project=self.project,
+            started_at=start - timedelta(seconds=1),
+            duration_seconds=60,
+        )
+
+        import_time_entries([], start=start, end=end)
+
+        inside_entry.refresh_from_db()
+        outside_entry.refresh_from_db()
+        self.assertTrue(inside_entry.is_deleted_at_source)
+        self.assertFalse(outside_entry.is_deleted_at_source)
+
+    @override_settings(TOGGL_MAX_IMPORT_DAYS=30)
+    def test_toggl_import_days_are_positive_and_limited(self):
+        self.assertEqual(validate_import_days(30), 30)
+        with self.assertRaisesMessage(
+            TogglSyncError,
+            "Days back must be a positive whole number.",
+        ):
+            validate_import_days(0)
+        with self.assertRaisesMessage(
+            TogglSyncError,
+            "Toggl supports importing at most 30 days at a time.",
+        ):
+            validate_import_days(31)
 
 
 class EducationDisplayModeTests(TestCase):

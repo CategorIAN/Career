@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import (
     Case,
     Count,
@@ -15,6 +16,7 @@ from django.db.models import (
     OuterRef,
     Prefetch,
     Q,
+    Sum,
     Value,
     When,
 )
@@ -43,6 +45,8 @@ from .forms import (
     InterviewPracticeSessionForm,
     ApplicationSubmittedForm,
     CompanyForm,
+    ChecklistItemForm,
+    ChecklistItemFormSet,
     CourseEditForm,
     CourseSkillsEditForm,
     EducationEditForm,
@@ -132,7 +136,12 @@ from .services.gmail import (
 )
 from .services.search_paths import create_company_search_paths
 from .services.project_management import review_is_due, seed_default_checklist_items
-from .services.toggl import TogglSyncError, sync_toggl_time_entries, toggl_is_configured
+from .services.toggl import (
+    TogglSyncError,
+    default_import_days,
+    sync_toggl_time_entries,
+    toggl_is_configured,
+)
 from .services.interview_practice import (
     InterviewPracticeError,
     build_interview_context,
@@ -3472,6 +3481,19 @@ def _project_management_access_denied(request):
         raise PermissionDenied("This page is only available to the Career administrator.")
 
 
+def _format_toggl_duration(duration_seconds):
+    hours, remaining_seconds = divmod(duration_seconds, 3600)
+    minutes, seconds = divmod(remaining_seconds, 60)
+    parts = []
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if not parts:
+        parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+    return " ".join(parts)
+
+
 def project_management_view(request):
     _project_management_access_denied(request)
     seed_default_checklist_items()
@@ -3480,33 +3502,90 @@ def project_management_view(request):
         request.POST.get("selected_project_id")
         or request.GET.get("project_id", "")
     ).strip()
+    invalid_checklist_forms = {}
+    checklist_item_formset = None
+    new_checklist_item_form = None
+    checklist_item_queryset = ChecklistItem.objects.order_by("id")
 
     if request.method == "POST":
         action = request.POST.get("action", "")
         project_id = request.POST.get("project_id", "")
         project = get_object_or_404(Project, pk=project_id) if project_id else None
-        if action == "save_project" and project is not None:
+        if action == "add_checklist_item":
+            new_checklist_item_form = ChecklistItemForm(
+                request.POST,
+                prefix="new-checklist-item",
+            )
+            if new_checklist_item_form.is_valid():
+                with transaction.atomic():
+                    checklist_item = new_checklist_item_form.save()
+                    ProjectChecklist.objects.bulk_create(
+                        [
+                            ProjectChecklist(
+                                project_id=project_id,
+                                checklist_item=checklist_item,
+                            )
+                            for project_id in Project.objects.values_list("pk", flat=True)
+                        ]
+                    )
+                messages.success(request, "Checklist item added to every project.")
+                return _project_management_redirect(include_inactive)
+            messages.error(request, "Checklist item was not added. Please correct the errors.")
+        elif action == "save_checklist_items":
+            checklist_item_formset = ChecklistItemFormSet(
+                request.POST,
+                queryset=checklist_item_queryset,
+                prefix="checklist-items",
+            )
+            if checklist_item_formset.is_valid():
+                try:
+                    with transaction.atomic():
+                        checklist_item_formset.save()
+                except ProtectedError:
+                    messages.error(
+                        request,
+                        "A checklist item already used by a project cannot be deleted.",
+                    )
+                else:
+                    messages.success(request, "Checklist items saved.")
+                    return _project_management_redirect(include_inactive)
+            else:
+                messages.error(request, "Checklist items were not saved. Please correct the errors.")
+        elif action == "save_project" and project is not None:
             form = ProjectManagementForm(request.POST, instance=project, prefix=f"project-{project.pk}")
             if form.is_valid():
                 form.save()
                 messages.success(request, f"Saved management settings for {project.title}.")
             else:
                 messages.error(request, "Project settings were not saved. Please correct the errors.")
-        elif action in {"save_checklist", "verify_checklist"} and project is not None:
+        elif action == "save_checklist" and project is not None:
             item = get_object_or_404(ChecklistItem, pk=request.POST.get("checklist_item_id"))
-            response, _ = ProjectChecklist.objects.get_or_create(
+            response = ProjectChecklist.objects.filter(
+                project=project,
+                checklist_item=item,
+            ).first() or ProjectChecklist(
                 project=project,
                 checklist_item=item,
             )
             form = ProjectChecklistForm(request.POST, instance=response, prefix=f"checklist-{item.pk}")
             if form.is_valid():
                 response = form.save(commit=False)
-                if action == "verify_checklist":
-                    response.last_verified_at = timezone.now()
+                response.project = project
+                response.checklist_item = item
                 response.save()
                 messages.success(request, f"Saved {item.name}.")
             else:
+                invalid_checklist_forms[(project.pk, item.pk)] = form
                 messages.error(request, f"{item.name} was not saved. Please correct the errors.")
+        elif action == "set_checklist_archived" and project is not None:
+            item = get_object_or_404(ChecklistItem, pk=request.POST.get("checklist_item_id"))
+            response, _ = ProjectChecklist.objects.get_or_create(
+                project=project,
+                checklist_item=item,
+            )
+            response.archived = request.POST.get("archived") == "1"
+            response.save(update_fields=["archived"])
+            messages.success(request, f"Updated archive state for {item.name}.")
         elif action == "add_action_item" and project is not None:
             form = ProjectActionItemForm(request.POST, prefix=f"new-action-{project.pk}")
             if form.is_valid():
@@ -3536,12 +3615,55 @@ def project_management_view(request):
                 messages.success(request, "Action item updated.")
         else:
             messages.error(request, "Unknown Project Management action.")
-        return _project_management_redirect(include_inactive, selected_project_id)
+        if (
+            not invalid_checklist_forms
+            and checklist_item_formset is None
+            and new_checklist_item_form is None
+        ):
+            return _project_management_redirect(include_inactive, selected_project_id)
+
+    if checklist_item_formset is None:
+        checklist_item_formset = ChecklistItemFormSet(
+            queryset=checklist_item_queryset,
+            prefix="checklist-items",
+        )
+    if new_checklist_item_form is None:
+        new_checklist_item_form = ChecklistItemForm(prefix="new-checklist-item")
 
     all_projects = list(Project.objects.order_by("sort_order", "title", "pk"))
-    search_projects = [
-        project for project in all_projects if project.is_active or include_inactive
-    ]
+    tracked_totals = {
+        row["project_id"]: row["total_seconds"]
+        for row in (
+            TogglTimeEntry.objects.filter(
+                project_id__in=[project.pk for project in all_projects],
+                is_deleted_at_source=False,
+                is_running=False,
+                is_ambiguous=False,
+            )
+            .values("project_id")
+            .annotate(total_seconds=Sum("duration_seconds"))
+        )
+    }
+    for project in all_projects:
+        project._alpha_total_seconds = tracked_totals.get(project.pk, 0)
+        alpha = project.alpha
+        project.management_selection_label = (
+            f"{project.title} ({alpha:.2f})" if alpha is not None else f"{project.title} (N/A)"
+        )
+
+    search_projects = sorted(
+        (
+            project
+            for project in all_projects
+            if project.is_active or include_inactive
+        ),
+        key=lambda project: (
+            project.alpha is None,
+            project.alpha if project.alpha is not None else 0,
+            project.title.casefold(),
+            project.pk,
+        ),
+    )
     selected_project = next(
         (project for project in search_projects if str(project.pk) == selected_project_id),
         None,
@@ -3563,22 +3685,40 @@ def project_management_view(request):
             )
             .get()
         )
+        selected_project._alpha_total_seconds = tracked_totals.get(selected_project.pk, 0)
+        alpha = selected_project.alpha
+        selected_project.management_selection_label = (
+            f"{selected_project.title} ({alpha:.2f})"
+            if alpha is not None
+            else f"{selected_project.title} (N/A)"
+        )
     projects = [selected_project] if selected_project is not None else []
-    checklist_items = list(ChecklistItem.objects.filter(is_active=True))
+    checklist_items = list(ChecklistItem.objects.order_by("id"))
     for project in projects:
         response_by_item = {response.checklist_item_id: response for response in project.checklist_responses.all()}
         project.management_form = ProjectManagementForm(instance=project, prefix=f"project-{project.pk}")
         project.management_checklist = []
         for item in checklist_items:
-            response = response_by_item.get(item.pk) or ProjectChecklist(project=project, checklist_item=item)
+            form = invalid_checklist_forms.get((project.pk, item.pk))
+            response = form.instance if form else response_by_item.get(item.pk) or ProjectChecklist(
+                project=project,
+                checklist_item=item,
+            )
             project.management_checklist.append(
                 {
                     "item": item,
                     "response": response,
-                    "form": ProjectChecklistForm(instance=response, prefix=f"checklist-{item.pk}"),
+                    "form": form or ProjectChecklistForm(instance=response, prefix=f"checklist-{item.pk}"),
                     "review_due": review_is_due(response),
                 }
             )
+        project.management_checklist.sort(
+            key=lambda checklist: (
+                checklist["response"].update_due is not None,
+                checklist["response"].update_due or date.min,
+                checklist["item"].pk,
+            )
+        )
         project.open_action_items = [item for item in project.action_items.all() if item.completed_at is None]
         project.completed_action_items = [item for item in project.action_items.all() if item.completed_at is not None]
         project.new_action_item_form = ProjectActionItemForm(prefix=f"new-action-{project.pk}")
@@ -3588,45 +3728,142 @@ def project_management_view(request):
     now = timezone.localtime()
     week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     four_weeks_start = week_start - timedelta(weeks=3)
-    entries = list(
-        TogglTimeEntry.objects.filter(is_deleted_at_source=False, is_running=False).select_related("project")
-    )
-    active_projects = [project for project in all_projects if project.is_active]
-    project_ids_for_totals = {project.pk for project in active_projects}
+    dashboard_weeks = []
+    dashboard_projects = []
+    dashboard_legend = []
+    if selected_project is None:
+        dashboard_projects = search_projects
+        week_starts = [week_start - timedelta(weeks=offset) for offset in range(3, -1, -1)]
+        weekly_annotations = {
+            f"week_{index}_seconds": Sum(
+                Case(
+                    When(
+                        started_at__gte=start,
+                        started_at__lt=start + timedelta(days=7),
+                        then=F("duration_seconds"),
+                    ),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            for index, start in enumerate(week_starts)
+        }
+        weekly_totals_by_project = {
+            row["project_id"]: [
+                row.get(f"week_{index}_seconds") or 0
+                for index in range(len(week_starts))
+            ]
+            for row in (
+                TogglTimeEntry.objects.filter(
+                    project_id__in=[project.pk for project in dashboard_projects],
+                    is_deleted_at_source=False,
+                    is_running=False,
+                    is_ambiguous=False,
+                )
+                .values("project_id")
+                .annotate(**weekly_annotations)
+            )
+        }
+        chart_max_seconds = max(
+            (
+                total_seconds
+                for project_totals in weekly_totals_by_project.values()
+                for total_seconds in project_totals
+            ),
+            default=0,
+        )
+        chart_colors = (
+            "#2563eb",
+            "#dc2626",
+            "#16a34a",
+            "#9333ea",
+            "#ea580c",
+            "#0891b2",
+            "#be123c",
+            "#4d7c0f",
+        )
+        dashboard_legend = sorted(
+            (
+                {
+                    "project": project,
+                    "color": chart_colors[index % len(chart_colors)],
+                    "alpha": project.alpha,
+                }
+                for index, project in enumerate(dashboard_projects)
+            ),
+            key=lambda entry: (
+                entry["alpha"] is None,
+                entry["alpha"] if entry["alpha"] is not None else 0,
+                entry["project"].title.casefold(),
+                entry["project"].pk,
+            ),
+        )
+        for index, start in enumerate(week_starts):
+            dashboard_weeks.append(
+                {
+                    "start": start,
+                    "end": start + timedelta(days=6),
+                    "projects": [
+                        {
+                            "project": project,
+                            "hours": weekly_totals_by_project.get(
+                                project.pk,
+                                [0] * len(week_starts),
+                            )[index]
+                            / 3600,
+                            "height": (
+                                weekly_totals_by_project.get(
+                                    project.pk,
+                                    [0] * len(week_starts),
+                                )[index]
+                                / chart_max_seconds
+                                * 100
+                                if chart_max_seconds
+                                else 0
+                            ),
+                            "color": chart_colors[project_index % len(chart_colors)],
+                        }
+                        for project_index, project in enumerate(dashboard_projects)
+                    ],
+                }
+            )
     if selected_project is not None:
-        project_ids_for_totals.add(selected_project.pk)
-    totals_by_project = {
-        project_id: {"week": 0, "four_weeks": 0, "total": 0}
-        for project_id in project_ids_for_totals
-    }
-    activity_totals = {}
-    for entry in entries:
-        if entry.project_id in totals_by_project:
-            totals = totals_by_project[entry.project_id]
+        selected_entries = TogglTimeEntry.objects.filter(
+            project=selected_project,
+            is_deleted_at_source=False,
+            is_running=False,
+            is_ambiguous=False,
+        )
+        totals = {"week": 0, "four_weeks": 0, "total": 0}
+        toggl_project_totals = {}
+        for entry in selected_entries:
             totals["total"] += entry.duration_seconds
+            if entry.source_project_id or entry.source_project_name:
+                source_project_name = (
+                    entry.source_project_name
+                    or f"Toggl project #{entry.source_project_id}"
+                )
+                toggl_project_totals[source_project_name] = (
+                    toggl_project_totals.get(source_project_name, 0)
+                    + entry.duration_seconds
+                )
             if entry.started_at >= week_start:
                 totals["week"] += entry.duration_seconds
             if entry.started_at >= four_weeks_start:
                 totals["four_weeks"] += entry.duration_seconds
-        if entry.started_at >= four_weeks_start:
-            activity = entry.source_project_name or "No Toggl project"
-            activity_totals[activity] = activity_totals.get(activity, 0) + entry.duration_seconds
-    total_weight = sum(project.allocation_weight for project in active_projects)
-    total_active_four_week_seconds = sum(totals_by_project[project.pk]["four_weeks"] for project in active_projects)
-    for project in projects:
-        totals = totals_by_project[project.pk]
-        project.time_totals = {
+        selected_project.time_totals = {
             key: value / 3600 for key, value in totals.items()
         }
-        project.target_share = (
-            100 * project.allocation_weight / total_weight
-            if project.is_active and total_weight
-            else 0
-        )
-        project.actual_share = (
-            100 * totals["four_weeks"] / total_active_four_week_seconds
-            if project.is_active and total_active_four_week_seconds
-            else 0
+        selected_project.toggl_project_totals = sorted(
+            [
+                {
+                    "name": name,
+                    "duration": _format_toggl_duration(seconds),
+                    "seconds": seconds,
+                }
+                for name, seconds in toggl_project_totals.items()
+            ],
+            key=lambda entry: entry["name"].casefold(),
         )
     sync_status = TogglSyncStatus.objects.filter(pk=1).first()
     return render(
@@ -3639,10 +3876,13 @@ def project_management_view(request):
             "selected_project": selected_project,
             "selected_project_id": selected_project_id,
             "include_inactive": include_inactive,
-            "activity_totals": sorted(
-                (name, seconds / 3600) for name, seconds in activity_totals.items()
-            ),
+            "dashboard_projects": dashboard_projects,
+            "dashboard_legend": dashboard_legend,
+            "dashboard_weeks": dashboard_weeks,
+            "checklist_item_formset": checklist_item_formset,
+            "new_checklist_item_form": new_checklist_item_form,
             "sync_status": sync_status,
+            "toggl_import_days": default_import_days(),
             "toggl_is_configured": toggl_is_configured(),
         },
     )
@@ -3651,8 +3891,14 @@ def project_management_view(request):
 @require_POST
 def sync_toggl_view(request):
     _project_management_access_denied(request)
+    days_back_value = request.POST.get("days_back", "").strip()
     try:
-        result = sync_toggl_time_entries()
+        if not days_back_value.isdecimal():
+            raise TogglSyncError("Days back must be a positive whole number.")
+        days_back = int(days_back_value)
+        if days_back <= 0:
+            raise TogglSyncError("Days back must be a positive whole number.")
+        result = sync_toggl_time_entries(days_back=days_back)
     except TogglSyncError as error:
         messages.error(request, f"Toggl sync failed: {error}")
     else:

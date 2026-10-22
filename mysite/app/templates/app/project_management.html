@@ -15,6 +15,35 @@
     .completed-item { color: #666; }
     .project-management-section-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; }
     .project-management-section-header h3 { margin: 0; }
+    .project-management-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.35); }
+    .project-management-modal[hidden] { display: none; }
+    .project-management-modal-content { position: relative; width: min(28rem, 100%); padding: 1.5rem; border: 1px solid #8c8c8c; border-radius: 0.5rem; background: #fff; }
+    .project-management-modal-close { position: absolute; top: 0.5rem; right: 0.75rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; }
+    .project-management-modal-form { display: grid; gap: 0.85rem; }
+    .project-management-modal-form label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .project-management-modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+    .project-checklist-table-wrap { overflow-x: auto; }
+    .project-checklist-date-form { display: grid; gap: 0.4rem; min-width: 11rem; }
+    .project-checklist-date-form input[type="date"] { width: 100%; box-sizing: border-box; }
+    .project-checklist-archive-form { margin: 0; }
+    .project-checklist-header-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .project-checklist-notes-form { display: grid; gap: 0.85rem; }
+    .project-checklist-notes-form label { display: grid; gap: 0.3rem; }
+    .project-checklist-notes-form textarea { width: 100%; min-height: 12rem; box-sizing: border-box; }
+    .project-checklist-error { margin: 0.3rem 0 0; color: #a33; font-weight: 600; }
+    .project-dashboard-chart { display: grid; grid-template-columns: repeat(4, minmax(12rem, 1fr)); gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem; }
+    .project-dashboard-week { min-width: 12rem; }
+    .project-dashboard-week h3 { margin: 0 0 0.5rem; font-size: 1rem; text-align: center; }
+    .project-dashboard-bars { display: flex; align-items: end; gap: 0.35rem; min-height: 14rem; padding: 0.5rem; border-bottom: 1px solid #777; background: #fafafa; }
+    .project-dashboard-bar-column { display: grid; flex: 1 1 0; min-width: 1.4rem; height: 13rem; grid-template-rows: 1fr auto; align-items: end; }
+    .project-dashboard-bar { width: 100%; min-height: 2px; border-radius: 0.2rem 0.2rem 0 0; }
+    .project-dashboard-hours { margin-top: 0.25rem; font-size: 0.7rem; text-align: center; }
+    .project-dashboard-legend { display: grid; gap: 0.4rem; margin-top: 1rem; }
+    .project-dashboard-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .project-dashboard-swatch { width: 0.8rem; height: 0.8rem; border-radius: 0.15rem; }
+    .checklist-items-table-wrap { overflow-x: auto; }
+    .checklist-items-table textarea { min-width: 18rem; }
+    @media (max-width: 48rem) { .project-dashboard-chart { grid-template-columns: repeat(4, 12rem); } }
 </style>
 <section class="utility-page">
     <h1>Project Management</h1>
@@ -24,11 +53,29 @@
         {% for message in messages %}<p{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>{% endfor %}
     {% endif %}
 
+    <section class="project-management-card" aria-label="Toggl synchronization">
+        {% if toggl_is_configured %}
+            <form method="post" action="{% url 'sync_toggl' %}">
+                {% csrf_token %}
+                {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                <label for="toggl-days-back">Days back:</label>
+                <input id="toggl-days-back" name="days_back" type="number" min="1" step="1" value="{{ toggl_import_days }}" required>
+                <button type="submit">Sync Toggl</button>
+            </form>
+        {% else %}
+            <p>Toggl is not configured. Set <code>TOGGL_API_TOKEN</code> to enable read-only imports.</p>
+        {% endif %}
+        {% if sync_status.last_successful_sync_at %}<p>Last successful sync: {{ sync_status.last_successful_sync_at|date:"Y-m-d g:i A" }}</p>{% endif %}
+        {% if sync_status.coverage_start_date and sync_status.coverage_end_date %}<p>Import range: {{ sync_status.coverage_start_date|date:"Y-m-d" }}–{{ sync_status.coverage_end_date|date:"Y-m-d" }}</p>{% endif %}
+        {% if sync_status.last_error %}<p class="status-needs-work">Last error: {{ sync_status.last_error }}</p>{% endif %}
+    </section>
+
     <form method="get" style="margin: 1rem 0;">
         <label for="project-management-search">Search Project</label>
-        <input id="project-management-search" type="text" list="project-management-options" value="{% if selected_project %}{{ selected_project.title }}{% endif %}" autocomplete="off" style="width: 20rem;">
+        <input id="project-management-search" type="text" list="project-management-options" value="{% if selected_project %}{{ selected_project.management_selection_label }}{% endif %}" autocomplete="off" style="width: 20rem;">
         <datalist id="project-management-options">
-            {% for project in search_projects %}<option value="{{ project.title }}" data-project-id="{{ project.pk }}"></option>{% endfor %}
+            {% for project in search_projects %}<option value="{{ project.management_selection_label }}" data-project-id="{{ project.pk }}"></option>{% endfor %}
         </datalist>
         <input id="project-management-id" type="hidden" name="project_id" value="{{ selected_project_id }}">
         {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
@@ -36,6 +83,81 @@
         <button type="button" onclick="window.location.href='{% url 'project_management' %}{% if include_inactive %}?inactive=1{% endif %}'">Clear</button>
         {% if include_inactive %}<a href="{% url 'project_management' %}{% if selected_project_id %}?project_id={{ selected_project_id }}{% endif %}">Hide inactive projects</a>{% else %}<a href="{% url 'project_management' %}?inactive=1{% if selected_project_id %}&amp;project_id={{ selected_project_id }}{% endif %}">Show inactive projects</a>{% endif %}
     </form>
+
+    {% if not selected_project %}
+        <article class="project-management-card">
+            <h2>Project Time Dashboard</h2>
+            <p class="muted">Completed, non-ambiguous imported Toggl time for the last four Monday–Sunday weeks, including this week.</p>
+            {% if dashboard_projects %}
+                <div class="project-dashboard-chart" role="img" aria-label="Time spent on each project for the last four weeks">
+                    {% for week in dashboard_weeks %}
+                        <section class="project-dashboard-week">
+                            <h3>{{ week.start|date:"M j" }}–{{ week.end|date:"M j" }}</h3>
+                            <div class="project-dashboard-bars">
+                                {% for entry in week.projects %}
+                                    <div class="project-dashboard-bar-column" title="{{ entry.project.title }}: {{ entry.hours|floatformat:1 }} hours">
+                                        <div class="project-dashboard-bar" style="height: {{ entry.height }}%; background: {{ entry.color }};" aria-label="{{ entry.project.title }}: {{ entry.hours|floatformat:1 }} hours"></div>
+                                        <span class="project-dashboard-hours">{{ entry.hours|floatformat:1 }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endfor %}
+                </div>
+                <div class="project-dashboard-legend" aria-label="Project legend">
+                    {% for entry in dashboard_legend %}
+                        <span class="project-dashboard-legend-item"><span class="project-dashboard-swatch" style="background: {{ entry.color }};"></span>{{ entry.project.title }} ({% if entry.alpha is None %}N/A{% else %}{{ entry.alpha|floatformat:2 }}{% endif %})</span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">No projects match the current active/inactive filter.</p>
+            {% endif %}
+        </article>
+        <article class="project-management-card">
+            <div class="project-management-section-header" style="margin-top: 0;">
+                <h2>Checklist Items</h2>
+                <button type="button" class="checklist-item-modal-open" data-target="add-checklist-item-modal">Add Checklist Item</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_checklist_items">
+                {{ checklist_item_formset.management_form }}
+                {{ checklist_item_formset.non_form_errors }}
+                <div class="checklist-items-table-wrap">
+                    <table class="project-management-table checklist-items-table">
+                        <thead><tr><th>Name</th><th>Guidance</th><th>Review interval (days)</th><th>Delete</th></tr></thead>
+                        <tbody>
+                            {% for form in checklist_item_formset %}
+                                <tr>
+                                    <td>{% for hidden_field in form.hidden_fields %}{{ hidden_field }}{% endfor %}{{ form.name }}{{ form.name.errors }}</td>
+                                    <td>{{ form.guidance }}{{ form.guidance.errors }}</td>
+                                    <td>{{ form.review_interval_days }}{{ form.review_interval_days.errors }}</td>
+                                    <td>{{ form.DELETE }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <button type="submit">Save Checklist Items</button>
+            </form>
+        </article>
+        <div id="add-checklist-item-modal" class="project-management-modal" role="dialog" aria-modal="true" aria-labelledby="add-checklist-item-title"{% if not new_checklist_item_form.errors %} hidden{% endif %}>
+            <div class="project-management-modal-content">
+                <button type="button" class="project-management-modal-close" aria-label="Close">&times;</button>
+                <h2 id="add-checklist-item-title">Add Checklist Item</h2>
+                <form method="post" class="project-management-modal-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_checklist_item">
+                    {{ new_checklist_item_form.non_field_errors }}
+                    {% for field in new_checklist_item_form %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }} {{ field }}</label>
+                        {% for error in field.errors %}<p class="project-checklist-error">{{ error }}</p>{% endfor %}
+                    {% endfor %}
+                    <div class="project-management-modal-actions"><button type="submit">Add Checklist Item</button></div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
 
     {% for project in projects %}
         <article class="project-management-card">
@@ -45,54 +167,112 @@
                 <button type="button" class="project-management-toggle" data-target="toggl-track-{{ project.pk }}" aria-expanded="false">Show</button>
             </div>
             <section id="toggl-track-{{ project.pk }}" hidden>
-                <form method="post" class="project-management-grid">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="save_project">
-                    <input type="hidden" name="project_id" value="{{ project.pk }}">
-                    <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
-                    {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
-                    {% for field in project.management_form %}<label>{{ field.label }} {{ field }}</label>{% endfor %}
-                    <button type="submit">Save</button>
-                </form>
+                <button type="button" class="project-management-edit" data-target="project-management-edit-modal-{{ project.pk }}">Edit</button>
                 <div class="project-management-grid" style="margin-top: 1rem;">
-                    <p><strong>Target share:</strong> {{ project.target_share|floatformat:1 }}%</p>
                     <p><strong>This week:</strong> {{ project.time_totals.week|floatformat:1 }} hours</p>
-                    <p><strong>Last four weeks:</strong> {{ project.time_totals.four_weeks|floatformat:1 }} hours ({{ project.actual_share|floatformat:1 }}% actual)</p>
+                    <p><strong>Last four weeks:</strong> {{ project.time_totals.four_weeks|floatformat:1 }} hours</p>
+                    <p><strong>Total:</strong> {{ project.time_totals.total|floatformat:1 }} hours</p>
                 </div>
-                <p><strong>Toggl tag:</strong> {{ project.toggl_tag_name|default:"Not configured" }}</p>
-                {% if toggl_is_configured %}
-                    <form method="post" action="{% url 'sync_toggl' %}">
-                        {% csrf_token %}
-                        {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
-                        <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
-                        <button type="submit">Sync Toggl</button>
-                    </form>
-                    <p class="muted">Imports the configured {{ sync_status.coverage_start_date|default:"selected" }} to {{ sync_status.coverage_end_date|default:"current" }} window. Edits, deletions, and tag changes inside each sync window are reconciled; running timers are stored but excluded from totals.</p>
-                {% else %}
-                    <p>Toggl is not configured. Set <code>TOGGL_API_TOKEN</code> to enable read-only imports.</p>
-                {% endif %}
-                {% if sync_status.last_successful_sync_at %}<p>Last successful sync: {{ sync_status.last_successful_sync_at|date:"Y-m-d g:i A" }}</p>{% endif %}
-                {% if sync_status.last_error %}<p class="status-needs-work">Last error: {{ sync_status.last_error }}</p>{% endif %}
-                <h4>Four-Week Activity Breakdown</h4>
-                <table class="project-management-table"><thead><tr><th>Toggl activity</th><th>Hours</th></tr></thead><tbody>{% for name, hours in activity_totals %}<tr><td>{{ name }}</td><td>{{ hours|floatformat:1 }}</td></tr>{% empty %}<tr><td colspan="2">No imported activity in the last four weeks.</td></tr>{% endfor %}</tbody></table>
+                <h4>Time by Toggl Project</h4>
+                <table class="project-management-table">
+                    <thead><tr><th>Toggl Project</th><th>Duration</th></tr></thead>
+                    <tbody>
+                        {% for activity in project.toggl_project_totals %}
+                            <tr><td>{{ activity.name }}</td><td>{{ activity.duration }}</td></tr>
+                        {% empty %}
+                            <tr><td colspan="2" class="muted">No named Toggl projects have imported time for this project.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </section>
+            <div id="project-management-edit-modal-{{ project.pk }}" class="project-management-modal" role="dialog" aria-modal="true" aria-labelledby="project-management-edit-modal-title-{{ project.pk }}" hidden>
+                <div class="project-management-modal-content">
+                    <button type="button" class="project-management-modal-close" aria-label="Close">&times;</button>
+                    <h2 id="project-management-edit-modal-title-{{ project.pk }}">Edit {{ project.title }}</h2>
+                    <form method="post" class="project-management-modal-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_project">
+                        <input type="hidden" name="project_id" value="{{ project.pk }}">
+                        <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                        {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                        {% for field in project.management_form %}<label>{{ field.label }} {{ field }}</label>{% endfor %}
+                        <div class="project-management-modal-actions">
+                            <button type="submit">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <div class="project-management-section-header">
                 <h3>Checklist</h3>
-                <button type="button" class="project-management-toggle" data-target="checklist-{{ project.pk }}" aria-expanded="false">Show</button>
+                <div class="project-checklist-header-actions">
+                    <button type="button" class="project-checklist-archive-toggle" data-target="checklist-{{ project.pk }}" aria-pressed="false">Show archived</button>
+                    <button type="button" class="project-management-toggle" data-target="checklist-{{ project.pk }}" aria-expanded="false">Show</button>
+                </div>
             </div>
             <section id="checklist-{{ project.pk }}" hidden>
-            <table class="project-management-table"><thead><tr><th>Standard</th><th>Status</th><th>Notes / evidence</th><th>Verification</th><th></th></tr></thead><tbody>
-            {% for checklist in project.management_checklist %}
-                <tr><form method="post">{% csrf_token %}
-                    <td><strong>{{ checklist.item.name }}</strong>{% if checklist.item.guidance %}<br><span class="muted">{{ checklist.item.guidance }}</span>{% endif %}</td>
-                    <td>{{ checklist.form.status }}</td>
-                    <td>{{ checklist.form.notes }}{{ checklist.form.evidence_url }}</td>
-                    <td>{% if checklist.response.last_verified_at %}{{ checklist.response.last_verified_at|date:"Y-m-d" }}{% else %}Not verified{% endif %}{% if checklist.review_due %}<br><span class="review-due">Review due</span>{% endif %}</td>
-                    <td><input type="hidden" name="project_id" value="{{ project.pk }}"><input type="hidden" name="selected_project_id" value="{{ selected_project_id }}"><input type="hidden" name="checklist_item_id" value="{{ checklist.item.pk }}">{% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}<button name="action" value="save_checklist">Save</button> <button name="action" value="verify_checklist">Verify now</button></td>
-                </form></tr>
-            {% endfor %}
-            </tbody></table>
+                <div class="project-checklist-table-wrap">
+                    <table class="project-management-table">
+                        <thead><tr><th>Name</th><th>Notes</th><th>Updated</th><th>Update Due</th><th>Archive</th></tr></thead>
+                        <tbody>
+                    {% for checklist in project.management_checklist %}
+                        <tr data-checklist-row data-archived="{{ checklist.response.archived|yesno:'true,false' }}"{% if checklist.response.archived %} hidden{% endif %}>
+                            <td><strong>{{ checklist.item.name }}</strong></td>
+                            <td><button type="button" class="project-checklist-modal-open" data-target="checklist-notes-modal-{{ project.pk }}-{{ checklist.item.pk }}">Notes</button></td>
+                            <td>
+                                <form method="post" class="project-checklist-date-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="save_checklist">
+                                    <input type="hidden" name="project_id" value="{{ project.pk }}">
+                                    <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                                    <input type="hidden" name="checklist_item_id" value="{{ checklist.item.pk }}">
+                                    <input type="hidden" name="checklist-{{ checklist.item.pk }}-notes" value="{{ checklist.response.notes }}">
+                                    {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                                    {% if not checklist.response.updated_at %}<span class="muted">Not completed yet</span>{% endif %}
+                                    {{ checklist.form.updated_at }}
+                                    {% for error in checklist.form.updated_at.errors %}<p class="project-checklist-error">{{ error }}</p>{% endfor %}
+                                    {% if checklist.review_due %}<span class="review-due">Review due</span>{% endif %}
+                                    <button type="submit">Save date</button>
+                                </form>
+                            </td>
+                            <td>{% if checklist.response.update_due %}{{ checklist.response.update_due|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</td>
+                            <td>
+                                <form method="post" class="project-checklist-archive-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="set_checklist_archived">
+                                    <input type="hidden" name="project_id" value="{{ project.pk }}">
+                                    <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                                    <input type="hidden" name="checklist_item_id" value="{{ checklist.item.pk }}">
+                                    {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                                    <input type="checkbox" name="archived" value="1" aria-label="Archive {{ checklist.item.name }}"{% if checklist.response.archived %} checked{% endif %}>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% for checklist in project.management_checklist %}
+                    <div id="checklist-notes-modal-{{ project.pk }}-{{ checklist.item.pk }}" class="project-management-modal" role="dialog" aria-modal="true" aria-labelledby="checklist-notes-modal-title-{{ project.pk }}-{{ checklist.item.pk }}"{% if not checklist.form.notes.errors and not checklist.form.non_field_errors %} hidden{% endif %}>
+                        <div class="project-management-modal-content">
+                            <button type="button" class="project-management-modal-close" aria-label="Close">&times;</button>
+                            <h2 id="checklist-notes-modal-title-{{ project.pk }}-{{ checklist.item.pk }}">Notes — {{ checklist.item.name }}</h2>
+                            <form method="post" class="project-checklist-notes-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="save_checklist">
+                                <input type="hidden" name="project_id" value="{{ project.pk }}">
+                                <input type="hidden" name="selected_project_id" value="{{ selected_project_id }}">
+                                <input type="hidden" name="checklist_item_id" value="{{ checklist.item.pk }}">
+                                <input type="hidden" name="checklist-{{ checklist.item.pk }}-updated_at" value="{{ checklist.response.updated_at|date:'Y-m-d' }}">
+                                {% if include_inactive %}<input type="hidden" name="inactive" value="1">{% endif %}
+                                {{ checklist.form.non_field_errors }}
+                                <label for="{{ checklist.form.notes.id_for_label }}">Notes <span class="muted">(optional)</span> {{ checklist.form.notes }}</label>
+                                {% for error in checklist.form.notes.errors %}<p class="project-checklist-error">{{ error }}</p>{% endfor %}
+                                <button type="submit">Save notes</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
             </section>
 
             <div class="project-management-section-header">
@@ -111,7 +291,7 @@
             {% empty %}<p class="muted">No completed action items.</p>{% endfor %}
             </section>
         </article>
-    {% empty %}<p class="muted">Select a project to view its management details.</p>{% endfor %}
+    {% endfor %}
 </section>
 <script>
     (() => {
@@ -129,6 +309,39 @@
                 button.textContent = isHidden ? "Hide" : "Show";
                 button.setAttribute("aria-expanded", String(isHidden));
             });
+        });
+        const closeModal = modal => { modal.hidden = true; };
+        document.querySelectorAll(".project-management-edit, .project-checklist-modal-open, .checklist-item-modal-open").forEach(button => {
+            button.addEventListener("click", () => {
+                document.getElementById(button.dataset.target).hidden = false;
+            });
+        });
+        document.querySelectorAll(".project-checklist-archive-toggle").forEach(button => {
+            let showingArchived = false;
+            button.addEventListener("click", () => {
+                showingArchived = !showingArchived;
+                const section = document.getElementById(button.dataset.target);
+                section.querySelectorAll("[data-checklist-row]").forEach(row => {
+                    row.hidden = row.dataset.archived !== String(showingArchived);
+                });
+                button.textContent = showingArchived ? "Show active" : "Show archived";
+                button.setAttribute("aria-pressed", String(showingArchived));
+            });
+        });
+        document.querySelectorAll(".project-checklist-archive-form input[type='checkbox']").forEach(checkbox => {
+            checkbox.addEventListener("change", () => checkbox.form.requestSubmit());
+        });
+        document.querySelectorAll(".project-management-modal-close").forEach(button => {
+            button.addEventListener("click", () => closeModal(button.closest(".project-management-modal")));
+        });
+        document.querySelectorAll(".project-management-modal").forEach(modal => {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) closeModal(modal);
+            });
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            document.querySelectorAll(".project-management-modal:not([hidden])").forEach(closeModal);
         });
     })();
 </script>

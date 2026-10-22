@@ -145,9 +145,8 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(ChecklistItem)
 class ChecklistItemAdmin(admin.ModelAdmin):
-    list_display = ("name", "review_interval_days", "is_active", "sort_order")
-    list_filter = ("is_active",)
-    ordering = ("sort_order", "id")
+    list_display = ("name", "review_interval_days")
+    ordering = ("id",)
 
 
 @admin.register(ProjectActionItem)

@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.utils import timezone
 
 from app.models import ChecklistItem, ProjectChecklist
@@ -18,25 +16,18 @@ DEFAULT_CHECKLIST_ITEMS = (
 
 def seed_default_checklist_items():
     """Create the shared project-review standards without duplicating them."""
-    for sort_order, (name, guidance, interval) in enumerate(DEFAULT_CHECKLIST_ITEMS):
+    for name, guidance, interval in DEFAULT_CHECKLIST_ITEMS:
         ChecklistItem.objects.get_or_create(
             name=name,
             defaults={
                 "guidance": guidance,
                 "review_interval_days": interval,
-                "sort_order": sort_order,
             },
         )
 
 
 def review_is_due(response, now=None):
-    if (
-        response.status != ProjectChecklist.Status.SATISFIED
-        or response.last_verified_at is None
-        or response.checklist_item.review_interval_days is None
-    ):
+    if response.update_due is None:
         return False
-    now = now or timezone.now()
-    return response.last_verified_at + timedelta(
-        days=response.checklist_item.review_interval_days
-    ) <= now
+    today = now or timezone.localdate()
+    return response.update_due <= today
