@@ -29,8 +29,8 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 FREELANCER_TOKEN = os.environ.get('FREELANCER_TOKEN')
 TOGGL_API_TOKEN = os.environ.get("TOGGL_API_TOKEN", "")
-TOGGL_IMPORT_DAYS = int(os.environ.get("TOGGL_IMPORT_DAYS", "365"))
-TOGGL_MAX_IMPORT_DAYS = int(os.environ.get("TOGGL_MAX_IMPORT_DAYS", "365"))
+TOGGL_IMPORT_DAYS = int(os.environ.get("TOGGL_IMPORT_DAYS", "7"))
+TOGGL_MAX_IMPORT_DAYS = int(os.environ.get("TOGGL_MAX_IMPORT_DAYS", "90"))
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_JOB_EVALUATION_MODEL = os.environ.get(
     "OPENAI_JOB_EVALUATION_MODEL",
