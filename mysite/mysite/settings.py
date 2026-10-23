@@ -188,6 +188,13 @@ if signature_secret.is_file():
         validate=True,
     )
 
+    print(
+        "Signature configuration:",
+        "secret_exists=", signature_secret.is_file(),
+        "image_path=", SIGNATURE_IMAGE_PATH,
+        flush=True,
+    )
+
     with tempfile.NamedTemporaryFile(
         prefix="signature-",
         suffix=".jpg",
