@@ -15,6 +15,8 @@ import os
 import dj_database_url
 from dotenv import load_dotenv
 from django.urls import reverse_lazy
+import base64
+import tempfile
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -171,10 +173,28 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Local signature image, with an optional environment override.
 SIGNATURE_IMAGE_PATH = os.environ.get(
     "SIGNATURE_IMAGE_PATH",
     str(BASE_DIR / "private" / "signature.jpg"),
 )
+
+# On Render, decode the Base64 secret into a temporary image file.
+signature_secret = Path("/etc/secrets/signature.b64")
+
+if signature_secret.is_file():
+    signature_bytes = base64.b64decode(
+        signature_secret.read_text().strip(),
+        validate=True,
+    )
+
+    with tempfile.NamedTemporaryFile(
+        prefix="signature-",
+        suffix=".jpg",
+        delete=False,
+    ) as signature_file:
+        signature_file.write(signature_bytes)
+        SIGNATURE_IMAGE_PATH = signature_file.name
 
 GOOGLE_CREDENTIALS_PATH = os.environ.get(
     "GOOGLE_CREDENTIALS_PATH",
