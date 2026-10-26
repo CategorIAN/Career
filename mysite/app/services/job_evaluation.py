@@ -80,7 +80,10 @@ matches and gaps.
             text_format=JobEvaluation,
         )
     except APIError as error:
-        raise JobEvaluationAPIError("OpenAI failed to evaluate the job posting.") from error
+        raise JobEvaluationAPIError(
+            f"OpenAI failed to evaluate the job posting: "
+            f"{type(error).__name__}: {error}"
+        ) from error
     except ValidationError as error:
         raise JobEvaluationParseError("OpenAI returned an invalid job evaluation.") from error
 
