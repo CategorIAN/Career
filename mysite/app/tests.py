@@ -10,6 +10,7 @@ from django.contrib.messages import get_messages
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
+from django.core import mail
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.core.management import call_command
@@ -190,6 +191,7 @@ class NavigationTemplateTests(TestCase):
             "job_applications",
             "emails",
             "freelancer_search",
+            "contact",
         )
         content = response.content.decode()
         for destination in expected_destinations:
@@ -226,8 +228,10 @@ class CareerAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "app/resume.html")
         self.assertNotContains(response, "Portfolio")
-        for destination in ("resume", "experience", "projects", "courses"):
+        for destination in ("resume", "contact"):
             self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 1)
+        for destination in ("experience", "projects", "courses"):
+            self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 2)
         for folder_name in ("Management", "Networking", "Finding Work"):
             self.assertNotContains(response, folder_name)
         self.assertEqual(self.client.get(reverse("job_postings")).status_code, 403)
@@ -235,6 +239,7 @@ class CareerAccessTests(TestCase):
         self.assertEqual(self.client.get(reverse("references")).status_code, 403)
         self.assertNotContains(response, "Residencies")
         self.assertEqual(self.client.get(reverse("residencies")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("contact")).status_code, 200)
         self.assertEqual(self.client.get(reverse("admin:login")).status_code, 200)
 
     def test_administrator_keeps_the_home_view(self):
@@ -252,7 +257,7 @@ class CareerAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Portfolio")
-        for destination in ("resume", "experience", "projects", "courses"):
+        for destination in ("resume", "experience", "projects", "courses", "contact"):
             self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 1)
         self.assertNotContains(response, "Management")
         self.assertEqual(self.client.get(reverse("skills")).status_code, 403)
@@ -260,6 +265,7 @@ class CareerAccessTests(TestCase):
         self.assertEqual(self.client.get(reverse("references")).status_code, 403)
         self.assertNotContains(response, "Residencies")
         self.assertEqual(self.client.get(reverse("residencies")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("contact")).status_code, 200)
 
 
 class DjangoAdminAccessTests(TestCase):
@@ -373,6 +379,110 @@ class ResumeContactAccessTests(TestCase):
         self.assertNotContains(response, 'id="contact-mode-toggle"', html=False)
         self.assertNotContains(response, "private.resume@example.com")
         self.assertNotIn("email", response.context["profile"])
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_HOST_USER="personal@example.com",
+    EMAIL_HOST_PASSWORD="smtp-app-password",
+    BUSINESS_CONTACT_EMAIL="business@example.com",
+    DEFAULT_FROM_EMAIL="personal@example.com",
+)
+class BusinessContactPageTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def _valid_submission(self, **overrides):
+        data = {
+            "name": "Taylor Visitor",
+            "email": "taylor@example.com",
+            "subject": "Website project",
+            "message": "I would like to discuss a new business website.",
+        }
+        data.update(overrides)
+        return self.client.post(reverse("contact"), data)
+
+    def test_anonymous_visitor_can_access_contact_page(self):
+        response = self.client.get(reverse("contact"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Kessler Computing")
+        self.assertContains(response, "Need a website for your business?")
+        self.assertContains(response, f'href="{reverse("contact")}"', html=False)
+
+    def test_non_administrator_can_access_contact_page(self):
+        visitor = get_user_model().objects.create_user(
+            username="contact-visitor",
+            password="test-password",
+        )
+        self.client.force_login(visitor)
+
+        response = self.client.get(reverse("contact"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_valid_submission_sends_business_inquiry_with_reply_to(self):
+        response = self._valid_submission()
+
+        self.assertRedirects(response, reverse("contact"), fetch_redirect_response=False)
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to, ["business@example.com"])
+        self.assertEqual(email.from_email, "personal@example.com")
+        self.assertEqual(email.reply_to, ["taylor@example.com"])
+        self.assertEqual(email.subject, "Kessler Computing inquiry: Website project")
+        self.assertIn("Taylor Visitor", email.body)
+        self.assertIn("taylor@example.com", email.body)
+
+    def test_invalid_submission_does_not_send_email(self):
+        response = self._valid_submission(email="not-an-email")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid email address.")
+        self.assertEqual(mail.outbox, [])
+
+    def test_honeypot_submission_does_not_send_email(self):
+        response = self._valid_submission(website="https://spam.example.com")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unable to submit this inquiry.")
+        self.assertEqual(mail.outbox, [])
+
+    @patch("app.views.EmailMessage.send", return_value=0)
+    def test_delivery_failure_does_not_show_success_message(self, send_mock):
+        response = self._valid_submission(follow=True)
+
+        send_mock.assert_called_once()
+        self.assertContains(
+            response,
+            "The inquiry could not be sent at this time. Please try again later.",
+        )
+        self.assertNotContains(response, "Your inquiry has been sent.")
+
+    @override_settings(
+        EMAIL_HOST_USER="",
+        EMAIL_HOST_PASSWORD="",
+        BUSINESS_CONTACT_EMAIL="",
+    )
+    def test_missing_smtp_configuration_is_handled_without_delivery(self):
+        response = self._valid_submission(follow=True)
+
+        self.assertContains(
+            response,
+            "The inquiry could not be sent at this time. Please try again later.",
+        )
+        self.assertNotContains(response, "Your inquiry has been sent.")
+        self.assertEqual(mail.outbox, [])
+
+    def test_submission_rate_limit_blocks_additional_delivery(self):
+        for _ in range(5):
+            self._valid_submission()
+
+        response = self._valid_submission()
+
+        self.assertEqual(len(mail.outbox), 5)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Too many inquiries were submitted")
 
 
 class ResumeRoleDisplayTests(TestCase):

@@ -39,6 +39,14 @@ from .models import (
 MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
 
+class ContactForm(forms.Form):
+    name = forms.CharField(max_length=200)
+    email = forms.EmailField()
+    subject = forms.CharField(max_length=200)
+    message = forms.CharField(widget=forms.Textarea(attrs={"rows": 8}))
+    website = forms.CharField(required=False, widget=forms.HiddenInput)
+
+
 class CompanyForm(forms.ModelForm):
     class Meta:
         model = Company

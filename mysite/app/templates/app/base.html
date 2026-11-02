@@ -534,11 +534,13 @@
                 </div>
             </div>
             <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
+            <a class="nav-link{% if request.resolver_match.url_name == 'contact' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'contact' %} aria-current="page"{% endif %} href="{% url 'contact' %}">Contact</a>
             {% else %}
             <a class="nav-link{% if request.resolver_match.url_name == 'resume' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'resume' %} aria-current="page"{% endif %} href="{% url 'resume' %}">Resume</a>
             <a class="nav-link{% if request.resolver_match.url_name == 'experience' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'experience' %} aria-current="page"{% endif %} href="{% url 'experience' %}">Experience</a>
             <a class="nav-link{% if request.resolver_match.url_name == 'projects' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'projects' %} aria-current="page"{% endif %} href="{% url 'projects' %}">Projects</a>
             <a class="nav-link{% if request.resolver_match.url_name == 'courses' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'courses' %} aria-current="page"{% endif %} href="{% url 'courses' %}">Education</a>
+            <a class="nav-link{% if request.resolver_match.url_name == 'contact' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'contact' %} aria-current="page"{% endif %} href="{% url 'contact' %}">Contact</a>
             {% endif %}
         </nav>
         {% endif %}

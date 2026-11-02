@@ -39,6 +39,14 @@ OPENAI_JOB_EVALUATION_MODEL = os.environ.get(
     "gpt-5.6-luna",
 )
 CAREER_ADMIN_USERNAME = os.environ.get("CAREER_ADMIN_USERNAME", "ian")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+BUSINESS_CONTACT_EMAIL = os.environ.get("BUSINESS_CONTACT_EMAIL", "")
 LOGOUT_REDIRECT_URL = reverse_lazy("home")
 
 # SECURITY WARNING: don't run with debug turned on in production!

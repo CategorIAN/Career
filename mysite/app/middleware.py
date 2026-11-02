@@ -13,6 +13,7 @@ PUBLIC_PORTFOLIO_VIEW_NAMES = frozenset(
         "experience",
         "projects",
         "courses",
+        "contact",
     }
 )
 PUBLIC_AUTH_VIEW_NAMES = frozenset({"admin:login"})

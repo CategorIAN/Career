@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.mail import EmailMessage
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
@@ -49,6 +50,7 @@ from .forms import (
     ChecklistItemFormSet,
     CourseEditForm,
     CourseSkillsEditForm,
+    ContactForm,
     EducationEditForm,
     FeatureForm,
     FeatureFormSet,
@@ -164,6 +166,8 @@ SEARCH_CACHE_TIMEOUT = 60 * 60
 FREELANCER_RATE_LIMIT_MESSAGE = (
     "Freelancer has temporarily rate-limited project searches. Please try again later."
 )
+CONTACT_SUBMISSION_LIMIT = 5
+CONTACT_SUBMISSION_WINDOW_SECONDS = 60 * 60
 
 
 logger = logging.getLogger(__name__)
@@ -585,6 +589,81 @@ def home_view(request):
     if not is_career_administrator(request.user):
         return resume_view(request)
     return render(request, "app/home.html")
+
+
+def _contact_rate_limit_key(request):
+    client_address = request.META.get("REMOTE_ADDR", "unknown")
+    address_hash = hashlib.sha256(client_address.encode("utf-8")).hexdigest()
+    return f"contact-submissions:{address_hash}"
+
+
+def _contact_submission_is_rate_limited(request):
+    cache_key = _contact_rate_limit_key(request)
+    if cache.add(cache_key, 1, timeout=CONTACT_SUBMISSION_WINDOW_SECONDS):
+        return False
+
+    try:
+        submissions = cache.incr(cache_key)
+    except ValueError:
+        cache.set(cache_key, 1, timeout=CONTACT_SUBMISSION_WINDOW_SECONDS)
+        return False
+    return submissions > CONTACT_SUBMISSION_LIMIT
+
+
+@require_http_methods(["GET", "POST"])
+def contact_view(request):
+    form = ContactForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        if form.cleaned_data["website"]:
+            form.add_error(None, "Unable to submit this inquiry.")
+        elif _contact_submission_is_rate_limited(request):
+            form.add_error(
+                None,
+                "Too many inquiries were submitted from this address. Please try again later.",
+            )
+        else:
+            recipient = (getattr(settings, "BUSINESS_CONTACT_EMAIL", "") or "").strip()
+            smtp_user = (getattr(settings, "EMAIL_HOST_USER", "") or "").strip()
+            smtp_password = getattr(settings, "EMAIL_HOST_PASSWORD", "") or ""
+            if not recipient or not smtp_user or not smtp_password:
+                logger.error("Contact form SMTP configuration is incomplete.")
+                form.add_error(
+                    None,
+                    "The inquiry could not be sent at this time. Please try again later.",
+                )
+            else:
+                visitor_name = form.cleaned_data["name"]
+                visitor_email = form.cleaned_data["email"]
+                visitor_subject = form.cleaned_data["subject"]
+                visitor_message = form.cleaned_data["message"]
+                email = EmailMessage(
+                    subject=f"Kessler Computing inquiry: {visitor_subject}",
+                    body=(
+                        f"Name: {visitor_name}\n"
+                        f"Email: {visitor_email}\n"
+                        f"Subject: {visitor_subject}\n\n"
+                        f"Message:\n{visitor_message}"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[settings.BUSINESS_CONTACT_EMAIL],
+                    reply_to=[visitor_email],
+                )
+                try:
+                    sent_count = email.send()
+                except Exception:
+                    logger.exception("Contact form email delivery failed.")
+                    sent_count = 0
+                if sent_count:
+                    messages.success(
+                        request,
+                        "Thanks for reaching out. Your inquiry has been sent.",
+                    )
+                    return redirect("contact")
+                form.add_error(
+                    None,
+                    "The inquiry could not be sent at this time. Please try again later.",
+                )
+    return render(request, "app/contact.html", {"form": form})
 
 
 def _create_platform_skills_for_platform(platform):

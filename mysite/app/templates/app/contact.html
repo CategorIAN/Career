@@ -1,0 +1,81 @@
+{% extends "app/base.html" %}
+
+{% block title %}Contact | Kessler Computing{% endblock %}
+
+{% block content %}
+<style>
+    .contact-page {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    .contact-page h1 {
+        margin-top: 0;
+    }
+
+    .contact-form {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        border: 1px solid #b9b9b9;
+        background: #f7f7f7;
+    }
+
+    .contact-form label {
+        display: grid;
+        gap: 0.35rem;
+        font-weight: 600;
+    }
+
+    .contact-form input,
+    .contact-form textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+    }
+
+    .contact-form textarea {
+        resize: vertical;
+    }
+
+    .contact-errors {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #9b1c1c;
+    }
+
+    .contact-success {
+        padding: 0.75rem 1rem;
+        border: 1px solid #6b9b63;
+        background: #e7f4e4;
+    }
+</style>
+
+<section class="contact-page">
+    <h1>Kessler Computing</h1>
+    <h2>Need a website for your business?</h2>
+    <p>I develop websites and custom software solutions for businesses. Whether you need a new website, improvements to an existing application, or help automating a business process, I'd be happy to discuss your project.</p>
+    <p>Use the form below to get in touch.</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <p{% if message.tags %} class="contact-success"{% endif %}>{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" class="contact-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {{ form.website }}
+        {% for field in form.visible_fields %}
+            <label for="{{ field.id_for_label }}">
+                {{ field.label }}
+                {{ field }}
+            </label>
+            {% if field.errors %}<ul class="contact-errors">{{ field.errors }}</ul>{% endif %}
+        {% endfor %}
+        <button type="submit">Send Inquiry</button>
+    </form>
+</section>
+{% endblock %}
