@@ -229,11 +229,11 @@ class CareerAccessTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "app/resume.html")
-        self.assertNotContains(response, "Portfolio")
-        for destination in ("resume", "contact"):
+        self.assertTemplateUsed(response, "app/home.html")
+        self.assertNotContains(response, ">Portfolio</button>", html=False)
+        for destination in ("contact",):
             self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 1)
-        for destination in ("experience", "projects", "courses"):
+        for destination in ("resume", "experience", "projects", "courses"):
             self.assertEqual(response.content.decode().count(f'href="{reverse(destination)}"'), 2)
         for folder_name in ("Management", "Networking", "Finding Work"):
             self.assertNotContains(response, folder_name)
@@ -252,6 +252,29 @@ class CareerAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "app/home.html")
+
+    def test_home_page_uses_the_resume_summary_and_portfolio_links(self):
+        ProfileSetting.objects.create(
+            key="resume_summary",
+            value="Database-backed professional summary.",
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, "Database-backed professional summary.")
+        self.assertContains(
+            response,
+            'src="/static/app/images/professional_portrait.jpg"',
+            html=False,
+        )
+        self.assertContains(response, "Contact Kessler Computing")
+        for destination in ("resume", "experience", "projects", "courses"):
+            self.assertContains(
+                response,
+                f'href="{reverse(destination)}"',
+                html=False,
+            )
+            self.assertEqual(self.client.get(reverse(destination)).status_code, 200)
 
     def test_other_signed_in_user_is_limited_to_portfolio(self):
         self.client.force_login(self.other_user)
@@ -3072,6 +3095,22 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, "0.5 months")
         self.assertNotContains(response, "15 days")
 
+    def test_professionals_page_shows_cc_button_for_carroll_connect_url(self):
+        professional = Professional.objects.create(
+            name="Ada Lovelace",
+            carrollconnect_url="https://carrollconnect.example.com/ada",
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, "<th>CC</th>", html=False)
+        self.assertContains(
+            response,
+            f'href="{professional.carrollconnect_url}"',
+            html=False,
+        )
+        self.assertContains(response, ">CC</a>", html=False)
+
     def test_professionals_add_button_creates_professional(self):
         response = self.client.post(
             reverse("professionals"),
@@ -3083,6 +3122,7 @@ class ProfessionalPageTests(TestCase):
                 "page": "1",
                 "new-name": "Grace Hopper",
                 "new-linkedin_url": "https://www.linkedin.com/in/grace-hopper",
+                "new-carrollconnect_url": "https://carrollconnect.example.com/grace",
                 "new-email": "grace@example.com",
                 "new-phone": "555-0100",
                 "new-wait_0": "0",
@@ -3099,6 +3139,10 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertEqual(professional.email, "grace@example.com")
         self.assertEqual(professional.phone, "555-0100")
+        self.assertEqual(
+            professional.carrollconnect_url,
+            "https://carrollconnect.example.com/grace",
+        )
         self.assertEqual(str(professional.wait), "15 days, 0:00:00")
 
     def test_professionals_search_displays_selected_professional(self):

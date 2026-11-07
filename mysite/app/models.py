@@ -822,6 +822,8 @@ class Professional(models.Model):
 
     linkedin_url = models.URLField(blank=True)
 
+    carrollconnect_url = models.URLField(blank=True)
+
     phone = models.CharField(
         max_length=30,
         blank=True,

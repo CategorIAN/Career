@@ -592,9 +592,17 @@ def _build_course_copy_payload(course):
 
 
 def home_view(request):
-    if not is_career_administrator(request.user):
-        return resume_view(request)
-    return render(request, "app/home.html")
+    professional_summary = (
+        ProfileSetting.objects.filter(key="resume_summary")
+        .values_list("value", flat=True)
+        .first()
+        or ""
+    )
+    return render(
+        request,
+        "app/home.html",
+        {"professional_summary": professional_summary},
+    )
 
 
 def _contact_rate_limit_key(request):

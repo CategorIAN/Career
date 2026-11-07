@@ -41,6 +41,11 @@
                         {{ new_form.linkedin_url.errors }}
                         {{ new_form.linkedin_url }}
                     </div>
+                    <label for="{{ new_form.carrollconnect_url.id_for_label }}">Carroll Connect URL</label>
+                    <div>
+                        {{ new_form.carrollconnect_url.errors }}
+                        {{ new_form.carrollconnect_url }}
+                    </div>
                     <label for="{{ new_form.email.id_for_label }}">Email</label>
                     <div>
                         {{ new_form.email.errors }}
@@ -215,6 +220,7 @@
                     <th>Invite Due</th>
                     <th>Connect Due</th>
                     <th>Invite</th>
+                    <th>CC</th>
                     <th>Send Invite</th>
                     <th>Pass</th>
                     <th>Edit</th>
@@ -244,6 +250,16 @@
                         <td>{{ professional.invite_due|date:"Y-m-d" }}</td>
                         <td>{{ professional.connect_due|date:"Y-m-d" }}</td>
                         <td>{{ professional.invite }}</td>
+                        <td>
+                            {% if professional.carrollconnect_url %}
+                                <a
+                                    class="copy-button"
+                                    href="{{ professional.carrollconnect_url }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >CC</a>
+                            {% endif %}
+                        </td>
                         <td>
                             <form method="post">
                                 {% csrf_token %}
@@ -299,6 +315,11 @@
                             <div>
                                 {{ professional.edit_form.linkedin_url.errors }}
                                 {{ professional.edit_form.linkedin_url }}
+                            </div>
+                            <label for="{{ professional.edit_form.carrollconnect_url.id_for_label }}">Carroll Connect URL</label>
+                            <div>
+                                {{ professional.edit_form.carrollconnect_url.errors }}
+                                {{ professional.edit_form.carrollconnect_url }}
                             </div>
                             <label for="{{ professional.edit_form.email.id_for_label }}">Email</label>
                             <div>

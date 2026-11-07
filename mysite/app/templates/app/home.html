@@ -1,3 +1,214 @@
 {% extends "app/base.html" %}
 
-{% block title %}Home{% endblock %}
+{% block title %}Ian Kessler | Professional Portfolio{% endblock %}
+
+{% block content %}
+<section class="professional-home">
+    <div class="professional-home-hero">
+        <img
+            class="professional-home-portrait"
+            src="/static/app/images/professional_portrait.jpg"
+            alt="Ian Kessler"
+        >
+        <div>
+            <p class="professional-home-eyebrow">Professional Portfolio</p>
+            <h1>Ian Kessler</h1>
+            <p class="professional-home-introduction">
+                Explore my professional background, technical work, and education.
+            </p>
+            {% if professional_summary %}
+            <div class="professional-home-summary">{{ professional_summary|linebreaksbr }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="professional-home-cards">
+        <article class="professional-home-card">
+            <h2>Resume</h2>
+            <p>An overview of my qualifications, skills, and professional accomplishments.</p>
+            <a href="{% url 'resume' %}">View Resume <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="professional-home-card">
+            <h2>Experience</h2>
+            <p>My professional work history, responsibilities, and experience.</p>
+            <a href="{% url 'experience' %}">View Experience <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="professional-home-card">
+            <h2>Projects</h2>
+            <p>My software applications, data engineering projects, API integrations, and optimization algorithms.</p>
+            <a href="{% url 'projects' %}">View Projects <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="professional-home-card">
+            <h2>Education</h2>
+            <p>My academic qualifications and educational background.</p>
+            <a href="{% url 'courses' %}">View Education <span aria-hidden="true">&rarr;</span></a>
+        </article>
+    </div>
+
+    <section class="professional-home-contact">
+        <div>
+            <p class="professional-home-eyebrow">Work With Me</p>
+            <h2>Need a website, custom software, or business automation?</h2>
+            <p>
+                I help businesses build practical websites and software solutions,
+                improve existing applications, and automate repetitive processes.
+            </p>
+        </div>
+        <a href="{% url 'contact' %}">Contact Kessler Computing <span aria-hidden="true">&rarr;</span></a>
+    </section>
+</section>
+
+<style>
+    .professional-home {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(1rem, 4vw, 3rem) 0;
+    }
+
+    .professional-home-hero {
+        display: grid;
+        grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+        align-items: center;
+        gap: clamp(1.5rem, 5vw, 4rem);
+        padding: clamp(1.5rem, 4vw, 3rem);
+        border-radius: 18px;
+        background: linear-gradient(135deg, #f3f7fb, #ffffff);
+        box-shadow: 0 8px 30px rgba(15, 23, 42, 0.10);
+    }
+
+    .professional-home-portrait {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 50%;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.20);
+    }
+
+    .professional-home-eyebrow {
+        margin: 0 0 0.5rem;
+        color: #315f8b;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .professional-home h1 {
+        margin: 0;
+        color: #13283c;
+        font-size: clamp(2rem, 5vw, 3.25rem);
+    }
+
+    .professional-home-introduction {
+        margin: 0.75rem 0;
+        color: #334155;
+        font-size: 1.12rem;
+        line-height: 1.6;
+    }
+
+    .professional-home-summary {
+        color: #1f2937;
+        line-height: 1.7;
+    }
+
+    .professional-home-cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.25rem;
+        margin-top: 1.5rem;
+    }
+
+    .professional-home-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 170px;
+        padding: 1.5rem;
+        border: 1px solid #d7e0e9;
+        border-radius: 12px;
+        background: #ffffff;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.07);
+    }
+
+    .professional-home-card h2 {
+        margin: 0;
+        color: #13283c;
+    }
+
+    .professional-home-card p {
+        margin: 0.75rem 0 1.25rem;
+        color: #475569;
+        line-height: 1.55;
+    }
+
+    .professional-home-card a {
+        margin-top: auto;
+        color: #1d5e94;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .professional-home-card a:hover,
+    .professional-home-card a:focus-visible {
+        text-decoration: underline;
+    }
+
+    .professional-home-contact {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+        padding: clamp(1.5rem, 4vw, 2.5rem);
+        border-radius: 14px;
+        background: #13283c;
+        color: #ffffff;
+    }
+
+    .professional-home-contact h2 {
+        margin: 0;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+    }
+
+    .professional-home-contact p:not(.professional-home-eyebrow) {
+        max-width: 700px;
+        margin: 0.75rem 0 0;
+        line-height: 1.6;
+    }
+
+    .professional-home-contact .professional-home-eyebrow {
+        color: #b9d8f3;
+    }
+
+    .professional-home-contact a {
+        flex: 0 0 auto;
+        padding: 0.75rem 1rem;
+        border-radius: 7px;
+        background: #ffffff;
+        color: #13283c;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .professional-home-contact a:hover,
+    .professional-home-contact a:focus-visible {
+        background: #dbeafe;
+    }
+
+    @media (max-width: 680px) {
+        .professional-home-hero,
+        .professional-home-cards {
+            grid-template-columns: 1fr;
+        }
+
+        .professional-home-contact {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .professional-home-portrait {
+            width: min(220px, 100%);
+            justify-self: center;
+        }
+    }
+</style>
+{% endblock %}

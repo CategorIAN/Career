@@ -850,7 +850,14 @@ class ProfessionalForm(forms.ModelForm):
 
     class Meta:
         model = Professional
-        fields = ["name", "linkedin_url", "email", "phone", "wait"]
+        fields = [
+            "name",
+            "linkedin_url",
+            "carrollconnect_url",
+            "email",
+            "phone",
+            "wait",
+        ]
         widgets = {
             "name": forms.TextInput(
                 attrs={
@@ -862,6 +869,9 @@ class ProfessionalForm(forms.ModelForm):
                 }
             ),
             "linkedin_url": forms.URLInput(
+                attrs={"autocomplete": "off", "style": "width: 22rem;"}
+            ),
+            "carrollconnect_url": forms.URLInput(
                 attrs={"autocomplete": "off", "style": "width: 22rem;"}
             ),
             "email": forms.EmailInput(
@@ -886,8 +896,15 @@ class ProfessionalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("linkedin_url", "email", "phone", "wait"):
-            self.fields[field_name].required = False
+        for field_name in (
+            "linkedin_url",
+            "carrollconnect_url",
+            "email",
+            "phone",
+            "wait",
+        ):
+            if field_name in self.fields:
+                self.fields[field_name].required = False
 
     def clean_name(self):
         name = (self.cleaned_data.get("name") or "").strip()
@@ -899,6 +916,7 @@ class ProfessionalForm(forms.ModelForm):
 class RecruiterForm(ProfessionalForm):
     class Meta(ProfessionalForm.Meta):
         model = Recruiter
+        fields = ["name", "linkedin_url", "email", "phone", "wait"]
 
 
 class ProfessionalConnectForm(forms.ModelForm):
