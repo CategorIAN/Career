@@ -48,16 +48,81 @@
         </tbody>
     </table>
 
-    {% if page_obj.paginator.num_pages > 1 %}
-        <nav class="pagination" aria-label="Companies pagination">
+    <nav class="pagination" aria-label="Companies pagination" style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
             {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous companies">&larr;</a>
+                <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous company">&larr;</a>
             {% endif %}
-            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <span>Company {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next companies">&rarr;</a>
+                <a href="?page={{ page_obj.next_page_number }}" aria-label="Next company">&rarr;</a>
             {% endif %}
-        </nav>
+    </nav>
+
+    <form method="get" style="margin-top: 1rem;">
+        <label for="company-search">Search Company</label>
+        <input
+            id="company-search"
+            type="text"
+            list="company-search-options"
+            value="{% if searched_company %}{{ searched_company.name }}{% endif %}"
+            autocomplete="new-password"
+            class="autofill-blocked"
+            data-form-type="other"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            data-dashlane-ignore="true"
+            data-dashlane-autofill="false"
+            data-dashlane-disabled-on-field="true"
+            readonly
+            style="width: 20rem;"
+        >
+        <datalist id="company-search-options">
+            {% for company in all_companies %}
+                <option value="{{ company.name }}" data-company-id="{{ company.pk }}"></option>
+            {% endfor %}
+        </datalist>
+        <input id="company-id-input" type="hidden" name="company_id" value="{% if searched_company %}{{ searched_company.pk }}{% endif %}">
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'companies' %}'">Clear</button>
+    </form>
+
+    {% if selected_company %}
+        <section style="margin-top: 1.5rem;">
+            <h2>Job Search Paths</h2>
+            <table class="project-results">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Search Term</th>
+                        <th>Active</th>
+                        <th>Success Probability</th>
+                        <th>Edit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for search_path in company_search_paths %}
+                        <tr>
+                            <td>
+                                {% if search_path.effective_url %}
+                                    <a href="{{ search_path.effective_url }}" target="_blank" rel="noopener noreferrer">{{ search_path }}</a>
+                                {% else %}
+                                    {{ search_path }}
+                                {% endif %}
+                            </td>
+                            <td>{% if search_path.search_term %}{{ search_path.search_term }}{% endif %}</td>
+                            <td>{{ search_path.active|yesno:"Yes,No" }}</td>
+                            <td>{{ search_path.page_success_probability|floatformat:2 }}</td>
+                            <td>
+                                <button type="button" class="copy-button open-company-search-path-modal" data-target="edit-company-search-path-modal-{{ search_path.pk }}">Edit</button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5">No job search paths for this company.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
     {% endif %}
 </section>
 
@@ -78,6 +143,26 @@
                         <button type="submit" name="delete_company" value="{{ company.pk }}" class="company-delete-button">Delete</button>
                         <button type="submit" name="save_company" value="{{ company.pk }}">Save</button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+
+{% for search_path, search_path_form in company_search_path_forms %}
+    <div id="edit-company-search-path-modal-{{ search_path.pk }}" class="company-modal company-search-path-modal{% if show_edit_company_search_path_id != search_path.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-company-search-path-modal-title-{{ search_path.pk }}">
+        <div class="company-modal-content">
+            <button type="button" class="company-modal-close close-company-search-path-modal" aria-label="Close">&times;</button>
+            <h2 id="edit-company-search-path-modal-title-{{ search_path.pk }}">Edit Job Search Path</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <div class="company-form-grid">
+                    {% for field in search_path_form.visible_fields %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div>{{ field.errors }}{{ field }}</div>
+                    {% endfor %}
+                    <button type="submit" name="save_company_search_path" value="{{ search_path.pk }}">Save</button>
                 </div>
             </form>
         </div>
@@ -113,6 +198,12 @@
         document.querySelectorAll(".close-edit-company-modal").forEach(button => {
             button.addEventListener("click", () => button.closest(".company-modal").classList.add("hidden"));
         });
+        document.querySelectorAll(".open-company-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => document.getElementById(button.dataset.target).classList.remove("hidden"));
+        });
+        document.querySelectorAll(".close-company-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => button.closest(".company-modal").classList.add("hidden"));
+        });
         document.querySelectorAll(".company-modal").forEach(companyModal => {
             companyModal.addEventListener("click", event => {
                 if (event.target === companyModal) companyModal.classList.add("hidden");
@@ -125,6 +216,30 @@
         }, 100);
         modal.addEventListener("click", event => {
             if (event.target === modal) modal.classList.add("hidden");
+        });
+
+        const searchInput = document.getElementById("company-search");
+        const companyIdInput = document.getElementById("company-id-input");
+        const companyOptions = document.querySelectorAll("#company-search-options option");
+        const companyIdByName = new Map();
+
+        companyOptions.forEach(option => {
+            if (!companyIdByName.has(option.value)) {
+                companyIdByName.set(option.value, option.dataset.companyId || "");
+            }
+        });
+
+        const syncCompanyId = () => {
+            companyIdInput.value = companyIdByName.get(searchInput.value) || "";
+        };
+
+        searchInput.addEventListener("input", syncCompanyId);
+        searchInput.addEventListener("change", syncCompanyId);
+        searchInput.form.addEventListener("submit", () => {
+            syncCompanyId();
+            if (!companyIdInput.value) {
+                companyIdInput.disabled = true;
+            }
         });
     });
 </script>

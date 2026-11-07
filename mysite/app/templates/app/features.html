@@ -4,7 +4,66 @@
 
 {% block content %}
 <section class="utility-page">
-    <h1>Features</h1>
+    <style>
+        .feature-page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .feature-add-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1001;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .feature-add-modal[hidden] {
+            display: none;
+        }
+
+        .feature-add-modal-content {
+            position: relative;
+            width: min(32rem, 100%);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-add-modal-close {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.75rem;
+            border: 0;
+            background: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .feature-add-form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .feature-add-form label {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .feature-add-form-error {
+            margin: 0;
+            color: #9b1c1c;
+        }
+    </style>
+    <div class="feature-page-header">
+        <h1>Features</h1>
+        <button type="button" id="open-add-feature-modal">Add Feature</button>
+    </div>
 <form method="post">
     {% csrf_token %}
     {{ formset.management_form }}
@@ -18,27 +77,10 @@
                 <th>Updated</th>
                 <th>Due Date</th>
                 <th>Add/Delete</th>
+                <th>Save</th>
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td>
-                    {{ new_form.name.errors }}
-                    {{ new_form.name }}
-                </td>
-                <td>
-                    {{ new_form.wait.errors }}
-                    {{ new_form.wait }}
-                </td>
-                <td>
-                    {{ new_form.updated.errors }}
-                    {{ new_form.updated }}
-                </td>
-                <td></td>
-                <td>
-                    <button type="submit" name="add_feature" value="1">Add</button>
-                </td>
-            </tr>
             {% for form in formset %}
                 <tr id="{{ form.instance.pk }}"{% if form.instance.due_date and form.instance.due_date <= current_date %} style="background: #f4cccc;"{% endif %}>
                     {% for hidden in form.hidden_fields %}
@@ -62,6 +104,9 @@
                     <td>
                         <button type="submit" name="delete_feature" value="{{ form.instance.pk }}">Delete</button>
                     </td>
+                    <td>
+                        <button type="submit">Save</button>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -77,8 +122,26 @@
             {% endif %}
         </div>
     {% endif %}
-    <button type="submit" style="margin-top: 1rem;">Save</button>
 </form>
+<div id="add-feature-modal" class="feature-add-modal" role="dialog" aria-modal="true" aria-labelledby="add-feature-modal-title"{% if not new_form.errors %} hidden{% endif %}>
+    <div class="feature-add-modal-content">
+        <button type="button" class="feature-add-modal-close" aria-label="Close">&times;</button>
+        <h2 id="add-feature-modal-title">Add Feature</h2>
+        <form method="post" class="feature-add-form">
+            {% csrf_token %}
+            <input type="hidden" name="add_feature" value="1">
+            {{ new_form.non_field_errors }}
+            {% for field in new_form.visible_fields %}
+                <label for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {{ field }}
+                </label>
+                {% for error in field.errors %}<p class="feature-add-form-error">{{ error }}</p>{% endfor %}
+            {% endfor %}
+            <button type="submit">Create Feature</button>
+        </form>
+    </div>
+</div>
 <form method="get" style="margin-top: 1rem;">
     <label for="feature-search">Search Feature</label>
     <input
@@ -248,6 +311,36 @@
             const isHidden = target.classList.contains("hidden");
             target.classList.toggle("hidden");
             button.textContent = isHidden ? "Hide" : "Show";
+        });
+    });
+
+    (() => {
+        const modal = document.getElementById("add-feature-modal");
+        const openButton = document.getElementById("open-add-feature-modal");
+        const closeButton = modal?.querySelector(".feature-add-modal-close");
+
+        if (!modal || !openButton || !closeButton) {
+            return;
+        }
+
+        const closeModal = () => modal.setAttribute("hidden", "");
+        openButton.addEventListener("click", () => modal.removeAttribute("hidden"));
+        closeButton.addEventListener("click", closeModal);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
+                closeModal();
+            }
+        });
+    })();
+
+    window.setTimeout(() => {
+        document.querySelectorAll("#add-feature-modal .autofill-blocked").forEach(input => {
+            input.removeAttribute("readonly");
         });
     });
 </script>

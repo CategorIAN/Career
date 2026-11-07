@@ -486,6 +486,20 @@ class BusinessContactPageTests(TestCase):
 
 
 class ResumeRoleDisplayTests(TestCase):
+    def test_resume_shows_only_the_resume_summary(self):
+        ProfileSetting.objects.bulk_create(
+            [
+                ProfileSetting(key="resume_summary", value="Resume summary text."),
+                ProfileSetting(key="platform_summary", value="Platform summary text."),
+            ]
+        )
+
+        response = self.client.get(reverse("resume"))
+
+        self.assertContains(response, "Resume summary text.")
+        self.assertNotContains(response, "Platform summary text.")
+        self.assertNotContains(response, 'id="summary-view-select"', html=False)
+
     def test_resume_hides_role_descriptions_but_shows_responsibilities(self):
         role = Role.objects.create(
             company=Company.objects.create(name="Example Co"),
@@ -2682,11 +2696,51 @@ class ApplicationReferencePageTests(TestCase):
 
 
 class PlatformPageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
+    def test_platforms_page_paginates_one_platform_with_arrow_navigation(self):
+        first_platform = Platform.objects.create(
+            name="Alpha Platform",
+            url="https://alpha.example.com",
+        )
+        second_platform = Platform.objects.create(
+            name="Beta Platform",
+            url="https://beta.example.com",
+        )
+
+        first_page = self.client.get(reverse("platforms"))
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.context["page_obj"].paginator.per_page, 1)
+        self.assertContains(first_page, first_platform.name)
+        self.assertNotContains(first_page, second_platform.name)
+        self.assertContains(first_page, "Platform 1 of 2")
+        self.assertContains(
+            first_page,
+            f'?page=2\" aria-label="Next platform"',
+            html=False,
+        )
+
+        second_page = self.client.get(reverse("platforms"), {"page": 2})
+
+        self.assertContains(second_page, second_platform.name)
+        self.assertNotContains(second_page, first_platform.name)
+        self.assertContains(second_page, "Platform 2 of 2")
+        self.assertContains(
+            second_page,
+            f'?page=1\" aria-label="Previous platform"',
+            html=False,
+        )
+
     def test_platforms_page_shows_add_delete_column_and_buttons(self):
         platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
-            max_skills=10,
         )
 
         response = self.client.get(reverse("platforms"))
@@ -2694,19 +2748,120 @@ class PlatformPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "<title>Platforms</title>", html=False)
         self.assertContains(response, "<h1>Platforms</h1>", html=False)
-        self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "Delete")
+        self.assertContains(response, "<th>Save</th>", html=False)
         self.assertContains(response, "Job Search Enabled")
+        self.assertNotContains(response, "Max Skills")
         self.assertContains(response, 'name="form-0-job_search_enabled"', html=False)
+        self.assertContains(response, 'id="open-add-platform-modal"', html=False)
+        self.assertContains(response, 'id="add-platform-modal"', html=False)
         self.assertContains(response, 'name="add_platform" value="1"', html=False)
+        self.assertContains(response, 'name="new-name"', html=False)
+        self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
         self.assertContains(response, f'name="delete_platform" value="{platform.pk}"', html=False)
         self.assertNotContains(response, 'name="form-0-DELETE"', html=False)
         self.assertNotContains(response, ">New<", html=False)
+
+    def test_add_platform_modal_shows_validation_errors(self):
+        response = self.client.post(
+            reverse("platforms"),
+            data={
+                "page": "1",
+                "new-name": "",
+                "add_platform": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+        self.assertNotContains(
+            response,
+            'id="add-platform-modal" class="platform-add-modal" role="dialog" aria-modal="true" aria-labelledby="add-platform-modal-title" hidden',
+            html=False,
+        )
+
+    def test_platforms_page_shows_only_current_platform_search_paths(self):
+        platform = Platform.objects.create(
+            name="Alpha Platform",
+            url="https://alpha.example.com",
+        )
+        other_platform = Platform.objects.create(
+            name="Beta Platform",
+            url="https://beta.example.com",
+        )
+        matching_term = SearchTerm.objects.create(term="Python")
+        other_term = SearchTerm.objects.create(term="Django")
+        SearchPath.objects.create(platform=platform, search_term=matching_term)
+        SearchPath.objects.create(platform=other_platform, search_term=other_term)
+
+        response = self.client.get(reverse("platforms"))
+
+        self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Success Probability")
+        self.assertContains(response, "Python")
+        self.assertNotContains(response, "Django")
+        self.assertContains(response, "0.50")
+        self.assertContains(
+            response,
+            f'data-target="edit-platform-search-path-modal-{SearchPath.objects.get(platform=platform).pk}"',
+            html=False,
+        )
+
+    def test_platform_search_path_edit_saves_only_the_current_platform_path(self):
+        platform = Platform.objects.create(name="Alpha Platform")
+        search_path = SearchPath.objects.create(platform=platform)
+
+        response = self.client.post(
+            reverse("platforms"),
+            data={
+                "page": "1",
+                "platform-search-path-%s-id" % search_path.pk: str(search_path.pk),
+                "platform-search-path-%s-url" % search_path.pk: "https://jobs.example.com",
+                "platform-search-path-%s-active" % search_path.pk: "on",
+                "save_platform_search_path": str(search_path.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('platforms')}?page=1")
+        search_path.refresh_from_db()
+        self.assertEqual(search_path.url, "https://jobs.example.com")
+        self.assertTrue(search_path.active)
+
+    def test_platform_search_paths_sort_by_success_probability_descending(self):
+        platform = Platform.objects.create(name="Alpha Platform")
+        lower_probability_path = SearchPath.objects.create(
+            platform=platform,
+            search_term=SearchTerm.objects.create(term="Django"),
+        )
+        higher_probability_path = SearchPath.objects.create(
+            platform=platform,
+            search_term=SearchTerm.objects.create(term="Python"),
+        )
+        job_posting = JobPosting.objects.create(
+            title="Engineer",
+            company_name="Example",
+        )
+        SearchObservation.objects.create(
+            search_path=higher_probability_path,
+            job_posting=job_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=higher_probability_path,
+            job_posting=job_posting,
+            complete=True,
+        )
+
+        response = self.client.get(reverse("platforms"))
+        content = response.content.decode()
+
+        self.assertLess(content.index("Python"), content.index("Django"))
+        self.assertEqual(lower_probability_path.platform_id, platform.pk)
 
     def test_platforms_save_updates_existing_rows_without_creating_top_row(self):
         existing_platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
-            max_skills=10,
         )
 
         response = self.client.post(
@@ -2720,11 +2875,9 @@ class PlatformPageTests(TestCase):
                 "form-0-id": str(existing_platform.pk),
                 "form-0-name": "Alpha Platform Updated",
                 "form-0-url": "https://updated.example.com",
-                "form-0-max_skills": "12",
                 "form-0-job_search_enabled": "on",
                 "new-name": "Should Not Save",
                 "new-url": "https://ignored.example.com",
-                "new-max_skills": "3",
             },
         )
 
@@ -2732,7 +2885,6 @@ class PlatformPageTests(TestCase):
         existing_platform.refresh_from_db()
         self.assertEqual(existing_platform.name, "Alpha Platform Updated")
         self.assertEqual(existing_platform.url, "https://updated.example.com")
-        self.assertEqual(existing_platform.max_skills, 12)
         self.assertTrue(existing_platform.job_search_enabled)
         self.assertFalse(Platform.objects.filter(name="Should Not Save").exists())
 
@@ -2751,7 +2903,6 @@ class PlatformPageTests(TestCase):
                 "page": "1",
                 "new-name": "Beta Platform",
                 "new-url": "https://beta.example.com",
-                "new-max_skills": "5",
                 "add_platform": "1",
             },
         )
@@ -2759,7 +2910,6 @@ class PlatformPageTests(TestCase):
         created_platform = Platform.objects.get(name="Beta Platform")
         self.assertRedirects(response, f"{reverse('platforms')}?page=1")
         self.assertEqual(created_platform.url, "https://beta.example.com")
-        self.assertEqual(created_platform.max_skills, 5)
         self.assertTrue(
             PlatformSkill.objects.filter(platform=created_platform, skill=skill).exists()
         )
@@ -2777,7 +2927,6 @@ class PlatformPageTests(TestCase):
         platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
-            max_skills=10,
         )
 
         response = self.client.post(
@@ -2791,7 +2940,6 @@ class PlatformPageTests(TestCase):
                 "form-0-id": str(platform.pk),
                 "form-0-name": platform.name,
                 "form-0-url": platform.url,
-                "form-0-max_skills": str(platform.max_skills),
                 "delete_platform": str(platform.pk),
             },
         )
@@ -2890,9 +3038,20 @@ class ProfessionalPageTests(TestCase):
             f'name="pass_professional" value="{professional.pk}"',
             html=False,
         )
-        self.assertContains(response, "15 days")
-        self.assertNotContains(response, "15 days, 0:00:00")
+        self.assertContains(response, "0.5 months")
+        self.assertNotContains(response, "15 days")
         self.assertContains(response, '<tr style="background: #f4cccc;">', html=False)
+
+    def test_professionals_wait_column_displays_months(self):
+        Professional.objects.create(
+            name="Ada Lovelace",
+            wait=timedelta(days=15),
+        )
+
+        response = self.client.get(reverse("professionals"))
+
+        self.assertContains(response, "0.5 months")
+        self.assertNotContains(response, "15 days")
 
     def test_professionals_add_button_creates_professional(self):
         response = self.client.post(
@@ -3908,7 +4067,14 @@ class ProfessionalPageTests(TestCase):
 
 
 class CompanyPageTests(TestCase):
-    def test_companies_page_paginates_ten_companies_per_page(self):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
+    def test_companies_page_paginates_one_company_per_page_with_arrow_navigation(self):
         companies = [
             Company(name=f"Company {index:02d}") for index in range(1, 12)
         ]
@@ -3917,12 +4083,22 @@ class CompanyPageTests(TestCase):
         first_page = self.client.get(reverse("companies"))
         second_page = self.client.get(reverse("companies"), {"page": 2})
 
-        self.assertContains(first_page, "Company 10")
-        self.assertNotContains(first_page, "Company 11")
-        self.assertContains(first_page, "Page 1 of 2")
-        self.assertContains(second_page, "Company 11")
+        self.assertContains(first_page, "Company 01")
+        self.assertNotContains(first_page, "Company 02")
+        self.assertContains(first_page, "Company 1 of 11")
+        self.assertContains(
+            first_page,
+            '?page=2" aria-label="Next company"',
+            html=False,
+        )
+        self.assertContains(second_page, "Company 02")
         self.assertNotContains(second_page, "Company 01")
-        self.assertContains(second_page, "Page 2 of 2")
+        self.assertContains(second_page, "Company 2 of 11")
+        self.assertContains(
+            second_page,
+            '?page=1" aria-label="Previous company"',
+            html=False,
+        )
 
     def test_companies_page_displays_companies_and_add_modal(self):
         company = Company.objects.create(
@@ -3946,6 +4122,7 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, "Job Search")
         self.assertContains(response, "Search Terms")
         self.assertContains(response, "Yes")
+        self.assertContains(response, "Job Search Paths")
 
     def test_companies_page_creates_company_from_modal_form(self):
         active_search_term = SearchTerm.objects.create(term="Python")
@@ -3964,7 +4141,7 @@ class CompanyPageTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, reverse("companies"))
+        self.assertRedirects(response, f"{reverse('companies')}?page=1")
         company = Company.objects.get(name="New Company")
         self.assertTrue(
             SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
@@ -4009,7 +4186,7 @@ class CompanyPageTests(TestCase):
                 "save_company": company.pk,
             },
         )
-        self.assertRedirects(save_response, reverse("companies"))
+        self.assertRedirects(save_response, f"{reverse('companies')}?page=1")
         company.refresh_from_db()
         self.assertEqual(company.name, "Analytical Engines Updated")
         self.assertFalse(company.job_search_enabled)
@@ -4019,14 +4196,14 @@ class CompanyPageTests(TestCase):
             reverse("companies"),
             {"delete_company": company.pk},
         )
-        self.assertRedirects(delete_response, reverse("companies"))
+        self.assertRedirects(delete_response, f"{reverse('companies')}?page=1")
         self.assertFalse(Company.objects.filter(pk=company.pk).exists())
 
     def test_companies_page_edit_returns_to_current_page(self):
         Company.objects.bulk_create(
-            [Company(name=f"Company {index:02d}") for index in range(1, 12)]
+            [Company(name=f"Company {index:02d}") for index in range(1, 3)]
         )
-        company = Company.objects.get(name="Company 11")
+        company = Company.objects.get(name="Company 02")
 
         response = self.client.post(
             f"{reverse('companies')}?page=2",
@@ -4045,6 +4222,99 @@ class CompanyPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('companies')}?page=2")
         company.refresh_from_db()
         self.assertEqual(company.name, "Company Updated")
+
+    def test_companies_page_shows_and_edits_current_company_search_paths(self):
+        company = Company.objects.create(name="Alpha Company")
+        other_company = Company.objects.create(name="Beta Company")
+        python_term = SearchTerm.objects.create(term="Python")
+        django_term = SearchTerm.objects.create(term="Django")
+        lower_probability_path = SearchPath.objects.create(
+            company=company,
+            search_term=django_term,
+        )
+        higher_probability_path = SearchPath.objects.create(
+            company=company,
+            search_term=python_term,
+        )
+        other_path = SearchPath.objects.create(
+            company=other_company,
+            search_term=SearchTerm.objects.create(term="Other"),
+        )
+        job_posting = JobPosting.objects.create(
+            title="Engineer",
+            company_name="Example",
+        )
+        SearchObservation.objects.create(
+            search_path=higher_probability_path,
+            job_posting=job_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=higher_probability_path,
+            job_posting=job_posting,
+            complete=True,
+        )
+
+        response = self.client.get(reverse("companies"))
+        content = response.content.decode()
+
+        self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Success Probability")
+        self.assertContains(
+            response,
+            f'data-target="edit-company-search-path-modal-{higher_probability_path.pk}"',
+            html=False,
+        )
+        self.assertNotContains(response, str(other_path))
+        self.assertLess(content.index("Python"), content.index("Django"))
+
+        save_response = self.client.post(
+            reverse("companies"),
+            {
+                "page": "1",
+                f"company-search-path-{lower_probability_path.pk}-id": str(
+                    lower_probability_path.pk
+                ),
+                f"company-search-path-{lower_probability_path.pk}-url": "https://jobs.example.com",
+                f"company-search-path-{lower_probability_path.pk}-active": "on",
+                "save_company_search_path": str(lower_probability_path.pk),
+            },
+        )
+
+        self.assertRedirects(save_response, f"{reverse('companies')}?page=1")
+        lower_probability_path.refresh_from_db()
+        self.assertEqual(lower_probability_path.url, "https://jobs.example.com")
+
+    def test_company_search_form_selects_company_from_filtered_datalist(self):
+        first_company = Company.objects.create(name="Alpha Company")
+        selected_company = Company.objects.create(name="Beta Company")
+
+        default_response = self.client.get(reverse("companies"))
+        response = self.client.get(
+            reverse("companies"),
+            {"company_id": selected_company.pk},
+        )
+
+        self.assertIsNone(default_response.context["searched_company"])
+        self.assertContains(
+            default_response,
+            'id="company-search"\n            type="text"\n            list="company-search-options"\n            value=""',
+            html=False,
+        )
+        self.assertContains(response, "Search Company")
+        self.assertContains(
+            response,
+            'id="company-search"',
+            html=False,
+        )
+        self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
+        self.assertContains(
+            response,
+            f'<option value="{selected_company.name}" data-company-id="{selected_company.pk}">',
+            html=False,
+        )
+        self.assertEqual(response.context["selected_company"], selected_company)
+        self.assertNotEqual(response.context["selected_company"], first_company)
 
 
 class SearchTermsPageTests(TestCase):
@@ -6265,6 +6535,24 @@ class JobSearchPageTests(TestCase):
 
 
 class RecruiterPageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
+    def test_recruiters_wait_column_displays_months(self):
+        Recruiter.objects.create(
+            name="Ada Recruiter",
+            wait=timedelta(days=15),
+        )
+
+        response = self.client.get(reverse("recruiters"))
+
+        self.assertContains(response, "0.5 months")
+        self.assertNotContains(response, "15 days")
+
     def test_recruiters_page_adds_recruiter_and_selects_it(self):
         response = self.client.post(
             reverse("recruiters"),
@@ -6381,8 +6669,97 @@ class RecruiterPageTests(TestCase):
         mock_sync.assert_not_called()
 
 
+class DirectionsPageTests(TestCase):
+    def setUp(self):
+        self.administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.professional = Professional.objects.create(name="Ada Lovelace")
+        self.recruiter = Recruiter.objects.create(name="Grace Hopper")
+
+    def test_directions_are_grouped_and_sorted_by_meeting_date(self):
+        later_connection = Connect.objects.create(
+            professional=self.professional,
+            meeting_at=datetime(2026, 9, 16, 9, 0, tzinfo=UTC),
+        )
+        earlier_connection = Connect.objects.create(
+            recruiter=self.recruiter,
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=UTC),
+        )
+        undated_connection = Connect.objects.create(professional=self.professional)
+        later = Direction.objects.create(
+            connect=later_connection,
+            description="Later unresolved direction",
+        )
+        earlier = Direction.objects.create(
+            connect=earlier_connection,
+            description="Earlier unresolved direction",
+        )
+        undated = Direction.objects.create(
+            connect=undated_connection,
+            description="Undated unresolved direction",
+        )
+        resolved = Direction.objects.create(
+            connect=earlier_connection,
+            description="Resolved direction",
+            resolved=True,
+        )
+        self.client.force_login(self.administrator)
+
+        response = self.client.get(reverse("directions"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<h1>Directions</h1>", html=False)
+        self.assertContains(response, "<th>Edit</th>", html=False)
+        self.assertContains(response, 'class="edit-direction-button"', html=False)
+        self.assertContains(response, 'id="edit-direction-modal"', html=False)
+        self.assertContains(response, "Ada Lovelace")
+        self.assertContains(response, "Grace Hopper")
+        self.assertNotContains(response, "Professional: Ada Lovelace")
+        self.assertNotContains(response, "Recruiter: Grace Hopper")
+        self.assertEqual(
+            response.context["unresolved_directions"],
+            [earlier, later, undated],
+        )
+        self.assertEqual(response.context["resolved_directions"], [resolved])
+
+        update_response = self.client.post(
+            reverse("directions"),
+            {
+                "direction_id": earlier.pk,
+                "description": "Updated direction",
+                "resolved": "on",
+            },
+        )
+
+        self.assertRedirects(update_response, reverse("directions"))
+        earlier.refresh_from_db()
+        self.assertEqual(earlier.description, "Updated direction")
+        self.assertTrue(earlier.resolved)
+
+        delete_response = self.client.post(
+            reverse("directions"),
+            {
+                "direction_id": later.pk,
+                "delete_direction": "1",
+            },
+        )
+
+        self.assertRedirects(delete_response, reverse("directions"))
+        self.assertFalse(Direction.objects.filter(pk=later.pk).exists())
+
+    def test_directions_page_requires_career_administrator(self):
+        self.assertEqual(self.client.get(reverse("directions")).status_code, 403)
+
+
 class ConnectionsCalendarTests(TestCase):
     def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
         self.professional = Professional.objects.create(name="Calendar Professional")
 
     def test_connections_page_includes_editable_fullcalendar(self):
@@ -6393,6 +6770,7 @@ class ConnectionsCalendarTests(TestCase):
         self.assertContains(response, 'data-date-mode="meeting"')
         self.assertContains(response, 'data-date-mode="invite-professionals"')
         self.assertContains(response, 'data-date-mode="invite-recruiters"')
+        self.assertContains(response, 'data-date-mode="to-review"')
         self.assertContains(response, 'id="connections-weekly-total"')
         self.assertContains(response, "invite-date-mode")
         self.assertContains(response, "FullCalendar.Calendar")
@@ -6510,6 +6888,9 @@ class ConnectionsCalendarTests(TestCase):
             "meeting": {"status": "updated", "message": "Meeting updated."},
         }
         csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(
+            get_user_model().objects.get(username=settings.CAREER_ADMIN_USERNAME)
+        )
         page_response = csrf_client.get(reverse("connections"))
         csrf_token = page_response.cookies["csrftoken"].value
         updated_at = datetime(2026, 9, 20, 18, 45, tzinfo=UTC)
@@ -6712,6 +7093,82 @@ class ConnectionsCalendarTests(TestCase):
             [event["id"] for event in recruiter_response.json()],
             [str(recruiter_invite.pk)],
         )
+
+    def test_connection_events_to_review_includes_incomplete_meetings_in_order(self):
+        first = Connect.objects.create(
+            professional=self.professional,
+            description="Needs notes",
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=UTC),
+            rating=4,
+            notes="",
+        )
+        second = Connect.objects.create(
+            professional=self.professional,
+            description="Needs rating",
+            meeting_at=datetime(2026, 9, 16, 9, 0, tzinfo=UTC),
+            notes="Complete notes",
+        )
+        Connect.objects.create(
+            professional=self.professional,
+            description="Reviewed",
+            meeting_at=datetime(2026, 9, 17, 9, 0, tzinfo=UTC),
+            rating=5,
+            notes="Complete notes",
+        )
+        Connect.objects.create(
+            professional=self.professional,
+            description="No meeting",
+            rating=None,
+            notes="",
+        )
+
+        response = self.client.get(
+            reverse("connection_events"),
+            {"date_mode": "to-review"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [event["id"] for event in response.json()],
+            [str(first.pk), str(second.pk)],
+        )
+
+    @patch("app.views.sync_professional_connect")
+    def test_connection_to_review_mode_saves_as_a_meeting(self, mock_sync):
+        connection = Connect.objects.create(
+            professional=self.professional,
+            meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=UTC),
+        )
+        mock_sync.return_value = {
+            "meeting": {"status": "updated", "message": "Meeting updated."},
+        }
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(
+            get_user_model().objects.get(username=settings.CAREER_ADMIN_USERNAME)
+        )
+        page_response = csrf_client.get(reverse("connections"))
+
+        response = csrf_client.post(
+            reverse("update_connection_meeting"),
+            data=json.dumps(
+                {
+                    "id": connection.pk,
+                    "date_mode": "to-review",
+                    "start": "2026-09-15T09:00:00",
+                    "meeting_end": "2026-09-15T10:00:00",
+                    "rating": 5,
+                    "notes": "Completed follow-up notes.",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=page_response.cookies["csrftoken"].value,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(connection.rating, 5)
+        self.assertEqual(connection.notes, "Completed follow-up notes.")
+        mock_sync.assert_called_once_with(connection)
 
     def test_connection_weekly_total_uses_the_active_date_mode(self):
         today = timezone.localdate()
@@ -7175,6 +7632,13 @@ class GmailServiceTests(TestCase):
 
 
 class SkillPageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
     def test_skills_page_shows_add_delete_header_and_add_button(self):
         Skill.objects.create(name="Python", type="Language")
 
@@ -7182,8 +7646,11 @@ class SkillPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Resume")
-        self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "Delete")
+        self.assertContains(response, "<th>Save</th>", html=False)
         self.assertContains(response, "Skill 1 of 1")
+        self.assertContains(response, 'id="open-add-skill-modal"', html=False)
+        self.assertContains(response, 'id="add-skill-modal"', html=False)
         self.assertContains(response, 'name="add_skill" value="1"', html=False)
         self.assertContains(response, 'name="delete_skill"', html=False)
         self.assertContains(response, 'name="new-resume_ready"', html=False)
@@ -8105,7 +8572,11 @@ class SkillPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Invalid Name")
-        self.assertContains(response, 'style="color: red;"', html=False)
+        self.assertNotContains(
+            response,
+            'id="add-skill-modal" class="skill-add-modal" role="dialog" aria-modal="true" aria-labelledby="add-skill-modal-title" hidden',
+            html=False,
+        )
         self.assertEqual(Skill.objects.filter(name="Existing Skill").count(), 1)
         self.assertEqual(Skill.objects.count(), 1)
 
@@ -8192,6 +8663,13 @@ class SkillPageTests(TestCase):
 
 
 class FeaturePageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
     def test_features_page_shows_single_existing_feature_row_with_pagination_and_search(self):
         first_feature = Feature.objects.create(
             name="Auth",
@@ -8213,7 +8691,16 @@ class FeaturePageTests(TestCase):
         self.assertContains(response, "<h1>Features</h1>", html=False)
         self.assertContains(response, "Due Date")
         self.assertContains(response, "Add/Delete")
+        self.assertContains(response, "<th>Save</th>", html=False)
         self.assertContains(response, "Search Feature")
+        self.assertContains(response, 'id="open-add-feature-modal"', html=False)
+        self.assertContains(response, 'id="add-feature-modal"', html=False)
+        self.assertContains(response, "Create Feature")
+        self.assertContains(response, 'name="new-name"', html=False)
+        self.assertContains(response, 'autocomplete="new-password"', html=False)
+        self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
+        self.assertContains(response, 'data-dashlane-autofill="false"', html=False)
+        self.assertContains(response, 'data-dashlane-disabled-on-field="true"', html=False)
         self.assertContains(response, 'name="add_feature" value="1"', html=False)
         self.assertContains(response, f'name="delete_feature" value="{second_feature.pk}"', html=False)
         self.assertNotContains(response, f'name="delete_feature" value="{first_feature.pk}"', html=False)

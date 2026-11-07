@@ -82,41 +82,9 @@
         transform: translateX(1.05rem);
     }
 
-    .summary-selector {
-        position: fixed;
-        top: 1rem;
-        right: 11.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.35rem 0.6rem;
-        border: 1px solid #7d7d7d;
-        border-radius: 999px;
-        background: #f2f2f2;
-        color: #222;
-        font-size: 0.9rem;
-    }
-
-    .summary-selector select {
-        border: 1px solid #7d7d7d;
-        border-radius: 999px;
-        background: #ffffff;
-        color: #222;
-        padding: 0.2rem 0.7rem;
-        font-size: 0.9rem;
-    }
-
     .contact-off .contact-item,
     .contact-off .contact-separator {
         display: none;
-    }
-
-    .summary-copy {
-        display: none;
-    }
-
-    .summary-copy.is-visible {
-        display: block;
     }
 
     .resume-section-heading {
@@ -154,7 +122,6 @@
         .sidebar,
         .resume-download-button,
         .contact-toggle,
-        .summary-selector,
         .resume-more-details-button {
             display: none !important;
         }
@@ -200,13 +167,6 @@
             margin-bottom: 0.35rem;
         }
 
-        .resume-summary {
-            display: block !important;
-        }
-
-        .platform-summary {
-            display: none !important;
-        }
     }
 </style>
 
@@ -227,16 +187,6 @@
         <span class="contact-toggle-slider" aria-hidden="true"></span>
     </label>
 {% endif %}
-
-<label class="summary-selector" for="summary-view-select">
-    <span>View Summary</span>
-    <select id="summary-view-select" aria-label="View Summary">
-        <option value="resume">Resume Summary</option>
-        {% if profile.platform_summary %}
-            <option value="platform">Platform Summary</option>
-        {% endif %}
-    </select>
-</label>
 
 <main class="resume-page contact-off" id="resume-page">
 
@@ -271,11 +221,8 @@
 
     <section>
         <h2>Summary</h2>
-        <p class="summary-copy resume-summary is-visible" id="resume-summary">
+        <p class="resume-summary">
             {{ profile.resume_summary }}
-        </p>
-        <p class="summary-copy platform-summary" id="platform-summary">
-            {{ profile.platform_summary|linebreaksbr }}
         </p>
     </section>
 
@@ -436,30 +383,12 @@
     const contactModeToggle = document.getElementById("contact-mode-toggle");
     const resumePage = document.getElementById("resume-page");
     const resumeDownloadButton = document.getElementById("resume-download-button");
-    const summaryViewSelect = document.getElementById("summary-view-select");
-    const resumeSummary = document.getElementById("resume-summary");
-    const platformSummary = document.getElementById("platform-summary");
     const originalTitle = document.title;
 
     if (contactModeToggle && resumePage) {
         contactModeToggle.addEventListener("change", () => {
             resumePage.classList.toggle("contact-off", !contactModeToggle.checked);
         });
-    }
-
-    const updateVisibleSummary = () => {
-        if (!summaryViewSelect || !resumeSummary || !platformSummary) {
-            return;
-        }
-
-        const showPlatform = summaryViewSelect.value === "platform";
-        resumeSummary.classList.toggle("is-visible", !showPlatform);
-        platformSummary.classList.toggle("is-visible", showPlatform);
-    };
-
-    if (summaryViewSelect) {
-        summaryViewSelect.addEventListener("change", updateVisibleSummary);
-        updateVisibleSummary();
     }
 
     const getResumeTitle = () => (

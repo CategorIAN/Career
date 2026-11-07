@@ -693,11 +693,6 @@ class Platform(models.Model):
         blank=True,
     )
 
-    max_skills = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-    )
-
     skills = models.ManyToManyField(
         "Skill",
         through="PlatformSkill",

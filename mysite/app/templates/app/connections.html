@@ -10,6 +10,7 @@
             <button type="button" class="date-mode-button active" data-date-mode="meeting">Meeting Date</button>
             <button type="button" class="date-mode-button" data-date-mode="invite-professionals">Invite Professionals</button>
             <button type="button" class="date-mode-button" data-date-mode="invite-recruiters">Invite Recruiters</button>
+            <button type="button" class="date-mode-button" data-date-mode="to-review">To Review</button>
         </div>
         <strong id="connections-weekly-total">Connections this week: 0</strong>
     </div>
@@ -81,7 +82,7 @@
         const weeklyTotal = document.getElementById("connections-weekly-total");
         let selectedEvent = null;
         let dateMode = "meeting";
-        const isInviteMode = () => dateMode !== "meeting";
+        const isInviteMode = () => dateMode.startsWith("invite");
 
         const closeEditModal = () => {
             editModal.classList.add("hidden");

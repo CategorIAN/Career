@@ -66,6 +66,7 @@ urlpatterns = [
         name="update_job_posting_apply_to",
     ),
     path("connections/", views.connections_view, name="connections"),
+    path("directions/", views.directions_view, name="directions"),
     path("connections/events/", views.connection_events_view, name="connection_events"),
     path(
         "connections/weekly-total/",

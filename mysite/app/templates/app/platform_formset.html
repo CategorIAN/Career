@@ -4,7 +4,76 @@
 
 {% block content %}
 <section class="utility-page">
-    <h1>Platforms</h1>
+    <style>
+        .platform-page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .platform-add-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1001;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .platform-add-modal[hidden] {
+            display: none;
+        }
+
+        .platform-add-modal-content {
+            position: relative;
+            width: min(32rem, 100%);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+        }
+
+        .platform-add-modal-close {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.75rem;
+            border: 0;
+            background: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .platform-add-form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .platform-add-form label {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .platform-add-form-error {
+            margin: 0;
+            color: #9b1c1c;
+        }
+
+        .platform-search-path-form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .platform-search-path-form label {
+            display: grid;
+            gap: 0.35rem;
+        }
+    </style>
+    <div class="platform-page-header">
+        <h1>Platforms</h1>
+        <button type="button" id="open-add-platform-modal">Add Platform</button>
+    </div>
 <form method="post">
     {% csrf_token %}
     {{ formset.management_form }}
@@ -14,33 +83,12 @@
             <tr>
                 <th>Name</th>
                 <th>URL</th>
-                <th>Max Skills</th>
                 <th>Job Search Enabled</th>
-                <th>Add/Delete</th>
+                <th>Delete</th>
+                <th>Save</th>
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td>
-                    {{ new_form.name.errors }}
-                    {{ new_form.name }}
-                </td>
-                <td>
-                    {{ new_form.url.errors }}
-                    {{ new_form.url }}
-                </td>
-                <td>
-                    {{ new_form.max_skills.errors }}
-                    {{ new_form.max_skills }}
-                </td>
-                <td>
-                    {{ new_form.job_search_enabled.errors }}
-                    {{ new_form.job_search_enabled }}
-                </td>
-                <td>
-                    <button type="submit" name="add_platform" value="1">Add</button>
-                </td>
-            </tr>
             {% for form in formset %}
                 <tr>
                     {% for hidden in form.hidden_fields %}
@@ -55,30 +103,172 @@
                         {{ form.url }}
                     </td>
                     <td>
-                        {{ form.max_skills.errors }}
-                        {{ form.max_skills }}
-                    </td>
-                    <td>
                         {{ form.job_search_enabled.errors }}
                         {{ form.job_search_enabled }}
                     </td>
                     <td>
                         <button type="submit" name="delete_platform" value="{{ form.instance.pk }}">Delete</button>
                     </td>
+                    <td>
+                        <button type="submit">Save</button>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
-    <button type="submit">Save</button>
 </form>
-<div style="margin-top: 1rem;">
+<div id="add-platform-modal" class="platform-add-modal" role="dialog" aria-modal="true" aria-labelledby="add-platform-modal-title"{% if not new_form.errors %} hidden{% endif %}>
+    <div class="platform-add-modal-content">
+        <button type="button" class="platform-add-modal-close" aria-label="Close">&times;</button>
+        <h2 id="add-platform-modal-title">Add Platform</h2>
+        <form method="post" class="platform-add-form">
+            {% csrf_token %}
+            <input type="hidden" name="add_platform" value="1">
+            <input type="hidden" name="page" value="{{ page_obj.number }}">
+            {{ new_form.non_field_errors }}
+            {% for field in new_form.visible_fields %}
+                <label for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {{ field }}
+                </label>
+                {% for error in field.errors %}<p class="platform-add-form-error">{{ error }}</p>{% endfor %}
+            {% endfor %}
+            <div style="display: flex; gap: 0.75rem;">
+                <button type="submit">Create Platform</button>
+                <button type="button" class="platform-add-modal-cancel">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div style="margin-top: 1rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
     {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        <a href="?page={{ page_obj.previous_page_number }}" aria-label="Previous platform">&larr;</a>
     {% endif %}
-    <span> Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} </span>
+    <span>Platform {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}">Next</a>
+        <a href="?page={{ page_obj.next_page_number }}" aria-label="Next platform">&rarr;</a>
     {% endif %}
 </div>
+{% if selected_platform %}
+    <section style="margin-top: 1.5rem;">
+        <h2>Job Search Paths</h2>
+        <table border="1" cellpadding="8" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Search Term</th>
+                    <th>Active</th>
+                    <th>Success Probability</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for search_path in platform_search_paths %}
+                    <tr>
+                        <td>
+                            {% if search_path.effective_url %}
+                                <a href="{{ search_path.effective_url }}" target="_blank" rel="noopener noreferrer">{{ search_path }}</a>
+                            {% else %}
+                                {{ search_path }}
+                            {% endif %}
+                        </td>
+                        <td>{% if search_path.search_term %}{{ search_path.search_term }}{% endif %}</td>
+                        <td>{{ search_path.active|yesno:"Yes,No" }}</td>
+                        <td>{{ search_path.page_success_probability|floatformat:2 }}</td>
+                        <td>
+                            <button type="button" class="open-platform-search-path-modal" data-target="edit-platform-search-path-modal-{{ search_path.pk }}">Edit</button>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">No job search paths for this platform.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endif %}
 </section>
+{% for search_path, search_path_form in platform_search_path_forms %}
+    <div id="edit-platform-search-path-modal-{{ search_path.pk }}" class="platform-add-modal platform-search-path-modal" role="dialog" aria-modal="true" aria-labelledby="edit-platform-search-path-modal-title-{{ search_path.pk }}"{% if show_edit_platform_search_path_id != search_path.pk %} hidden{% endif %}>
+        <div class="platform-add-modal-content">
+            <button type="button" class="platform-add-modal-close platform-search-path-modal-close" aria-label="Close">&times;</button>
+            <h2 id="edit-platform-search-path-modal-title-{{ search_path.pk }}">Edit Job Search Path</h2>
+            <form method="post" class="platform-search-path-form">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                {{ search_path_form.non_field_errors }}
+                {% for field in search_path_form.visible_fields %}
+                    <label for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                        {{ field }}
+                    </label>
+                    {% for error in field.errors %}<p class="platform-add-form-error">{{ error }}</p>{% endfor %}
+                {% endfor %}
+                <button type="submit" name="save_platform_search_path" value="{{ search_path.pk }}">Save</button>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+<script>
+    (() => {
+        const modal = document.getElementById("add-platform-modal");
+        const openButton = document.getElementById("open-add-platform-modal");
+        const closeButton = modal?.querySelector(".platform-add-modal-close");
+        const cancelButton = modal?.querySelector(".platform-add-modal-cancel");
+
+        if (!modal || !openButton || !closeButton) {
+            return;
+        }
+
+        const closeModal = () => modal.setAttribute("hidden", "");
+        openButton.addEventListener("click", () => modal.removeAttribute("hidden"));
+        closeButton.addEventListener("click", closeModal);
+        cancelButton?.addEventListener("click", closeModal);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
+                closeModal();
+            }
+        });
+
+        window.setTimeout(() => {
+            modal.querySelectorAll(".autofill-blocked").forEach(input => {
+                input.removeAttribute("readonly");
+            });
+        });
+    })();
+
+    (() => {
+        const modals = document.querySelectorAll(".platform-search-path-modal");
+        const closeModal = modal => modal.setAttribute("hidden", "");
+
+        document.querySelectorAll(".open-platform-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => {
+                const modal = document.getElementById(button.dataset.target);
+                modal?.removeAttribute("hidden");
+            });
+        });
+        modals.forEach(modal => {
+            modal.querySelector(".platform-search-path-modal-close")?.addEventListener(
+                "click",
+                () => closeModal(modal),
+            );
+            modal.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                modals.forEach(closeModal);
+            }
+        });
+    })();
+</script>
 {% endblock %}

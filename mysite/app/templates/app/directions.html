@@ -1,0 +1,166 @@
+{% extends "app/base.html" %}
+
+{% block title %}Directions{% endblock %}
+
+{% block content %}
+<section class="directions-page">
+    <h1>Directions</h1>
+
+    {% for heading, directions in direction_groups %}
+    <section class="directions-group">
+        <h2>{{ heading }}</h2>
+        {% if directions %}
+        <table class="project-results">
+            <thead>
+                <tr>
+                    <th>Meeting Date</th>
+                    <th>Given By</th>
+                    <th>Direction</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for direction in directions %}
+                <tr>
+                    <td>
+                        {% if direction.connect.meeting_at %}
+                            {{ direction.connect.meeting_at|date:"M j, Y, g:i A" }}
+                        {% else %}
+                            No meeting date
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if direction.connect.professional %}
+                            {{ direction.connect.professional.name }}
+                        {% elif direction.connect.recruiter %}
+                            {{ direction.connect.recruiter.name }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </td>
+                    <td>{{ direction.description }}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="edit-direction-button"
+                            data-direction-id="{{ direction.pk }}"
+                            data-description="{{ direction.description }}"
+                            data-resolved="{% if direction.resolved %}true{% else %}false{% endif %}"
+                        >Edit</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No {{ heading|lower }} directions.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+</section>
+
+<div id="edit-direction-modal" class="direction-edit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="edit-direction-title">
+    <form method="post" class="direction-edit-dialog">
+        {% csrf_token %}
+        <input id="edit-direction-id" type="hidden" name="direction_id">
+        <h2 id="edit-direction-title">Edit Direction</h2>
+        <label for="edit-direction-description">Direction</label>
+        <textarea id="edit-direction-description" name="description" rows="5" required></textarea>
+        <label class="direction-resolved-label" for="edit-direction-resolved">
+            <input id="edit-direction-resolved" type="checkbox" name="resolved">
+            Resolved
+        </label>
+        <div class="direction-edit-actions">
+            <button type="submit" name="delete_direction" value="1" class="direction-delete-button">Delete</button>
+            <button type="button" id="cancel-direction-edit">Cancel</button>
+            <button type="submit">Save</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const modal = document.getElementById("edit-direction-modal");
+        const directionIdInput = document.getElementById("edit-direction-id");
+        const descriptionInput = document.getElementById("edit-direction-description");
+        const resolvedInput = document.getElementById("edit-direction-resolved");
+
+        const closeModal = () => modal.classList.add("hidden");
+
+        document.querySelectorAll(".edit-direction-button").forEach(button => {
+            button.addEventListener("click", () => {
+                directionIdInput.value = button.dataset.directionId;
+                descriptionInput.value = button.dataset.description;
+                resolvedInput.checked = button.dataset.resolved === "true";
+                modal.classList.remove("hidden");
+                descriptionInput.focus();
+            });
+        });
+
+        document.getElementById("cancel-direction-edit").addEventListener("click", closeModal);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+    });
+</script>
+
+<style>
+    .directions-page {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .directions-page h1 {
+        margin-top: 0;
+    }
+
+    .directions-group {
+        margin-top: 1.5rem;
+    }
+
+    .direction-edit-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .direction-edit-dialog {
+        display: grid;
+        gap: 0.75rem;
+        width: min(480px, 100%);
+        padding: 1.25rem;
+        border-radius: 10px;
+        background: #ffffff;
+    }
+
+    .direction-edit-dialog h2 {
+        margin: 0;
+    }
+
+    .direction-resolved-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .direction-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .direction-delete-button {
+        margin-right: auto;
+        border-color: #b91c1c;
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+{% endblock %}

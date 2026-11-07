@@ -588,7 +588,7 @@ SkillFormSet = modelformset_factory(
 class PlatformForm(forms.ModelForm):
     class Meta:
         model = Platform
-        fields = ["name", "url", "max_skills", "job_search_enabled"]
+        fields = ["name", "url", "job_search_enabled"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -597,6 +597,27 @@ class PlatformForm(forms.ModelForm):
 
     def clean_name(self):
         return self.cleaned_data.get("name") or ""
+
+
+class PlatformCreateForm(PlatformForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].required = True
+        for field_name in ("name", "url"):
+            self.fields[field_name].widget.attrs.update(
+                {
+                    "autocomplete": "new-password",
+                    "class": "autofill-blocked",
+                    "data-form-type": "other",
+                    "data-lpignore": "true",
+                    "data-1p-ignore": "true",
+                    "data-bwignore": "true",
+                    "data-dashlane-ignore": "true",
+                    "data-dashlane-autofill": "false",
+                    "data-dashlane-disabled-on-field": "true",
+                    "readonly": "readonly",
+                }
+            )
 
 
 PlatformFormSet = modelformset_factory(
@@ -794,6 +815,26 @@ class FeatureForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
+
+
+class FeatureCreateForm(FeatureForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].required = True
+        self.fields["name"].widget.attrs.update(
+            {
+                "autocomplete": "new-password",
+                "class": "autofill-blocked",
+                "data-form-type": "other",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+                "data-bwignore": "true",
+                "data-dashlane-ignore": "true",
+                "data-dashlane-autofill": "false",
+                "data-dashlane-disabled-on-field": "true",
+                "readonly": "readonly",
+            }
+        )
 
 
 FeatureFormSet = modelformset_factory(

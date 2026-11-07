@@ -54,10 +54,12 @@ from .forms import (
     EducationEditForm,
     FeatureForm,
     FeatureFormSet,
+    FeatureCreateForm,
     FeatureLinkForm,
     FeatureLinkFormSet,
     JobPostingCreateForm,
     JobPostingForm,
+    PlatformCreateForm,
     PlatformForm,
     PlatformFeatureFormSet,
     PlatformFormSet,
@@ -77,6 +79,7 @@ from .forms import (
     RoleDetailsEditForm,
     RoleSkillsEditForm,
     RoleTaskEditFormSet,
+    SearchPathForm,
     SearchPathFormSet,
     SearchTermForm,
     SkillForm,
@@ -720,6 +723,7 @@ def skill_formset_view(request):
     selected_skill = None
     selected_platform = all_platforms.filter(pk=selected_platform_id).first() if selected_platform_id else None
     is_filtered = False
+    show_add_skill_modal = False
 
     if selected_skill_id:
         selected_skill = all_skills.filter(pk=selected_skill_id).first()
@@ -879,6 +883,7 @@ def skill_formset_view(request):
                     add_redirect_params["platform_id"] = selected_platform.pk
                 return redirect(_build_redirect_url(add_redirect_params))
             invalid_name_message = "Invalid Name"
+            show_add_skill_modal = True
         elif delete_skill_id:
             Skill.objects.filter(pk=delete_skill_id).delete()
             delete_redirect_params = {}
@@ -1020,6 +1025,7 @@ def skill_formset_view(request):
             "selected_platform_id": selected_platform_id,
             "is_filtered": is_filtered,
             "invalid_name_message": invalid_name_message,
+            "show_add_skill_modal": show_add_skill_modal,
             "roles_with_skill": roles_with_skill,
             "roles_without_skill": roles_without_skill,
             "projects_with_skill": projects_with_skill,
@@ -1035,18 +1041,114 @@ def skill_formset_view(request):
         },
     )
 
+def _search_paths_with_success_probability(source):
+    completed_observation_filter = Q(observations__complete=True) & ~Q(
+        observations__job_posting__expired=True
+    )
+    successful_observation_filter = (
+        completed_observation_filter
+        & Q(observations__job_posting__isnull=False)
+        & ~Q(observations__job_posting__apply_to=False)
+        & (
+            Q(observations__job_posting__application__isnull=True)
+            | (
+                Q(observations__job_posting__application__stop_reason="")
+                & (
+                    Q(
+                        observations__job_posting__application__outcome__in=[
+                            Application.Outcome.IN_PROCESS,
+                            Application.Outcome.ACCEPTED,
+                        ]
+                    )
+                    | Q(
+                        observations__job_posting__application__outcome=Application.Outcome.REJECTED,
+                        observations__job_posting__application__stage__in=[
+                            Application.Stage.ASSESSED,
+                            Application.Stage.INTERVIEWED,
+                        ],
+                    )
+                )
+            )
+        )
+    )
+    if source is None:
+        return []
+
+    search_paths = list(
+        source.search_paths.select_related("company", "platform", "search_term")
+        .annotate(
+            page_observation_count=Count(
+                "observations",
+                filter=completed_observation_filter,
+            ),
+            page_success_count=Count(
+                "observations",
+                filter=successful_observation_filter,
+            ),
+        )
+    )
+    for search_path in search_paths:
+        search_path.page_success_probability = (
+            search_path.page_success_count + 1
+        ) / (search_path.page_observation_count + 2)
+    search_paths.sort(
+        key=lambda search_path: (
+            -search_path.page_success_probability,
+            str(search_path).casefold(),
+        )
+    )
+    return search_paths
+
+
+def _wait_months_display(wait_value):
+    if not wait_value:
+        return ""
+
+    months = wait_value.days / 30
+    formatted_months = f"{months:.2f}".rstrip("0").rstrip(".")
+    unit = "month" if months == 1 else "months"
+    return f"{formatted_months} {unit}"
+
+
 def platform_formset_view(request):
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Platform.objects.all().order_by("name")
-    paginator = Paginator(queryset, 8)
+    paginator = Paginator(queryset, 1)
     page_obj = paginator.get_page(page_number)
     page_queryset = page_obj.object_list
+    selected_platform = page_queryset.first()
+    platform_search_paths = _search_paths_with_success_probability(selected_platform)
+    show_edit_platform_search_path_id = None
+    submitted_platform_search_path_form = None
 
     if request.method == "POST":
-        new_form = PlatformForm(request.POST, prefix="new")
-        formset = PlatformFormSet(request.POST, queryset=page_queryset)
+        save_platform_search_path_id = request.POST.get(
+            "save_platform_search_path",
+            "",
+        ).strip()
         add_platform_requested = "add_platform" in request.POST
         delete_platform_id = request.POST.get("delete_platform", "").strip()
+
+        if save_platform_search_path_id:
+            platform_search_path = get_object_or_404(
+                SearchPath,
+                pk=save_platform_search_path_id,
+                platform=selected_platform,
+            )
+            submitted_platform_search_path_form = SearchPathForm(
+                request.POST,
+                instance=platform_search_path,
+                prefix=f"platform-search-path-{platform_search_path.pk}",
+            )
+            if submitted_platform_search_path_form.is_valid():
+                submitted_platform_search_path_form.save()
+                return redirect(f"{request.path}?page={page_obj.number}")
+            show_edit_platform_search_path_id = platform_search_path.pk
+            new_form = PlatformCreateForm(prefix="new")
+            formset = PlatformFormSet(queryset=page_queryset)
+        else:
+            new_form = PlatformCreateForm(request.POST, prefix="new")
+            formset = PlatformFormSet(request.POST, queryset=page_queryset)
 
         if add_platform_requested:
             if new_form.is_valid():
@@ -1054,7 +1156,7 @@ def platform_formset_view(request):
                     platform = new_form.save()
                     _create_platform_skills_for_platform(platform)
                     _create_platform_features_for_platform(platform)
-            return redirect(f"{request.path}?page={page_obj.number}")
+                return redirect(f"{request.path}?page={page_obj.number}")
         if delete_platform_id:
             Platform.objects.filter(pk=delete_platform_id).delete()
             return redirect(f"{request.path}?page={page_obj.number}")
@@ -1062,8 +1164,24 @@ def platform_formset_view(request):
             formset.save()
             return redirect(f"{request.path}?page={page_obj.number}")
     else:
-        new_form = PlatformForm(prefix="new")
+        new_form = PlatformCreateForm(prefix="new")
         formset = PlatformFormSet(queryset=page_queryset)
+
+    platform_search_path_forms = []
+    for platform_search_path in platform_search_paths:
+        search_path_form = (
+            submitted_platform_search_path_form
+            if (
+                submitted_platform_search_path_form is not None
+                and submitted_platform_search_path_form.instance.pk
+                == platform_search_path.pk
+            )
+            else SearchPathForm(
+                instance=platform_search_path,
+                prefix=f"platform-search-path-{platform_search_path.pk}",
+            )
+        )
+        platform_search_path_forms.append((platform_search_path, search_path_form))
 
     return render(
         request,
@@ -1072,6 +1190,10 @@ def platform_formset_view(request):
             "new_form": new_form,
             "formset": formset,
             "page_obj": page_obj,
+            "selected_platform": selected_platform,
+            "platform_search_paths": platform_search_paths,
+            "platform_search_path_forms": platform_search_path_forms,
+            "show_edit_platform_search_path_id": show_edit_platform_search_path_id,
         },
     )
 
@@ -1091,9 +1213,7 @@ def professional_formset_view(request):
     )
 
     for professional in all_professionals:
-        professional.wait_display = (
-            f"{professional.wait.days} days" if professional.wait else ""
-        )
+        professional.wait_display = _wait_months_display(professional.wait)
     all_professionals.sort(
         key=lambda professional: (
             not professional.invite,
@@ -1553,15 +1673,53 @@ def companies_view(request):
     show_edit_company_id = None
     submitted_edit_form = None
     submitted_edit_company_id = None
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    companies_queryset = Company.objects.order_by("name", "pk")
+    selected_company_id = request.GET.get("company_id", "").strip()
+    searched_company = None
+    if selected_company_id:
+        searched_company = companies_queryset.filter(pk=selected_company_id).first()
+        if searched_company is not None:
+            page_number = companies_queryset.filter(
+                Q(name__lt=searched_company.name)
+                | Q(name=searched_company.name, pk__lte=searched_company.pk)
+            ).count()
+
+    paginator = Paginator(companies_queryset, 1)
+    page_obj = paginator.get_page(page_number)
+    companies = list(page_obj.object_list)
+    selected_company = companies[0] if companies else None
+    all_companies = list(companies_queryset.only("pk", "name"))
+    company_search_paths = _search_paths_with_success_probability(selected_company)
+    show_edit_company_search_path_id = None
+    submitted_company_search_path_form = None
+    redirect_url = f"{reverse('companies')}?page={page_obj.number}"
+
     if request.method == "POST":
-        page_number = request.POST.get("page", "").strip()
-        redirect_url = reverse("companies")
-        if page_number:
-            redirect_url = f"{redirect_url}?page={page_number}"
         new_company_form = CompanyForm(request.POST, prefix="new-company")
         save_company_id = request.POST.get("save_company", "").strip()
         delete_company_id = request.POST.get("delete_company", "").strip()
-        if "add_company" in request.POST:
+        save_company_search_path_id = request.POST.get(
+            "save_company_search_path",
+            "",
+        ).strip()
+        if save_company_search_path_id:
+            company_search_path = get_object_or_404(
+                SearchPath,
+                pk=save_company_search_path_id,
+                company=selected_company,
+            )
+            submitted_company_search_path_form = SearchPathForm(
+                request.POST,
+                instance=company_search_path,
+                prefix=f"company-search-path-{company_search_path.pk}",
+            )
+            if submitted_company_search_path_form.is_valid():
+                submitted_company_search_path_form.save()
+                return redirect(redirect_url)
+            show_edit_company_search_path_id = company_search_path.pk
+            new_company_form = CompanyForm(prefix="new-company")
+        elif "add_company" in request.POST:
             if new_company_form.is_valid():
                 company = new_company_form.save()
                 create_company_search_paths(company)
@@ -1586,15 +1744,27 @@ def companies_view(request):
     else:
         new_company_form = CompanyForm(prefix="new-company")
 
-    paginator = Paginator(Company.objects.order_by("name", "pk"), 10)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    companies = list(page_obj.object_list)
     for company in companies:
         company.edit_form = (
             submitted_edit_form
             if company.pk == submitted_edit_company_id
             else CompanyForm(instance=company, prefix=f"edit-company-{company.pk}")
         )
+    company_search_path_forms = []
+    for company_search_path in company_search_paths:
+        search_path_form = (
+            submitted_company_search_path_form
+            if (
+                submitted_company_search_path_form is not None
+                and submitted_company_search_path_form.instance.pk
+                == company_search_path.pk
+            )
+            else SearchPathForm(
+                instance=company_search_path,
+                prefix=f"company-search-path-{company_search_path.pk}",
+            )
+        )
+        company_search_path_forms.append((company_search_path, search_path_form))
 
     return render(
         request,
@@ -1605,6 +1775,12 @@ def companies_view(request):
             "new_company_form": new_company_form,
             "show_add_modal": show_add_modal,
             "show_edit_company_id": show_edit_company_id,
+            "selected_company": selected_company,
+            "all_companies": all_companies,
+            "searched_company": searched_company,
+            "company_search_paths": company_search_paths,
+            "company_search_path_forms": company_search_path_forms,
+            "show_edit_company_search_path_id": show_edit_company_search_path_id,
         },
     )
 
@@ -2779,7 +2955,12 @@ def features_view(request):
     )
 
     if request.method == "POST":
-        new_form = FeatureForm(request.POST, prefix="new")
+        add_feature_requested = bool(request.POST.get("add_feature"))
+        new_form = (
+            FeatureCreateForm(request.POST, prefix="new")
+            if add_feature_requested
+            else FeatureCreateForm(prefix="new")
+        )
         new_link_form = FeatureLinkForm(request.POST, prefix="new-link")
         feature_formset_submitted = "form-TOTAL_FORMS" in request.POST
         feature_link_formset_submitted = "feature-links-TOTAL_FORMS" in request.POST
@@ -2816,7 +2997,6 @@ def features_view(request):
             )
         )
 
-        add_feature_requested = bool(request.POST.get("add_feature"))
         add_feature_link_requested = bool(request.POST.get("add_feature_link"))
         save_selected_feature_platform_features_requested = (
             "save_selected_feature_platform_features" in request.POST
@@ -2874,7 +3054,7 @@ def features_view(request):
                 query_string = urlencode(redirect_params)
                 return redirect(f"{request.path}?{query_string}" if query_string else request.path)
     else:
-        new_form = FeatureForm(prefix="new")
+        new_form = FeatureCreateForm(prefix="new")
         formset = FeatureFormSet(queryset=queryset)
         new_link_form = FeatureLinkForm(prefix="new-link")
         feature_link_formset = FeatureLinkFormSet(
@@ -3230,7 +3410,6 @@ def resume_view(request):
             "linkedin_url",
             "github_url",
             "resume_summary",
-            "platform_summary",
         ]
     )
     profile_by_key = {
@@ -4263,6 +4442,52 @@ def connections_view(request):
     return render(request, "app/connections.html")
 
 
+@require_http_methods(["GET", "POST"])
+def directions_view(request):
+    if request.method == "POST":
+        direction = get_object_or_404(
+            Direction,
+            pk=request.POST.get("direction_id", ""),
+        )
+        if "delete_direction" in request.POST:
+            direction.delete()
+            messages.success(request, "Direction deleted.")
+            return redirect("directions")
+
+        description = request.POST.get("description", "").strip()
+        if not description:
+            messages.error(request, "A direction description is required.")
+        else:
+            direction.description = description
+            direction.resolved = "resolved" in request.POST
+            direction.save(update_fields=["description", "resolved"])
+            messages.success(request, "Direction saved.")
+        return redirect("directions")
+
+    directions = Direction.objects.select_related(
+        "connect__professional",
+        "connect__recruiter",
+    ).order_by(F("connect__meeting_at").asc(nulls_last=True), "pk")
+    unresolved_directions = [
+        direction for direction in directions if not direction.resolved
+    ]
+    resolved_directions = [
+        direction for direction in directions if direction.resolved
+    ]
+    return render(
+        request,
+        "app/directions.html",
+        {
+            "unresolved_directions": unresolved_directions,
+            "resolved_directions": resolved_directions,
+            "direction_groups": (
+                ("Unresolved", unresolved_directions),
+                ("Resolved", resolved_directions),
+            ),
+        },
+    )
+
+
 def connection_events_view(request):
     date_mode = request.GET.get("date_mode", "meeting")
     if date_mode in {"invite", "invite-professionals", "invite-recruiters"}:
@@ -4276,6 +4501,13 @@ def connection_events_view(request):
             .select_related("professional", "recruiter")
             .order_by("invite_date", "pk")
         )
+    elif date_mode == "to-review":
+        connections = (
+            Connect.objects.filter(meeting_at__isnull=False)
+            .filter(Q(rating__isnull=True) | Q(notes__isnull=True) | Q(notes=""))
+            .select_related("professional", "recruiter")
+            .order_by("meeting_at", "pk")
+        )
     else:
         date_mode = "meeting"
         connections = (
@@ -4284,21 +4516,26 @@ def connection_events_view(request):
             .order_by("meeting_at", "pk")
         )
 
+    is_invite_mode = date_mode in {
+        "invite",
+        "invite-professionals",
+        "invite-recruiters",
+    }
     events = [
         {
             "id": str(connection.pk),
             "title": connection.description,
             "start": (
                 connection.invite_date.isoformat()
-                if date_mode != "meeting"
+                if is_invite_mode
                 else _calendar_datetime_value(connection.meeting_at)
             ),
             "end": (
                 _calendar_datetime_value(connection.meeting_end)
-                if date_mode == "meeting" and connection.meeting_end is not None
+                if not is_invite_mode and connection.meeting_end is not None
                 else None
             ),
-            "allDay": date_mode != "meeting",
+            "allDay": is_invite_mode,
             "extendedProps": {
                 "status": connection.status,
                 "description": connection.description,
@@ -4324,6 +4561,12 @@ def connection_weekly_total_view(request):
         elif date_mode == "invite-recruiters":
             invite_filters["recruiter__isnull"] = False
         total = Connect.objects.filter(**invite_filters).count()
+    elif date_mode == "to-review":
+        total = (
+            Connect.objects.filter(meeting_at__date__range=(week_start, week_end))
+            .filter(Q(rating__isnull=True) | Q(notes__isnull=True) | Q(notes=""))
+            .count()
+        )
     else:
         total = Connect.objects.filter(
             meeting_at__date__range=(week_start, week_end),
@@ -4344,16 +4587,18 @@ def update_connection_meeting_view(request):
     date_mode = payload.get("date_mode", "meeting")
     if date_mode not in {
         "meeting",
+        "to-review",
         "invite",
         "invite-professionals",
         "invite-recruiters",
     }:
         return JsonResponse({"error": "Invalid date mode."}, status=400)
 
+    is_meeting_mode = date_mode in {"meeting", "to-review"}
     meeting_at = None
     meeting_end = None
     invite_date = None
-    if date_mode == "meeting":
+    if is_meeting_mode:
         meeting_at = parse_datetime(start_value) if isinstance(start_value, str) else None
         if meeting_at is None and payload.get("clear_meeting") is not True:
             return JsonResponse({"error": "A meeting datetime is required."}, status=400)
@@ -4421,7 +4666,7 @@ def update_connection_meeting_view(request):
             return JsonResponse({"error": "Description must be 200 characters or fewer."}, status=400)
         description = description_value
 
-    if date_mode == "meeting":
+    if is_meeting_mode:
         connection.meeting_at = meeting_at
         if meeting_at is None:
             connection.meeting_end = None
@@ -4433,8 +4678,8 @@ def update_connection_meeting_view(request):
     connection.rating = rating
     connection.notes = notes
     update_fields = ["description", "rating", "notes"]
-    update_fields.append("meeting_at" if date_mode == "meeting" else "invite_date")
-    if date_mode == "meeting" and ("meeting_end" in payload or meeting_at is None):
+    update_fields.append("meeting_at" if is_meeting_mode else "invite_date")
+    if is_meeting_mode and ("meeting_end" in payload or meeting_at is None):
         update_fields.append("meeting_end")
     try:
         connection.save(update_fields=update_fields)
@@ -4454,7 +4699,7 @@ def update_connection_meeting_view(request):
             "id": str(connection.pk),
             "start": (
                 connection.invite_date.isoformat()
-                if date_mode != "meeting"
+                if not is_meeting_mode
                 else _calendar_datetime_value(connection.meeting_at)
                 if connection.meeting_at
                 else None
@@ -4471,7 +4716,7 @@ def update_connection_meeting_view(request):
             ),
             "sync_message": sync_message,
             "sync_failed": sync_failed,
-            "removed_from_calendar": date_mode == "meeting" and connection.meeting_at is None,
+            "removed_from_calendar": is_meeting_mode and connection.meeting_at is None,
         }
     )
 
@@ -4579,9 +4824,7 @@ def recruiter_formset_view(request):
     )
 
     for recruiter in all_recruiters:
-        recruiter.wait_display = (
-            f"{recruiter.wait.days} days" if recruiter.wait else ""
-        )
+        recruiter.wait_display = _wait_months_display(recruiter.wait)
     all_recruiters.sort(
         key=lambda recruiter: (
             not recruiter.invite,

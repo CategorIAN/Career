@@ -4,7 +4,66 @@
 
 {% block content %}
 <section class="utility-page">
-    <h1>Skills</h1>
+    <style>
+        .skill-page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .skill-add-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1001;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .skill-add-modal[hidden] {
+            display: none;
+        }
+
+        .skill-add-modal-content {
+            position: relative;
+            width: min(32rem, 100%);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+        }
+
+        .skill-add-modal-close {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.75rem;
+            border: 0;
+            background: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .skill-add-form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .skill-add-form label {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .skill-add-form-error {
+            margin: 0;
+            color: #9b1c1c;
+        }
+    </style>
+    <div class="skill-page-header">
+        <h1>Skills</h1>
+        <button type="button" id="open-add-skill-modal">Add Skill</button>
+    </div>
 <form method="post">
     {% csrf_token %}
     {{ formset.management_form }}
@@ -20,27 +79,11 @@
                         <th>Type</th>
                         <th>Rating</th>
                         <th>Resume</th>
-                        <th>Add/Delete</th>
+                        <th>Delete</th>
+                        <th>Save</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>
-                            {{ new_form.name }}
-                        </td>
-                        <td>
-                            {{ new_form.type }}
-                        </td>
-                        <td>
-                            {{ new_form.rating }}
-                        </td>
-                        <td>
-                            {{ new_form.resume_ready }}
-                        </td>
-                        <td>
-                            <button type="submit" name="add_skill" value="1">Add</button>
-                        </td>
-                    </tr>
                     {% for form in formset %}
                         <tr>
                             {% for hidden in form.hidden_fields %}
@@ -65,6 +108,9 @@
                             <td>
                                 <button type="submit" name="delete_skill" value="{{ form.instance.pk }}">Delete</button>
                             </td>
+                            <td>
+                                <button type="submit">Save</button>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -81,12 +127,35 @@
                 </div>
             {% endif %}
         </div>
-        {% if invalid_name_message %}
-            <div style="color: red;">{{ invalid_name_message }}</div>
-        {% endif %}
     </div>
-    <button type="submit">Save</button>
 </form>
+<div id="add-skill-modal" class="skill-add-modal" role="dialog" aria-modal="true" aria-labelledby="add-skill-modal-title"{% if not show_add_skill_modal %} hidden{% endif %}>
+    <div class="skill-add-modal-content">
+        <button type="button" class="skill-add-modal-close" aria-label="Close">&times;</button>
+        <h2 id="add-skill-modal-title">Add Skill</h2>
+        <form method="post" class="skill-add-form">
+            {% csrf_token %}
+            <input type="hidden" name="add_skill" value="1">
+            <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+            <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+            <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
+            {{ new_form.non_field_errors }}
+            {% for field in new_form.visible_fields %}
+                {% if field.name != "updated" %}
+                    <label for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                        {{ field }}
+                    </label>
+                    {% for error in field.errors %}<p class="skill-add-form-error">{{ error }}</p>{% endfor %}
+                {% endif %}
+            {% endfor %}
+            <div style="display: flex; gap: 0.75rem;">
+                <button type="submit">Create Skill</button>
+                <button type="button" class="skill-add-modal-cancel">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
 <form method="get" style="margin-top: 1rem;">
     <label for="skill-search">Search Skill</label>
     <input
@@ -567,5 +636,31 @@
             window.open(platformUrl, "_blank", "noopener");
         });
     });
+
+    (() => {
+        const modal = document.getElementById("add-skill-modal");
+        const openButton = document.getElementById("open-add-skill-modal");
+        const closeButton = modal?.querySelector(".skill-add-modal-close");
+        const cancelButton = modal?.querySelector(".skill-add-modal-cancel");
+
+        if (!modal || !openButton || !closeButton) {
+            return;
+        }
+
+        const closeModal = () => modal.setAttribute("hidden", "");
+        openButton.addEventListener("click", () => modal.removeAttribute("hidden"));
+        closeButton.addEventListener("click", closeModal);
+        cancelButton?.addEventListener("click", closeModal);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
+                closeModal();
+            }
+        });
+    })();
 </script>
 {% endblock %}

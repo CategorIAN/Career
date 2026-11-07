@@ -514,11 +514,12 @@
                 </div>
             </div>
             <div class="nav-folder">
-                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'professionals' or request.resolver_match.url_name == 'recruiters' or request.resolver_match.url_name == 'connections' or request.resolver_match.url_name == 'references' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="networking-submenu">Networking</button>
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'professionals' or request.resolver_match.url_name == 'recruiters' or request.resolver_match.url_name == 'connections' or request.resolver_match.url_name == 'directions' or request.resolver_match.url_name == 'references' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="networking-submenu">Networking</button>
                 <div id="networking-submenu" class="nav-submenu">
                     <a class="nav-link{% if request.resolver_match.url_name == 'professionals' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'professionals' %} aria-current="page"{% endif %} href="{% url 'professionals' %}">Professionals</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'recruiters' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'recruiters' %} aria-current="page"{% endif %} href="{% url 'recruiters' %}">Recruiters</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'connections' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'connections' %} aria-current="page"{% endif %} href="{% url 'connections' %}">Connections</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'directions' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'directions' %} aria-current="page"{% endif %} href="{% url 'directions' %}">Directions</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'references' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'references' %} aria-current="page"{% endif %} href="{% url 'references' %}">References</a>
                 </div>
             </div>
