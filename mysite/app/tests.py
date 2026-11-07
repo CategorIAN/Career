@@ -95,7 +95,10 @@ from .services.job_evaluation import (
     JobEvaluationRefusalError,
     evaluate_job_posting,
 )
-from .services.search_paths import create_company_search_paths
+from .services.search_paths import (
+    create_company_search_paths,
+    create_platform_search_paths,
+)
 from .services.project_management import review_is_due
 from .services.toggl import (
     TogglSyncError,
@@ -2892,6 +2895,8 @@ class PlatformPageTests(TestCase):
         skill = Skill.objects.create(name="Python", type="Language")
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
+        active_search_term = SearchTerm.objects.create(term="Python")
+        inactive_search_term = SearchTerm.objects.create(term="Inactive", active=False)
 
         response = self.client.post(
             reverse("platforms"),
@@ -2903,6 +2908,7 @@ class PlatformPageTests(TestCase):
                 "page": "1",
                 "new-name": "Beta Platform",
                 "new-url": "https://beta.example.com",
+                "new-job_search_enabled": "on",
                 "add_platform": "1",
             },
         )
@@ -2910,6 +2916,19 @@ class PlatformPageTests(TestCase):
         created_platform = Platform.objects.get(name="Beta Platform")
         self.assertRedirects(response, f"{reverse('platforms')}?page=1")
         self.assertEqual(created_platform.url, "https://beta.example.com")
+        self.assertTrue(
+            SearchPath.objects.filter(
+                platform=created_platform,
+                company__isnull=True,
+                search_term=active_search_term,
+            ).exists()
+        )
+        self.assertFalse(
+            SearchPath.objects.filter(
+                platform=created_platform,
+                search_term=inactive_search_term,
+            ).exists()
+        )
         self.assertTrue(
             PlatformSkill.objects.filter(platform=created_platform, skill=skill).exists()
         )
@@ -4491,6 +4510,58 @@ class CompanySearchPathServiceTests(TestCase):
         self.assertFalse(SearchPath.objects.filter(company=disabled_company).exists())
         self.assertEqual(disabled_result.created, 0)
         self.assertEqual(disabled_result.existing, 0)
+
+
+class PlatformSearchPathServiceTests(TestCase):
+    def test_creates_active_term_paths_idempotently_for_an_enabled_platform(self):
+        active_first = SearchTerm.objects.create(term="Django")
+        active_second = SearchTerm.objects.create(term="Python")
+        inactive = SearchTerm.objects.create(term="Inactive", active=False)
+        platform = Platform.objects.create(name="Enabled Platform")
+
+        result = create_platform_search_paths(platform)
+
+        self.assertEqual(result.created, 2)
+        self.assertEqual(result.existing, 0)
+        self.assertTrue(
+            SearchPath.objects.filter(
+                platform=platform,
+                company__isnull=True,
+                search_term=active_first,
+            ).exists()
+        )
+        self.assertTrue(
+            SearchPath.objects.filter(
+                platform=platform,
+                company__isnull=True,
+                search_term=active_second,
+            ).exists()
+        )
+        self.assertFalse(
+            SearchPath.objects.filter(platform=platform, search_term=inactive).exists()
+        )
+        self.assertFalse(
+            SearchPath.objects.filter(platform=platform, search_term__isnull=True).exists()
+        )
+
+        repeated_result = create_platform_search_paths(platform)
+
+        self.assertEqual(repeated_result.created, 0)
+        self.assertEqual(repeated_result.existing, 2)
+        self.assertEqual(SearchPath.objects.filter(platform=platform).count(), 2)
+
+    def test_skips_disabled_platform(self):
+        SearchTerm.objects.create(term="Python")
+        platform = Platform.objects.create(
+            name="Disabled Platform",
+            job_search_enabled=False,
+        )
+
+        result = create_platform_search_paths(platform)
+
+        self.assertEqual(result.created, 0)
+        self.assertEqual(result.existing, 0)
+        self.assertFalse(SearchPath.objects.filter(platform=platform).exists())
 
 
 class JobPostingsPageTests(TestCase):

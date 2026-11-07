@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.models import Company, SearchPath, SearchTerm
+from app.models import Company, Platform, SearchPath, SearchTerm
 
 
 @dataclass(frozen=True)
@@ -42,5 +42,35 @@ def create_company_search_paths(
         )
         for search_term in active_search_terms:
             create_path(search_term=search_term)
+
+    return SearchPathCreationResult(created_count, existing_count)
+
+
+def create_platform_search_paths(
+    platform: Platform,
+    *,
+    active_search_terms=None,
+) -> SearchPathCreationResult:
+    """Create every valid SearchPath for an enabled Platform."""
+    if not platform.job_search_enabled:
+        return SearchPathCreationResult()
+
+    active_search_terms = (
+        SearchTerm.objects.filter(active=True)
+        if active_search_terms is None
+        else active_search_terms
+    )
+    created_count = 0
+    existing_count = 0
+    for search_term in active_search_terms:
+        _, created = SearchPath.objects.get_or_create(
+            company=None,
+            platform=platform,
+            search_term=search_term,
+        )
+        if created:
+            created_count += 1
+        else:
+            existing_count += 1
 
     return SearchPathCreationResult(created_count, existing_count)

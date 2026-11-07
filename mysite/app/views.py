@@ -139,7 +139,10 @@ from .services.gmail import (
     get_or_create_label,
     search_emails,
 )
-from .services.search_paths import create_company_search_paths
+from .services.search_paths import (
+    create_company_search_paths,
+    create_platform_search_paths,
+)
 from .services.project_management import review_is_due, seed_default_checklist_items
 from .services.toggl import (
     TogglSyncError,
@@ -1156,6 +1159,7 @@ def platform_formset_view(request):
                     platform = new_form.save()
                     _create_platform_skills_for_platform(platform)
                     _create_platform_features_for_platform(platform)
+                    create_platform_search_paths(platform)
                 return redirect(f"{request.path}?page={page_obj.number}")
         if delete_platform_id:
             Platform.objects.filter(pk=delete_platform_id).delete()
