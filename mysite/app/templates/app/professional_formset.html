@@ -658,6 +658,11 @@
                                     {{ invitation.edit_form.meeting_at.errors }}
                                     {{ invitation.edit_form.meeting_at }}
                                 </div>
+                                <label for="{{ invitation.edit_form.meeting_end.id_for_label }}">Meeting End</label>
+                                <div>
+                                    {{ invitation.edit_form.meeting_end.errors }}
+                                    {{ invitation.edit_form.meeting_end }}
+                                </div>
                                 <label for="{{ invitation.edit_form.rating.id_for_label }}">Rating</label>
                                 <div>
                                     {{ invitation.edit_form.rating.errors }}
@@ -705,6 +710,11 @@
                             <div>
                                 {{ new_connection_form.meeting_at.errors }}
                                 {{ new_connection_form.meeting_at }}
+                            </div>
+                            <label for="{{ new_connection_form.meeting_end.id_for_label }}">Meeting End</label>
+                            <div>
+                                {{ new_connection_form.meeting_end.errors }}
+                                {{ new_connection_form.meeting_end }}
                             </div>
                             <label for="{{ new_connection_form.rating.id_for_label }}">Rating</label>
                             <div>

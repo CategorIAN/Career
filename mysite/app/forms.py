@@ -922,7 +922,7 @@ class RecruiterForm(ProfessionalForm):
 class ProfessionalConnectForm(forms.ModelForm):
     class Meta:
         model = Connect
-        fields = ["invite_date", "meeting_at", "rating", "notes"]
+        fields = ["invite_date", "meeting_at", "meeting_end", "rating", "notes"]
         widgets = {
             "invite_date": forms.DateInput(
                 format="%Y-%m-%d",
@@ -941,22 +941,27 @@ class ProfessionalConnectForm(forms.ModelForm):
                 format="%Y-%m-%dT%H:%M",
                 attrs={"type": "datetime-local"},
             ),
+            "meeting_end": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M",
+                attrs={"type": "datetime-local"},
+            ),
             "notes": forms.Textarea(attrs={"rows": 3, "style": "width: 20rem;"}),
         }
 
     def __init__(self, *args, require_invite_date=False, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("meeting_at", "rating"):
+        for field_name in ("meeting_at", "meeting_end", "rating"):
             self.fields[field_name].required = False
         self.fields["invite_date"].required = require_invite_date
-        self.fields["meeting_at"].input_formats = ["%Y-%m-%dT%H:%M"]
+        for field_name in ("meeting_at", "meeting_end"):
+            self.fields[field_name].input_formats = ["%Y-%m-%dT%H:%M"]
 
-    def clean_meeting_at(self):
-        value = self.cleaned_data.get("meeting_at")
+    def _clean_local_datetime(self, field_name):
+        value = self.cleaned_data.get(field_name)
         if value is None:
             return None
 
-        raw_value = self.data.get(self.add_prefix("meeting_at"))
+        raw_value = self.data.get(self.add_prefix(field_name))
         if raw_value:
             try:
                 local_value = datetime.strptime(raw_value, "%Y-%m-%dT%H:%M")
@@ -965,6 +970,22 @@ class ProfessionalConnectForm(forms.ModelForm):
             return timezone.make_aware(local_value, MOUNTAIN_TIME_ZONE)
 
         return timezone.localtime(value, MOUNTAIN_TIME_ZONE)
+
+    def clean_meeting_at(self):
+        return self._clean_local_datetime("meeting_at")
+
+    def clean_meeting_end(self):
+        return self._clean_local_datetime("meeting_end")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        meeting_at = cleaned_data.get("meeting_at")
+        meeting_end = cleaned_data.get("meeting_end")
+
+        if meeting_at is not None and meeting_end is None:
+            cleaned_data["meeting_end"] = meeting_at + timedelta(hours=1)
+
+        return cleaned_data
 
 
 class RecruiterConnectForm(ProfessionalConnectForm):

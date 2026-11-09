@@ -3931,7 +3931,64 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(connection.invite_date, date(2026, 9, 1))
         self.assertEqual(connection.rating, 5)
         self.assertEqual(connection.notes, "New connection")
+        self.assertEqual(
+            timezone.localtime(connection.meeting_end, ZoneInfo("America/Denver")),
+            datetime(2026, 9, 2, 10, 30, tzinfo=ZoneInfo("America/Denver")),
+        )
         mock_sync.assert_called_once_with(connection)
+
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_connection_form_preserves_explicit_meeting_end(
+        self, mock_sync
+    ):
+        professional = Professional.objects.create(name="Ada Lovelace")
+        mock_sync.return_value = {"meeting": {"status": "created"}}
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-connection-invite_date": "2026-09-02",
+                "new-connection-meeting_at": "2026-09-02T09:30",
+                "new-connection-meeting_end": "2026-09-02T11:15",
+                "add_connection": str(professional.pk),
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('professionals')}?page=1")
+        connection = ProfessionalConnect.objects.get(professional=professional)
+        self.assertEqual(
+            timezone.localtime(connection.meeting_end, ZoneInfo("America/Denver")),
+            datetime(2026, 9, 2, 11, 15, tzinfo=ZoneInfo("America/Denver")),
+        )
+        mock_sync.assert_called_once_with(connection)
+
+    @patch("app.views.sync_professional_connect")
+    def test_professionals_connection_form_rejects_nonpositive_meeting_interval(
+        self, mock_sync
+    ):
+        professional = Professional.objects.create(name="Ada Lovelace")
+
+        response = self.client.post(
+            reverse("professionals"),
+            data={
+                "page": "1",
+                "new-connection-invite_date": "2026-09-02",
+                "new-connection-meeting_at": "2026-09-02T09:30",
+                "new-connection-meeting_end": "2026-09-02T09:00",
+                "add_connection": str(professional.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Meeting end must be after the meeting start.")
+        self.assertContains(
+            response,
+            'name="new-connection-meeting_end" value="2026-09-02T09:00"',
+            html=False,
+        )
+        self.assertFalse(ProfessionalConnect.objects.filter(professional=professional).exists())
+        mock_sync.assert_not_called()
 
     @patch("app.views.sync_professional_connect")
     def test_professionals_connection_time_matches_connections_calendar(self, mock_sync):
