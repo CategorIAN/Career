@@ -2252,8 +2252,173 @@ class JobEvaluationServiceTests(TestCase):
         self.assertIs(parse_kwargs["text_format"], JobEvaluation)
         self.assertIn("Data Engineer", parse_kwargs["input"][1]["content"])
         self.assertIn("Candidate Background", parse_kwargs["input"][1]["content"])
+        instructions = " ".join(parse_kwargs["input"][0]["content"].split())
+        self.assertIn(
+            "willing to relocate anywhere in the United States", instructions
+        )
+        self.assertIn("remote, hybrid, and fully on-site work", instructions)
+        self.assertIn("Missing preferred technologies", instructions)
+        self.assertIn("substantial, consequential mismatches", instructions)
+        self.assertIn("absent qualification in the supplied background", instructions)
+        self.assertIn("only when the posting explicitly makes the requirement material", instructions)
         job_posting.refresh_from_db()
         self.assertIsNone(job_posting.apply_to)
+
+    @override_settings(
+        OPENAI_API_KEY="test-api-key",
+        OPENAI_JOB_EVALUATION_MODEL="test-model",
+    )
+    @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
+    @patch("app.services.job_evaluation.OpenAI")
+    def test_evaluation_request_includes_assumptions_and_genuine_barriers(
+        self,
+        mock_openai,
+        mock_build_background,
+    ):
+        job_posting = JobPosting.objects.create(
+            title="Senior Backend Engineer",
+            company_name="Example Co",
+            description=(
+                "Hybrid in New York City. Long hours may be required. "
+                "Preferred: Rust. Required: active security clearance."
+            ),
+        )
+        mock_openai.return_value.responses.parse.return_value = SimpleNamespace(
+            output_parsed=JobEvaluation(apply=False, explanation="Mocked result."),
+            output=[],
+            status="completed",
+        )
+
+        evaluate_job_posting(job_posting)
+
+        instructions = " ".join(
+            mock_openai.return_value.responses.parse.call_args.kwargs["input"][0]["content"].split()
+        )
+        self.assertIn(
+            "unconfirmed willingness to relocate or work on-site as a negative factor",
+            instructions,
+        )
+        self.assertIn("long hours, extensive travel", instructions)
+        self.assertIn("consideration, not as evidence", instructions)
+        self.assertIn(
+            "Do not automatically reject a role solely because it requests more experience",
+            instructions,
+        )
+        self.assertIn("security clearances", instructions)
+        self.assertIn("only when the posting explicitly makes the requirement material", instructions)
+        self.assertIn(
+            "do not assume the candidate meets or fails it",
+            instructions,
+        )
+        mock_build_background.assert_called_once_with()
+
+    @override_settings(
+        OPENAI_API_KEY="test-api-key",
+        OPENAI_JOB_EVALUATION_MODEL="test-model",
+    )
+    @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
+    @patch("app.services.job_evaluation.OpenAI")
+    def test_evaluation_request_distinguishes_unknowns_from_gaps(
+        self,
+        mock_openai,
+        mock_build_background,
+    ):
+        job_posting = JobPosting.objects.create(
+            title="Backend Engineer",
+            company_name="Example Co",
+            description="Build Django APIs. Preferred: Kubernetes.",
+        )
+        mock_openai.return_value.responses.parse.return_value = SimpleNamespace(
+            output_parsed=JobEvaluation(apply=True, explanation="Mocked result."),
+            output=[],
+            status="completed",
+        )
+
+        evaluate_job_posting(job_posting)
+
+        parse_kwargs = mock_openai.return_value.responses.parse.call_args.kwargs
+        self.assertIs(parse_kwargs["text_format"], JobEvaluation)
+        instructions = " ".join(parse_kwargs["input"][0]["content"].split())
+        self.assertIn(
+            "unverified, not a confirmed deficiency",
+            instructions,
+        )
+        self.assertIn("not demonstrated in the supplied background", instructions)
+        self.assertIn("Do not describe undocumented experience as", instructions)
+        self.assertIn("Django application", instructions)
+        self.assertIn("deployed on Render", instructions)
+        self.assertIn("Mention unknowns only when an explicit, material job requirement", instructions)
+        self.assertIn("Avoid speculative concerns, generic disclaimers", instructions)
+        mock_build_background.assert_called_once_with()
+
+    @override_settings(
+        OPENAI_API_KEY="test-api-key",
+        OPENAI_JOB_EVALUATION_MODEL="test-model",
+    )
+    @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
+    @patch("app.services.job_evaluation.OpenAI")
+    def test_evaluation_request_distinguishes_requirements_from_responsibilities(
+        self,
+        mock_openai,
+        mock_build_background,
+    ):
+        job_posting = JobPosting.objects.create(
+            title="Founding Engineer",
+            company_name="Example Co",
+            description=(
+                "Architect and scale our platform. Required: five years of "
+                "distributed-systems design experience."
+            ),
+        )
+        mock_openai.return_value.responses.parse.return_value = SimpleNamespace(
+            output_parsed=JobEvaluation(apply=False, explanation="Mocked result."),
+            output=[],
+            status="completed",
+        )
+
+        evaluate_job_posting(job_posting)
+
+        parse_kwargs = mock_openai.return_value.responses.parse.call_args.kwargs
+        self.assertIs(parse_kwargs["text_format"], JobEvaluation)
+        self.assertIn("Founding Engineer", parse_kwargs["input"][1]["content"])
+        self.assertIn(
+            "five years of distributed-systems design experience",
+            parse_kwargs["input"][1]["content"],
+        )
+        instructions = " ".join(parse_kwargs["input"][0]["content"].split())
+        self.assertIn(
+            "Separate explicit hiring requirements, stated job responsibilities",
+            instructions,
+        )
+        self.assertIn(
+            "do not automatically require prior professional performance of that exact task",
+            instructions,
+        )
+        self.assertIn(
+            "Do not convert responsibilities into mandatory prior experience",
+            instructions,
+        )
+        self.assertIn(
+            "not explicit requirements",
+            instructions,
+        )
+        self.assertIn(
+            "founding-engineer title alone does not establish a minimum number of years",
+            instructions,
+        )
+        self.assertIn(
+            "does not by itself require prior large-scale distributed-systems experience",
+            instructions,
+        )
+        self.assertIn(
+            "substantially beyond a plausible transition from the demonstrated background",
+            instructions,
+        )
+        self.assertIn(
+            "competitiveness concern from a confirmed failure to meet a stated requirement",
+            instructions,
+        )
+        mock_build_background.assert_called_once_with()
 
     @override_settings(OPENAI_API_KEY="test-api-key")
     @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
