@@ -524,12 +524,12 @@
                     </section>
                     <section class="project-edit-section">
                         <h3>Tasks</h3>
-                        {% if project.task_edit_formset.forms %}
-                            <form class="project-edit-form" data-save-url="{% url 'save_project_tasks' project.pk %}">
-                                {% csrf_token %}
-                                {{ project.task_edit_formset.management_form }}
-                                <div class="project-task-list" aria-label="Project tasks">
-                                    {% for task_form in project.task_edit_formset.forms %}
+                        <form class="project-edit-form" data-save-url="{% url 'save_project_tasks' project.pk %}">
+                            {% csrf_token %}
+                            {{ project.task_edit_formset.management_form }}
+                            <div class="project-task-list" aria-label="Project tasks">
+                                {% for task_form in project.task_edit_formset.forms %}
+                                    {% if task_form.instance.pk %}
                                         <div class="project-task-item" draggable="true" data-task-id="{{ task_form.instance.pk }}">
                                             {{ task_form.id }}{{ task_form.ORDER.as_hidden }}
                                             <div class="project-edit-fields">
@@ -538,14 +538,22 @@
                                                 {{ task_form.resume_ready.errors }}
                                             </div>
                                         </div>
-                                    {% endfor %}
-                                </div>
-                                <button type="submit" class="copy-button">Save Project Tasks</button>
-                                <p class="project-edit-status" role="status"></p>
-                            </form>
-                        {% else %}
-                            <p>No tasks have been added.</p>
-                        {% endif %}
+                                    {% else %}
+                                        <div class="project-task-item project-task-new-item">
+                                            {{ task_form.id }}{{ task_form.ORDER.as_hidden }}
+                                            <h4>Add Project Task</h4>
+                                            <div class="project-edit-fields">
+                                                <div>{{ task_form.description.label_tag }}{{ task_form.description }}{{ task_form.description.errors }}</div>
+                                                <label>{{ task_form.resume_ready }} {{ task_form.resume_ready.label }}</label>
+                                                {{ task_form.resume_ready.errors }}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <button type="submit" class="copy-button">Save Project Tasks</button>
+                            <p class="project-edit-status" role="status"></p>
+                        </form>
                     </section>
                 </div>
             </article>
@@ -729,11 +737,11 @@
             const form = taskList.closest(".project-edit-form");
             let draggedTask = null;
             const syncTaskOrder = () => {
-                taskList.querySelectorAll(".project-task-item").forEach((task, index) => { task.querySelector('input[name$="-ORDER"]').value = index + 1; });
+                taskList.querySelectorAll(".project-task-item[draggable=true]").forEach((task, index) => { task.querySelector('input[name$="-ORDER"]').value = index + 1; });
                 form.dataset.dirty = "true";
                 refreshDirtyState();
             };
-            taskList.querySelectorAll(".project-task-item").forEach(task => {
+            taskList.querySelectorAll(".project-task-item[draggable=true]").forEach(task => {
                 task.addEventListener("dragstart", event => { draggedTask = task; task.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; });
                 task.addEventListener("dragend", () => { task.classList.remove("dragging"); draggedTask = null; taskList.classList.remove("is-drag-over"); });
             });
@@ -743,9 +751,12 @@
                 event.preventDefault();
                 taskList.classList.remove("is-drag-over");
                 if (!draggedTask) return;
-                const dropTarget = event.target.closest(".project-task-item");
+                const dropTarget = event.target.closest(".project-task-item[draggable=true]");
                 if (dropTarget && dropTarget !== draggedTask) taskList.insertBefore(draggedTask, dropTarget);
-                else taskList.appendChild(draggedTask);
+                else taskList.insertBefore(
+                    draggedTask,
+                    taskList.querySelector(".project-task-new-item"),
+                );
                 syncTaskOrder();
             });
         });

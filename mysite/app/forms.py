@@ -298,7 +298,7 @@ ProjectTaskEditFormSet = inlineformset_factory(
     Project,
     ProjectTask,
     form=ProjectTaskEditForm,
-    extra=0,
+    extra=1,
     can_delete=False,
     can_order=True,
 )

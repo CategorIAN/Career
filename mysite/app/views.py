@@ -3772,7 +3772,10 @@ def save_experience_role_tasks_view(request, role_id):
         for sort_order, form in enumerate(formset.ordered_forms):
             task = form.save(commit=False)
             task.sort_order = sort_order
-            task.save(update_fields=["description", "resume_ready", "sort_order"])
+            if task.pk is None:
+                task.save()
+            else:
+                task.save(update_fields=["description", "resume_ready", "sort_order"])
 
     return JsonResponse({"message": "Role tasks saved."})
 
@@ -4377,7 +4380,10 @@ def save_project_tasks_view(request, project_id):
         for sort_order, form in enumerate(formset.ordered_forms):
             task = form.save(commit=False)
             task.sort_order = sort_order
-            task.save(update_fields=["description", "resume_ready", "sort_order"])
+            if task._state.adding:
+                task.save()
+            else:
+                task.save(update_fields=["description", "resume_ready", "sort_order"])
 
     return JsonResponse({"message": "Project tasks saved."})
 

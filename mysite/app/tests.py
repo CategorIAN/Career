@@ -839,6 +839,7 @@ class ProjectDisplayModeTests(TestCase):
         self.assertEqual(editing_response.context["projects_mode"], "editing")
         self.assertContains(editing_response, "Save Project Details")
         self.assertContains(editing_response, "Save Project Tasks")
+        self.assertContains(editing_response, "Add Project Task")
         self.assertContains(editing_response, "Save Project Order")
         self.assertContains(editing_response, "Drag to reorder")
         self.assertContains(editing_response, "Skills in Project")
@@ -921,6 +922,37 @@ class ProjectDisplayModeTests(TestCase):
             list(self.public_project.tasks.order_by("sort_order", "pk")),
             [self.second_task, self.first_task],
         )
+
+    def test_owner_can_add_project_task(self):
+        self.client.force_login(self.administrator)
+        prefix = f"project-{self.public_project.pk}-tasks"
+
+        response = self.client.post(
+            reverse("save_project_tasks", args=[self.public_project.pk]),
+            {
+                f"{prefix}-TOTAL_FORMS": "3",
+                f"{prefix}-INITIAL_FORMS": "2",
+                f"{prefix}-MIN_NUM_FORMS": "0",
+                f"{prefix}-MAX_NUM_FORMS": "1000",
+                f"{prefix}-0-id": self.first_task.pk,
+                f"{prefix}-0-description": self.first_task.description,
+                f"{prefix}-0-ORDER": "1",
+                f"{prefix}-1-id": self.second_task.pk,
+                f"{prefix}-1-description": self.second_task.description,
+                f"{prefix}-1-ORDER": "2",
+                f"{prefix}-2-description": "Created from the editing view.",
+                f"{prefix}-2-resume_ready": "on",
+                f"{prefix}-2-ORDER": "3",
+            },
+        )
+
+        self.assertJSONEqual(response.content, {"message": "Project tasks saved."})
+        created_task = ProjectTask.objects.get(
+            project=self.public_project,
+            description="Created from the editing view.",
+        )
+        self.assertTrue(created_task.resume_ready)
+        self.assertEqual(created_task.sort_order, 2)
 
 
 class ProjectManagementTests(TestCase):

@@ -206,14 +206,14 @@
             {% endif %}
             {% if profile.linkedin_url %}
                 {% if profile.location or profile.email or profile.phone %}<span class="contact-separator" style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span><a href="{{ profile.linkedin_url }}">LinkedIn</a></span>
+                <span><a href="{{ profile.linkedin_url }}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span>
             {% endif %}
             {% if profile.github_url %}
                 {% if profile.location or profile.email or profile.phone or profile.linkedin_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
-                <span><a href="{{ profile.github_url }}">GitHub</a></span>
+                <span><a href="{{ profile.github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a></span>
             {% endif %}
             {% if profile.location or profile.email or profile.phone or profile.linkedin_url or profile.github_url %}<span style="font-size: 1.2em;"> &middot; </span>{% endif %}
-            <span><a href="https://ian-kessler-career.onrender.com/">Website</a></span>
+            <span><a href="https://ian-kessler-career.onrender.com/" target="_blank" rel="noopener noreferrer">Website</a></span>
         </p>
     </header>
 
@@ -240,10 +240,10 @@
                     <div style="display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
                         <h3 style="margin: 0;">{{ role.title }}</h3>
                         {% if role.github_url %}
-                            <a href="{{ role.github_url }}">[GitHub]</a>
+                            <a href="{{ role.github_url }}" target="_blank" rel="noopener noreferrer">[GitHub]</a>
                         {% endif %}
                         {% if role.live_url %}
-                            <a href="{{ role.live_url }}">[Live]</a>
+                            <a href="{{ role.live_url }}" target="_blank" rel="noopener noreferrer">[Live]</a>
                         {% endif %}
                     </div>
                     <p style="margin: 0; text-align: right; white-space: nowrap;">
@@ -293,10 +293,10 @@
                     <div style="display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
                         <h3 style="margin: 0;">{{ project.title }}</h3>
                         {% if project.github_url %}
-                            <a href="{{ project.github_url }}">[GitHub]</a>
+                            <a href="{{ project.github_url }}" target="_blank" rel="noopener noreferrer">[GitHub]</a>
                         {% endif %}
                         {% if project.live_url %}
-                            <a href="{{ project.live_url }}">[Live]</a>
+                            <a href="{{ project.live_url }}" target="_blank" rel="noopener noreferrer">[Live]</a>
                         {% endif %}
                     </div>
                     <p style="margin: 0; text-align: right; white-space: nowrap;">
