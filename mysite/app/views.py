@@ -1802,19 +1802,51 @@ def search_terms_view(request):
     show_edit_search_term_id = None
     submitted_edit_form = None
     submitted_edit_search_term_id = None
+    page_number = request.POST.get("page") or request.GET.get("page") or 1
+    search_terms_queryset = SearchTerm.objects.order_by("term", "pk")
+    paginator = Paginator(search_terms_queryset, 1)
+    page_obj = paginator.get_page(page_number)
+    search_terms = list(page_obj.object_list)
+    selected_search_term = search_terms[0] if search_terms else None
+    search_term_search_paths = _search_paths_with_success_probability(
+        selected_search_term
+    )
+    show_edit_search_term_search_path_id = None
+    submitted_search_path_form = None
+    redirect_url = f"{reverse('search_terms')}?page={page_obj.number}"
 
     if request.method == "POST":
         new_search_term_form = SearchTermForm(request.POST, prefix="new-search-term")
         save_search_term_id = request.POST.get("save_search_term", "").strip()
         delete_search_term_id = request.POST.get("delete_search_term", "").strip()
+        save_search_term_search_path_id = request.POST.get(
+            "save_search_term_search_path",
+            "",
+        ).strip()
         if "add_search_term" in request.POST:
             if new_search_term_form.is_valid():
                 new_search_term_form.save()
-                return redirect("search_terms")
+                return redirect(redirect_url)
             show_add_modal = True
         elif delete_search_term_id:
             SearchTerm.objects.filter(pk=delete_search_term_id).delete()
-            return redirect("search_terms")
+            return redirect(redirect_url)
+        elif save_search_term_search_path_id:
+            search_path = get_object_or_404(
+                SearchPath,
+                pk=save_search_term_search_path_id,
+                search_term=selected_search_term,
+            )
+            submitted_search_path_form = SearchPathForm(
+                request.POST,
+                instance=search_path,
+                prefix=f"search-term-search-path-{search_path.pk}",
+            )
+            if submitted_search_path_form.is_valid():
+                submitted_search_path_form.save()
+                return redirect(redirect_url)
+            show_edit_search_term_search_path_id = search_path.pk
+            new_search_term_form = SearchTermForm(prefix="new-search-term")
         elif save_search_term_id:
             search_term = SearchTerm.objects.filter(pk=save_search_term_id).first()
             if search_term is not None:
@@ -1826,12 +1858,11 @@ def search_terms_view(request):
                 )
                 if submitted_edit_form.is_valid():
                     submitted_edit_form.save()
-                    return redirect("search_terms")
+                    return redirect(redirect_url)
                 show_edit_search_term_id = search_term.pk
     else:
         new_search_term_form = SearchTermForm(prefix="new-search-term")
 
-    search_terms = list(SearchTerm.objects.order_by("term", "pk"))
     for search_term in search_terms:
         search_term.edit_form = (
             submitted_edit_form
@@ -1841,15 +1872,36 @@ def search_terms_view(request):
                 prefix=f"edit-search-term-{search_term.pk}",
             )
         )
+    search_term_search_path_forms = []
+    for search_path in search_term_search_paths:
+        search_path_form = (
+            submitted_search_path_form
+            if (
+                submitted_search_path_form is not None
+                and submitted_search_path_form.instance.pk == search_path.pk
+            )
+            else SearchPathForm(
+                instance=search_path,
+                prefix=f"search-term-search-path-{search_path.pk}",
+            )
+        )
+        search_term_search_path_forms.append((search_path, search_path_form))
 
     return render(
         request,
         "app/search_terms.html",
         {
             "search_terms": search_terms,
+            "page_obj": page_obj,
+            "selected_search_term": selected_search_term,
+            "search_term_search_paths": search_term_search_paths,
+            "search_term_search_path_forms": search_term_search_path_forms,
             "new_search_term_form": new_search_term_form,
             "show_add_modal": show_add_modal,
             "show_edit_search_term_id": show_edit_search_term_id,
+            "show_edit_search_term_search_path_id": (
+                show_edit_search_term_search_path_id
+            ),
         },
     )
 
@@ -1908,15 +1960,30 @@ def job_postings_view(request):
 
             return redirect("job_postings")
 
-    job_postings = JobPosting.objects.order_by("-created", "-pk")
+    job_postings = JobPosting.objects.select_related("application").order_by(
+        "-created",
+        "-pk",
+    )
     return render(
         request,
         "app/job_postings.html",
         {
-            "apply_job_postings": job_postings.filter(apply_to=True),
-            "other_job_postings": job_postings.filter(
-                Q(apply_to=False) | Q(apply_to__isnull=True)
+            "undecided_job_postings": job_postings.filter(apply_to__isnull=True),
+            "apply_without_application_job_postings": job_postings.filter(
+                apply_to=True,
+                application__isnull=True,
             ),
+            "apply_in_progress_job_postings": job_postings.filter(
+                apply_to=True,
+                application__isnull=False,
+                application__submitted__isnull=True,
+                application__stop_reason="",
+            ),
+            "applied_job_postings": job_postings.filter(
+                apply_to=True,
+                application__submitted__isnull=False,
+            ),
+            "do_not_apply_job_postings": job_postings.filter(apply_to=False),
             "new_job_posting_form": new_job_posting_form,
             "show_add_job_posting_modal": show_add_job_posting_modal,
         },
@@ -2644,6 +2711,8 @@ def job_search_view(request):
     show_edit_job_posting_observation_id = None
     submitted_job_posting_form = None
     submitted_job_posting_observation_id = None
+    show_edit_source_type = None
+    submitted_source_form = None
 
     if request.method == "POST":
         start_search_observation_id = request.POST.get(
@@ -2678,11 +2747,56 @@ def job_search_view(request):
             "evaluate_job_posting",
             "",
         ).strip()
+        save_source_company_id = request.POST.get(
+            "save_source_company",
+            "",
+        ).strip()
+        save_source_platform_id = request.POST.get(
+            "save_source_platform",
+            "",
+        ).strip()
         redirect_params = {"page": page_obj.number}
         if search_text:
             redirect_params["search"] = search_text
         redirect_url = f"{reverse('job_search')}?{urlencode(redirect_params)}"
+        current_search_path = (
+            SearchPath.objects.select_related("company", "platform")
+            .filter(pk=current_search_path_id)
+            .first()
+            if current_search_path_id is not None
+            else None
+        )
+
         if (
+            save_source_company_id
+            and current_search_path is not None
+            and str(current_search_path.company_id) == save_source_company_id
+        ):
+            submitted_source_form = CompanyForm(
+                request.POST,
+                instance=current_search_path.company,
+                prefix=f"job-search-company-{current_search_path.company_id}",
+            )
+            if submitted_source_form.is_valid():
+                submitted_source_form.save()
+                return redirect(redirect_url)
+            show_edit_source_type = "company"
+        elif (
+            save_source_platform_id
+            and current_search_path is not None
+            and str(current_search_path.platform_id) == save_source_platform_id
+        ):
+            submitted_source_form = PlatformForm(
+                request.POST,
+                instance=current_search_path.platform,
+                prefix=f"job-search-platform-{current_search_path.platform_id}",
+            )
+            if submitted_source_form.is_valid():
+                submitted_source_form.save()
+                return redirect(redirect_url)
+            show_edit_source_type = "platform"
+
+        elif (
             current_search_path_id is not None
             and start_search_observation_id == str(current_search_path_id)
         ):
@@ -2805,6 +2919,8 @@ def job_search_view(request):
             or delete_job_posting_observation_id
             or update_job_posting_apply_to_id
             or evaluate_job_posting_id
+            or save_source_company_id
+            or save_source_platform_id
         ):
             formset = SearchPathFormSet(queryset=page_queryset)
         else:
@@ -2825,6 +2941,26 @@ def job_search_view(request):
         ) = page_statistics[form.instance.pk]
 
     current_search_path = formset.forms[0].instance if formset.forms else None
+    source_edit_form = None
+    if current_search_path is not None:
+        if current_search_path.company_id is not None:
+            source_edit_form = (
+                submitted_source_form
+                if show_edit_source_type == "company"
+                else CompanyForm(
+                    instance=current_search_path.company,
+                    prefix=f"job-search-company-{current_search_path.company_id}",
+                )
+            )
+        elif current_search_path.platform_id is not None:
+            source_edit_form = (
+                submitted_source_form
+                if show_edit_source_type == "platform"
+                else PlatformForm(
+                    instance=current_search_path.platform,
+                    prefix=f"job-search-platform-{current_search_path.platform_id}",
+                )
+            )
     pending_search_observations = []
     if current_search_path is not None and current_search_path.pending:
         pending_search_observations = list(
@@ -2860,6 +2996,9 @@ def job_search_view(request):
             "show_edit_search_path_id": show_edit_search_path_id,
             "show_add_job_posting_observation_id": show_add_job_posting_observation_id,
             "show_edit_job_posting_observation_id": show_edit_job_posting_observation_id,
+            "current_search_path": current_search_path,
+            "source_edit_form": source_edit_form,
+            "show_edit_source_type": show_edit_source_type,
         },
     )
 

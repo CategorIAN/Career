@@ -10,6 +10,7 @@
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Source</th>
                 <th>Success Count</th>
                 <th>Observation Count</th>
                 <th>Success Probability</th>
@@ -27,6 +28,11 @@
                             {{ form.instance }}
                         {% endif %}
                     </td>
+                    <td>
+                        {% if form.instance.company or form.instance.platform %}
+                            <button type="button" class="copy-button open-source-edit-modal" data-target="edit-job-search-source-modal">Source</button>
+                        {% endif %}
+                    </td>
                     <td>{{ form.instance.page_success_count }}</td>
                     <td>{{ form.instance.page_observation_count }}</td>
                     <td>{{ form.instance.page_success_probability|floatformat:2 }}</td>
@@ -41,7 +47,7 @@
                     <td><button type="button" class="copy-button open-edit-search-path-modal" data-target="edit-search-path-modal-{{ form.instance.pk }}">Edit</button></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6">No job search paths available.</td></tr>
+                <tr><td colspan="7">No job search paths available.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -206,6 +212,31 @@
     </div>
 {% endfor %}
 
+{% if source_edit_form and current_search_path %}
+    <div id="edit-job-search-source-modal" class="search-path-modal{% if not show_edit_source_type %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-job-search-source-modal-title">
+        <div class="search-path-modal-content">
+            <button type="button" class="search-path-modal-close" aria-label="Close">&times;</button>
+            <h2 id="edit-job-search-source-modal-title">Edit {% if current_search_path.company %}Company{% else %}Platform{% endif %}</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{{ page_obj.number }}">
+                <input type="hidden" name="search" value="{{ search_text }}">
+                <div class="search-path-form-grid">
+                    {% for field in source_edit_form %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div>{{ field.errors }}{{ field }}</div>
+                    {% endfor %}
+                    {% if current_search_path.company %}
+                        <button type="submit" name="save_source_company" value="{{ current_search_path.company.pk }}">Save</button>
+                    {% else %}
+                        <button type="submit" name="save_source_platform" value="{{ current_search_path.platform.pk }}">Save</button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+{% endif %}
+
 {% for observation in pending_search_observations %}
     {% if observation.job_posting %}
         <div id="edit-job-posting-modal-{{ observation.pk }}" class="search-path-modal job-posting-modal{% if show_edit_job_posting_observation_id != observation.pk %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="edit-job-posting-modal-title-{{ observation.pk }}">
@@ -264,6 +295,11 @@
             });
         });
         document.querySelectorAll(".open-edit-search-path-modal").forEach(button => {
+            button.addEventListener("click", () => {
+                document.getElementById(button.dataset.target).classList.remove("hidden");
+            });
+        });
+        document.querySelectorAll(".open-source-edit-modal").forEach(button => {
             button.addEventListener("click", () => {
                 document.getElementById(button.dataset.target).classList.remove("hidden");
             });

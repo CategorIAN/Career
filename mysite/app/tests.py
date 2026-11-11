@@ -199,6 +199,14 @@ class NavigationTemplateTests(TestCase):
         content = response.content.decode()
         for destination in expected_destinations:
             self.assertEqual(content.count(f'href="{reverse(destination)}"'), 1)
+        self.assertLess(
+            content.index('id="management-submenu"'),
+            content.index(f'href="{reverse("search_terms")}"'),
+        )
+        self.assertLess(
+            content.index(f'href="{reverse("search_terms")}"'),
+            content.index('id="networking-submenu"'),
+        )
 
 
 class CareerAccessTests(TestCase):
@@ -4603,6 +4611,13 @@ class CompanyPageTests(TestCase):
 
 
 class SearchTermsPageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
     def test_search_terms_page_displays_terms_alphabetically(self):
         SearchTerm.objects.create(term="Python", active=False)
         SearchTerm.objects.create(term="Data Engineer")
@@ -4612,12 +4627,17 @@ class SearchTermsPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Search Terms")
         self.assertContains(response, 'id="open-add-search-term-modal"', html=False)
-        self.assertLess(
-            response.content.index(b"Data Engineer"),
-            response.content.index(b"Python"),
-        )
+        self.assertContains(response, "Search Term 1 of 2")
+        self.assertContains(response, "Data Engineer")
+        self.assertNotContains(response, "Python")
         self.assertContains(response, "Yes")
-        self.assertContains(response, "No")
+
+        second_page_response = self.client.get(f"{reverse('search_terms')}?page=2")
+
+        self.assertContains(second_page_response, "Search Term 2 of 2")
+        self.assertContains(second_page_response, "Python")
+        self.assertNotContains(second_page_response, "Data Engineer")
+        self.assertContains(second_page_response, "No")
 
     def test_search_terms_page_creates_and_edits_search_term(self):
         create_response = self.client.post(
@@ -4629,7 +4649,7 @@ class SearchTermsPageTests(TestCase):
             },
         )
 
-        self.assertRedirects(create_response, reverse("search_terms"))
+        self.assertRedirects(create_response, f"{reverse('search_terms')}?page=1")
         search_term = SearchTerm.objects.get(term="Python")
 
         edit_response = self.client.post(
@@ -4640,7 +4660,7 @@ class SearchTermsPageTests(TestCase):
             },
         )
 
-        self.assertRedirects(edit_response, reverse("search_terms"))
+        self.assertRedirects(edit_response, f"{reverse('search_terms')}?page=1")
         search_term.refresh_from_db()
         self.assertEqual(search_term.term, "Django")
         self.assertFalse(search_term.active)
@@ -4662,11 +4682,69 @@ class SearchTermsPageTests(TestCase):
             {"delete_search_term": search_term.pk},
         )
 
-        self.assertRedirects(delete_response, reverse("search_terms"))
+        self.assertRedirects(delete_response, f"{reverse('search_terms')}?page=1")
         self.assertFalse(SearchTerm.objects.filter(pk=search_term.pk).exists())
         search_path.refresh_from_db()
         self.assertIsNone(search_path.search_term)
         self.assertTrue(SearchObservation.objects.filter(pk=observation.pk).exists())
+
+    def test_search_terms_page_shows_and_edits_selected_terms_search_paths(self):
+        search_term = SearchTerm.objects.create(term="Python")
+        other_term = SearchTerm.objects.create(term="SQL")
+        higher_probability_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Alpha Platform"),
+            search_term=search_term,
+        )
+        lower_probability_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Beta Platform"),
+            search_term=search_term,
+        )
+        SearchPath.objects.create(
+            platform=Platform.objects.create(name="Other Platform"),
+            search_term=other_term,
+        )
+        job_posting = JobPosting.objects.create(
+            title="Engineer",
+            company_name="Example",
+            apply_to=True,
+        )
+        SearchObservation.objects.create(
+            search_path=higher_probability_path,
+            job_posting=job_posting,
+            complete=True,
+        )
+
+        response = self.client.get(reverse("search_terms"))
+
+        self.assertEqual(response.context["selected_search_term"], search_term)
+        self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Success Probability")
+        self.assertContains(
+            response,
+            f'edit-search-term-search-path-modal-{higher_probability_path.pk}',
+            html=False,
+        )
+        self.assertNotContains(response, "Other Platform")
+        self.assertEqual(
+            response.context["search_term_search_paths"],
+            [higher_probability_path, lower_probability_path],
+        )
+
+        save_response = self.client.post(
+            reverse("search_terms"),
+            {
+                "page": "1",
+                f"search-term-search-path-{higher_probability_path.pk}-url": (
+                    "https://jobs.example.com/python"
+                ),
+                f"search-term-search-path-{higher_probability_path.pk}-active": "on",
+                "save_search_term_search_path": higher_probability_path.pk,
+            },
+        )
+
+        self.assertRedirects(save_response, f"{reverse('search_terms')}?page=1")
+        higher_probability_path.refresh_from_db()
+        self.assertEqual(higher_probability_path.url, "https://jobs.example.com/python")
 
 
 class CreateSearchPathsCommandTests(TestCase):
@@ -4831,6 +4909,13 @@ class PlatformSearchPathServiceTests(TestCase):
 
 
 class JobPostingsPageTests(TestCase):
+    def setUp(self):
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
     def test_job_postings_page_shows_add_posting_modal(self):
         response = self.client.get(reverse("job_postings"))
 
@@ -4899,19 +4984,29 @@ class JobPostingsPageTests(TestCase):
         self.assertContains(response, "Enter a valid URL.")
         self.assertEqual(JobPosting.objects.count(), 0)
 
-    def test_job_postings_are_grouped_and_sorted_by_apply_decision(self):
-        apply_older = JobPosting.objects.create(
-            title="Apply Older",
+    def test_job_postings_are_grouped_by_apply_decision_and_application_status(self):
+        apply_without_application = JobPosting.objects.create(
+            title="Apply Without Application",
             company_name="Company A",
             apply_to=True,
         )
-        apply_newer = JobPosting.objects.create(
-            title="Apply Newer",
+        apply_in_progress = JobPosting.objects.create(
+            title="Apply In Progress",
             company_name="Company B",
             apply_to=True,
             url="https://example.com/jobs/apply-newer",
             description="# Data Engineering\n\nBuild **data products** with Python.",
             ai_explanation="The Python background is a strong match.",
+        )
+        apply_submitted = JobPosting.objects.create(
+            title="Apply Submitted",
+            company_name="Company Submitted",
+            apply_to=True,
+        )
+        stopped_application = JobPosting.objects.create(
+            title="Stopped Application",
+            company_name="Company Stopped",
+            apply_to=True,
         )
         do_not_apply = JobPosting.objects.create(
             title="Do Not Apply",
@@ -4923,22 +5018,39 @@ class JobPostingsPageTests(TestCase):
             title="Undecided",
             company_name="Company D",
         )
-        JobPosting.objects.filter(pk=apply_older.pk).update(
+        Application.objects.create(job_posting=apply_in_progress)
+        Application.objects.create(
+            job_posting=apply_submitted,
+            submitted=datetime(2026, 1, 5, tzinfo=UTC),
+        )
+        Application.objects.create(
+            job_posting=stopped_application,
+            stop_reason=Application.StopReason.OTHER,
+        )
+        JobPosting.objects.filter(pk=apply_without_application.pk).update(
             created=datetime(2026, 1, 1, tzinfo=UTC)
         )
-        JobPosting.objects.filter(pk=apply_newer.pk).update(
+        JobPosting.objects.filter(pk=apply_in_progress.pk).update(
             created=datetime(2026, 1, 2, tzinfo=UTC)
         )
-        JobPosting.objects.filter(pk=do_not_apply.pk).update(
+        JobPosting.objects.filter(pk=apply_submitted.pk).update(
             created=datetime(2026, 1, 3, tzinfo=UTC)
         )
-        JobPosting.objects.filter(pk=undecided.pk).update(
+        JobPosting.objects.filter(pk=do_not_apply.pk).update(
             created=datetime(2026, 1, 4, tzinfo=UTC)
+        )
+        JobPosting.objects.filter(pk=undecided.pk).update(
+            created=datetime(2026, 1, 5, tzinfo=UTC)
         )
 
         response = self.client.get(reverse("job_postings"))
 
         self.assertContains(response, "Job Postings")
+        self.assertContains(response, "Apply To: Not Set")
+        self.assertContains(response, "Apply To: Yes — No Application")
+        self.assertContains(response, "Apply To: Yes -- Application in Progress")
+        self.assertContains(response, "Apply To: Yes — Application Submitted")
+        self.assertContains(response, "Apply To: No")
         self.assertContains(response, "Expired: No")
         self.assertContains(response, "Expired: Yes")
         self.assertContains(response, 'id="job-posting-detail-modal"', html=False)
@@ -4957,15 +5069,34 @@ class JobPostingsPageTests(TestCase):
         self.assertContains(response, 'class="job-posting-apply-to-field"', html=False)
         self.assertContains(response, 'detailModal.classList.add("explanation-open")', html=False)
         self.assertEqual(
-            [posting.pk for posting in response.context["apply_job_postings"]],
-            [apply_newer.pk, apply_older.pk],
+            [posting.pk for posting in response.context["undecided_job_postings"]],
+            [undecided.pk],
         )
         self.assertEqual(
-            [posting.pk for posting in response.context["other_job_postings"]],
-            [undecided.pk, do_not_apply.pk],
+            [
+                posting.pk
+                for posting in response.context["apply_without_application_job_postings"]
+            ],
+            [apply_without_application.pk],
         )
+        self.assertEqual(
+            [posting.pk for posting in response.context["apply_in_progress_job_postings"]],
+            [apply_in_progress.pk],
+        )
+        self.assertEqual(
+            [posting.pk for posting in response.context["applied_job_postings"]],
+            [apply_submitted.pk],
+        )
+        self.assertEqual(
+            [posting.pk for posting in response.context["do_not_apply_job_postings"]],
+            [do_not_apply.pk],
+        )
+        self.assertNotContains(response, "Stopped Application")
         content = response.content.decode()
-        self.assertLess(content.index("Apply Newer"), content.index("Do Not Apply"))
+        self.assertLess(content.index("Undecided"), content.index("Apply Without Application"))
+        self.assertLess(content.index("Apply Without Application"), content.index("Apply In Progress"))
+        self.assertLess(content.index("Apply In Progress"), content.index("Apply Submitted"))
+        self.assertLess(content.index("Apply Submitted"), content.index("Do Not Apply"))
 
     def test_job_postings_can_mark_a_posting_expired(self):
         job_posting = JobPosting.objects.create(
@@ -6294,6 +6425,162 @@ class InterviewPracticeTests(TestCase):
         mock_feedback.assert_called_once_with(session)
 
 
+class SearchPathHidePropertyTests(TestCase):
+    def test_hides_paths_for_disabled_platforms(self):
+        path = SearchPath.objects.create(
+            platform=Platform.objects.create(
+                name="Disabled platform",
+                job_search_enabled=False,
+            )
+        )
+
+        self.assertTrue(path.hide)
+
+    def test_hides_paths_for_disabled_companies(self):
+        path = SearchPath.objects.create(
+            company=Company.objects.create(
+                name="Disabled company",
+                job_search_enabled=False,
+            )
+        )
+
+        self.assertTrue(path.hide)
+
+    def test_hides_company_term_paths_when_company_does_not_support_terms(self):
+        company = Company.objects.create(
+            name="No term searches",
+            supports_job_search_terms=False,
+        )
+        term_path = SearchPath.objects.create(
+            company=company,
+            search_term=SearchTerm.objects.create(term="Python"),
+        )
+        unqualified_path = SearchPath.objects.create(company=company)
+
+        self.assertTrue(term_path.hide)
+        self.assertFalse(unqualified_path.hide)
+
+    def test_hides_path_with_recent_completed_observation_without_job_posting(self):
+        path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Empty recent search")
+        )
+        observation = SearchObservation.objects.create(search_path=path, complete=True)
+        alternate_source_path = SearchPath.objects.create(
+            company=Company.objects.create(name="Alternate source")
+        )
+        alternate_observation = SearchObservation.objects.create(
+            search_path=alternate_source_path,
+            complete=True,
+        )
+        now = timezone.now()
+        SearchObservation.objects.filter(pk=observation.pk).update(
+            created=now - timedelta(hours=1)
+        )
+        SearchObservation.objects.filter(pk=alternate_observation.pk).update(created=now)
+        path.refresh_from_db()
+
+        self.assertTrue(path.hide)
+
+    def test_does_not_hide_path_when_latest_completed_observation_has_job_posting(self):
+        path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Populated recent search")
+        )
+        first_posting = JobPosting.objects.create(
+            title="First role",
+            company_name="Example",
+        )
+        latest_posting = JobPosting.objects.create(
+            title="Latest role",
+            company_name="Example",
+        )
+        first_observation = SearchObservation.objects.create(
+            search_path=path,
+            job_posting=first_posting,
+            complete=True,
+        )
+        latest_observation = SearchObservation.objects.create(
+            search_path=path,
+            job_posting=latest_posting,
+            complete=True,
+        )
+        alternate_source_path = SearchPath.objects.create(
+            company=Company.objects.create(name="Alternate source")
+        )
+        alternate_observation = SearchObservation.objects.create(
+            search_path=alternate_source_path,
+            complete=True,
+        )
+        now = timezone.now()
+        SearchObservation.objects.filter(pk=first_observation.pk).update(
+            created=now - timedelta(hours=2)
+        )
+        SearchObservation.objects.filter(pk=latest_observation.pk).update(
+            created=now - timedelta(hours=1)
+        )
+        SearchObservation.objects.filter(pk=alternate_observation.pk).update(
+            created=now
+        )
+        path.refresh_from_db()
+
+        self.assertFalse(path.hide)
+
+    def test_does_not_hide_path_when_latest_empty_observation_is_older_than_day(self):
+        path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Old empty search")
+        )
+        observation = SearchObservation.objects.create(search_path=path, complete=True)
+        alternate_source_path = SearchPath.objects.create(
+            company=Company.objects.create(name="Alternate source")
+        )
+        alternate_observation = SearchObservation.objects.create(
+            search_path=alternate_source_path,
+            complete=True,
+        )
+        now = timezone.now()
+        SearchObservation.objects.filter(pk=observation.pk).update(
+            created=now - timedelta(days=1, seconds=1)
+        )
+        SearchObservation.objects.filter(pk=alternate_observation.pk).update(created=now)
+        path.refresh_from_db()
+
+        self.assertFalse(path.hide)
+
+    def test_does_not_hide_path_without_completed_observations(self):
+        path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="No completed searches")
+        )
+
+        self.assertFalse(path.hide)
+
+    def test_preserves_inactive_recent_application_and_source_alternation_rules(self):
+        inactive_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Inactive platform"),
+            active=False,
+        )
+        platform_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Searched platform")
+        )
+        company = Company.objects.create(name="Recently applied company")
+        company_path = SearchPath.objects.create(company=company)
+        SearchObservation.objects.create(search_path=platform_path, complete=True)
+
+        self.assertTrue(inactive_path.hide)
+        self.assertTrue(platform_path.hide)
+        self.assertFalse(company_path.hide)
+
+        job_posting = JobPosting.objects.create(
+            title="Data Engineer",
+            company_name=company.name,
+        )
+        Application.objects.create(
+            company=company,
+            job_posting=job_posting,
+            submitted=timezone.now() - timedelta(days=1),
+        )
+
+        self.assertTrue(company_path.hide)
+
+
 class JobSearchPageTests(TestCase):
     def setUp(self):
         self.administrator = get_user_model().objects.create_user(
@@ -6646,6 +6933,76 @@ class JobSearchPageTests(TestCase):
                 complete=False,
             ).exists()
         )
+
+    def test_job_search_source_button_opens_and_saves_company_form(self):
+        company = Company.objects.create(name="Example Company")
+        search_path = SearchPath.objects.create(company=company)
+
+        page_response = self.client.get(reverse("job_search"))
+
+        self.assertContains(page_response, "<th>Source</th>", html=False)
+        self.assertContains(
+            page_response,
+            'data-target="edit-job-search-source-modal"',
+            html=False,
+        )
+        self.assertContains(page_response, "Edit Company")
+        self.assertContains(
+            page_response,
+            f'name="job-search-company-{company.pk}-name"',
+            html=False,
+        )
+
+        save_response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                f"job-search-company-{company.pk}-name": "Updated Company",
+                f"job-search-company-{company.pk}-website": "",
+                f"job-search-company-{company.pk}-linkedin_url": "",
+                f"job-search-company-{company.pk}-email": "",
+                f"job-search-company-{company.pk}-phone": "",
+                f"job-search-company-{company.pk}-description": "",
+                f"job-search-company-{company.pk}-job_search_enabled": "on",
+                f"job-search-company-{company.pk}-supports_job_search_terms": "",
+                "save_source_company": company.pk,
+            },
+        )
+
+        self.assertRedirects(save_response, f"{reverse('job_search')}?page=1")
+        company.refresh_from_db()
+        self.assertEqual(company.name, "Updated Company")
+        self.assertEqual(SearchPath.objects.get(pk=search_path.pk).company, company)
+
+    def test_job_search_source_button_opens_and_saves_platform_form(self):
+        platform = Platform.objects.create(name="Example Platform")
+        search_path = SearchPath.objects.create(platform=platform)
+
+        page_response = self.client.get(reverse("job_search"))
+
+        self.assertContains(page_response, "Edit Platform")
+        self.assertContains(
+            page_response,
+            f'name="job-search-platform-{platform.pk}-name"',
+            html=False,
+        )
+
+        save_response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                f"job-search-platform-{platform.pk}-name": "Updated Platform",
+                f"job-search-platform-{platform.pk}-url": "https://platform.example.com",
+                f"job-search-platform-{platform.pk}-job_search_enabled": "on",
+                "save_source_platform": platform.pk,
+            },
+        )
+
+        self.assertRedirects(save_response, f"{reverse('job_search')}?page=1")
+        platform.refresh_from_db()
+        self.assertEqual(platform.name, "Updated Platform")
+        self.assertEqual(platform.url, "https://platform.example.com")
+        self.assertEqual(SearchPath.objects.get(pk=search_path.pk).platform, platform)
 
     def test_job_search_sorts_pending_paths_before_lower_alpha_paths(self):
         pending_path = SearchPath.objects.create(

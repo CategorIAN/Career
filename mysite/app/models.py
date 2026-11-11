@@ -1386,6 +1386,36 @@ class SearchPath(models.Model):
         if not self.active:
             return True
 
+        # Respect the search configuration of the path's source before
+        # considering application history or source alternation.
+        if self.platform_id is not None and not self.platform.job_search_enabled:
+            return True
+
+        if self.company_id is not None:
+            if not self.company.job_search_enabled:
+                return True
+
+            if (
+                    self.search_term_id is not None
+                    and not self.company.supports_job_search_terms
+            ):
+                return True
+
+        latest_completed_observation = (
+            self.observations
+            .filter(complete=True)
+            .order_by("-created")
+            .first()
+        )
+        recent_observation_cutoff = timezone.now() - timedelta(days=1)
+
+        if (
+                latest_completed_observation is not None
+                and latest_completed_observation.created > recent_observation_cutoff
+                and latest_completed_observation.job_posting_id is None
+        ):
+            return True
+
         # Hide company SearchPaths when there is a recent
         # submitted application to that company.
         if self.company_id is not None:

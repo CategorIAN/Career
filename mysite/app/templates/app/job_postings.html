@@ -234,67 +234,38 @@
         {% endfor %}
     {% endif %}
 
-    <section class="job-posting-group" aria-labelledby="apply-to-heading">
-        <h2 id="apply-to-heading">Apply To: Yes</h2>
+    <section class="job-posting-group" aria-labelledby="undecided-heading">
+        <h2 id="undecided-heading">Apply To: Not Set</h2>
+        <div class="job-posting-card-grid">
+            {% include "app/includes/job_posting_cards.html" with job_postings=undecided_job_postings empty_message="No undecided job postings." %}
+        </div>
+    </section>
+
+    <section class="job-posting-group" aria-labelledby="apply-without-application-heading">
+        <h2 id="apply-without-application-heading">Apply To: Yes — No Application</h2>
         <div class="job-posting-card-grid" data-apply-to="true">
-            {% for job_posting in apply_job_postings %}
-                <article
-                    class="utility-card job-posting-card open-job-posting-detail"
-                    role="button"
-                    tabindex="0"
-                    draggable="true"
-                    data-job-posting-id="{{ job_posting.pk }}"
-                    data-title="{{ job_posting.title|escape }}"
-                    data-company-name="{{ job_posting.company_name|escape }}"
-                    data-description="{{ job_posting.description|escape }}"
-                    data-url="{{ job_posting.url|escape }}"
-                    data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
-                    data-ai-recommend-apply="{{ job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
-                    data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
-                    data-expired="{{ job_posting.expired|yesno:'true,false' }}"
-                    data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
-                    aria-label="View {{ job_posting }}"
-                >
-                    <h3>{{ job_posting.title }}</h3>
-                    <p>{{ job_posting.company_name }}</p>
-                    <p class="job-posting-created">Created: {{ job_posting.created|date:"M j, Y, g:i A" }}</p>
-                    <p class="job-posting-expired-status">Expired: {{ job_posting.expired|yesno:"Yes,No" }}</p>
-                </article>
-            {% empty %}
-                <p>No job postings marked to apply to.</p>
-            {% endfor %}
+            {% include "app/includes/job_posting_cards.html" with job_postings=apply_without_application_job_postings empty_message="No job postings awaiting an application." %}
+        </div>
+    </section>
+
+    <section class="job-posting-group" aria-labelledby="apply-in-progress-heading">
+        <h2 id="apply-in-progress-heading">Apply To: Yes -- Application in Progress</h2>
+        <div class="job-posting-card-grid" data-apply-to="true">
+            {% include "app/includes/job_posting_cards.html" with job_postings=apply_in_progress_job_postings empty_message="No applications in progress." %}
+        </div>
+    </section>
+
+    <section class="job-posting-group" aria-labelledby="applied-heading">
+        <h2 id="applied-heading">Apply To: Yes — Application Submitted</h2>
+        <div class="job-posting-card-grid" data-apply-to="true">
+            {% include "app/includes/job_posting_cards.html" with job_postings=applied_job_postings empty_message="No submitted applications." %}
         </div>
     </section>
 
     <section class="job-posting-group" aria-labelledby="do-not-apply-heading">
-        <h2 id="do-not-apply-heading">Apply To: No / Not Set</h2>
+        <h2 id="do-not-apply-heading">Apply To: No</h2>
         <div class="job-posting-card-grid" data-apply-to="false">
-            {% for job_posting in other_job_postings %}
-                <article
-                    class="utility-card job-posting-card open-job-posting-detail"
-                    role="button"
-                    tabindex="0"
-                    draggable="true"
-                    data-job-posting-id="{{ job_posting.pk }}"
-                    data-title="{{ job_posting.title|escape }}"
-                    data-company-name="{{ job_posting.company_name|escape }}"
-                    data-description="{{ job_posting.description|escape }}"
-                    data-url="{{ job_posting.url|escape }}"
-                    data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
-                    data-ai-recommend-apply="{{ job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
-                    data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
-                    data-expired="{{ job_posting.expired|yesno:'true,false' }}"
-                    data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
-                    aria-label="View {{ job_posting }}"
-                >
-                    <h3>{{ job_posting.title }}</h3>
-                    <p>{{ job_posting.company_name }}</p>
-                    <p class="job-posting-created">Created: {{ job_posting.created|date:"M j, Y, g:i A" }}</p>
-                    <p class="job-posting-expired-status">Expired: {{ job_posting.expired|yesno:"Yes,No" }}</p>
-                </article>
-            {% empty %}
-                <p>No remaining job postings.</p>
-            {% endfor %}
+            {% include "app/includes/job_posting_cards.html" with job_postings=do_not_apply_job_postings empty_message="No job postings marked not to apply to." %}
         </div>
     </section>
 </section>
@@ -509,7 +480,7 @@
                 });
             });
         });
-        document.querySelectorAll(".job-posting-card-grid").forEach(group => {
+        document.querySelectorAll(".job-posting-card-grid[data-apply-to]").forEach(group => {
             group.addEventListener("dragover", event => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";

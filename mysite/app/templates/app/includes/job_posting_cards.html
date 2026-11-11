@@ -1,0 +1,26 @@
+{% for job_posting in job_postings %}
+    <article
+        class="utility-card job-posting-card open-job-posting-detail"
+        role="button"
+        tabindex="0"
+        draggable="true"
+        data-job-posting-id="{{ job_posting.pk }}"
+        data-title="{{ job_posting.title|escape }}"
+        data-company-name="{{ job_posting.company_name|escape }}"
+        data-description="{{ job_posting.description|escape }}"
+        data-url="{{ job_posting.url|escape }}"
+        data-ai-explanation="{{ job_posting.ai_explanation|escape }}"
+        data-ai-recommend-apply="{{ job_posting.ai_recommend_apply|yesno:'true,false,unknown' }}"
+        data-apply-to="{{ job_posting.apply_to|yesno:'true,false,unknown' }}"
+        data-expired="{{ job_posting.expired|yesno:'true,false' }}"
+        data-update-apply-to-url="{% url 'update_job_posting_apply_to' job_posting.pk %}"
+        aria-label="View {{ job_posting }}"
+    >
+        <h3>{{ job_posting.title }}</h3>
+        <p>{{ job_posting.company_name }}</p>
+        <p class="job-posting-created">Created: {{ job_posting.created|date:"M j, Y, g:i A" }}</p>
+        <p class="job-posting-expired-status">Expired: {{ job_posting.expired|yesno:"Yes,No" }}</p>
+    </article>
+{% empty %}
+    <p>{{ empty_message }}</p>
+{% endfor %}
