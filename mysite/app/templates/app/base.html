@@ -494,13 +494,14 @@
         <nav class="sidebar" aria-label="Primary navigation">
             {% if career_is_admin %}
             <div class="nav-folder">
-                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'resume' or request.resolver_match.url_name == 'experience' or request.resolver_match.url_name == 'residencies' or request.resolver_match.url_name == 'projects' or request.resolver_match.url_name == 'courses' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="portfolio-submenu">Portfolio</button>
+                <button class="nav-folder-toggle{% if request.resolver_match.url_name == 'resume' or request.resolver_match.url_name == 'experience' or request.resolver_match.url_name == 'residencies' or request.resolver_match.url_name == 'projects' or request.resolver_match.url_name == 'courses' or request.resolver_match.url_name == 'contact' %} is-active{% endif %}" type="button" aria-expanded="false" aria-controls="portfolio-submenu">Portfolio</button>
                 <div id="portfolio-submenu" class="nav-submenu">
                     <a class="nav-link{% if request.resolver_match.url_name == 'resume' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'resume' %} aria-current="page"{% endif %} href="{% url 'resume' %}">Resume</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'experience' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'experience' %} aria-current="page"{% endif %} href="{% url 'experience' %}">Experience</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'residencies' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'residencies' %} aria-current="page"{% endif %} href="{% url 'residencies' %}">Residencies</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'projects' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'projects' %} aria-current="page"{% endif %} href="{% url 'projects' %}">Projects</a>
                     <a class="nav-link{% if request.resolver_match.url_name == 'courses' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'courses' %} aria-current="page"{% endif %} href="{% url 'courses' %}">Education</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'contact' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'contact' %} aria-current="page"{% endif %} href="{% url 'contact' %}">Contact</a>
                 </div>
             </div>
             <div class="nav-folder">
@@ -535,7 +536,6 @@
                 </div>
             </div>
             <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
-            <a class="nav-link{% if request.resolver_match.url_name == 'contact' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'contact' %} aria-current="page"{% endif %} href="{% url 'contact' %}">Contact</a>
             {% else %}
             <a class="nav-link{% if request.resolver_match.url_name == 'resume' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'resume' %} aria-current="page"{% endif %} href="{% url 'resume' %}">Resume</a>
             <a class="nav-link{% if request.resolver_match.url_name == 'experience' %} is-active{% endif %}"{% if request.resolver_match.url_name == 'experience' %} aria-current="page"{% endif %} href="{% url 'experience' %}">Experience</a>
