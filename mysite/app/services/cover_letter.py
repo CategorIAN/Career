@@ -1,3 +1,4 @@
+from typing import Any
 from django.conf import settings
 from openai import APIError, OpenAI
 
@@ -21,7 +22,8 @@ class CoverLetterParseError(CoverLetterError):
     """OpenAI did not return a complete, usable cover letter."""
 
 
-def _job_posting_text(application):
+def _job_posting_text(application: Any) -> Any:
+    """Executes this callable."""
     job_posting = application.job_posting
     lines = [
         "JOB POSTING",
@@ -35,7 +37,8 @@ def _job_posting_text(application):
     return "\n".join(lines)
 
 
-def _response_refusal(response):
+def _response_refusal(response: Any) -> Any:
+    """Executes this callable."""
     for output in getattr(response, "output", []):
         for content in getattr(output, "content", []):
             refusal = getattr(content, "refusal", None)

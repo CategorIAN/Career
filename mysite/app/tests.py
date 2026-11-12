@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import MagicMock, call, patch
 import json
 from io import StringIO
@@ -115,14 +116,15 @@ from .services.interview_practice import (
 
 
 def make_project(
-    project_id,
+    project_id: Any,
     *,
-    title=None,
-    submitdate=1721260800,
-    jobs=None,
-    upgrades=None,
-    freebids_expire=1721347200,
-):
+    title: Any=None,
+    submitdate: Any=1721260800,
+    jobs: Any=None,
+    upgrades: Any=None,
+    freebids_expire: Any=1721347200,
+) -> dict[str, Any]:
+    """Executes this callable."""
     return {
         "id": project_id,
         "title": title or f"Project {project_id}",
@@ -152,14 +154,16 @@ def make_project(
 
 
 class NavigationTemplateTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(self.administrator)
 
-    def test_navigation_groups_every_destination_once_and_marks_active_folder(self):
+    def test_navigation_groups_every_destination_once_and_marks_active_folder(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("job_postings"))
 
         self.assertContains(response, "Portfolio")
@@ -210,7 +214,8 @@ class NavigationTemplateTests(TestCase):
 
 
 class CareerAccessTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -221,7 +226,8 @@ class CareerAccessTests(TestCase):
             password="test-password",
         )
 
-    def test_administrator_can_access_management_navigation_and_pages(self):
+    def test_administrator_can_access_management_navigation_and_pages(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         response = self.client.get(reverse("job_postings"))
@@ -233,7 +239,8 @@ class CareerAccessTests(TestCase):
         self.assertEqual(response.content.decode().count(f'href="{reverse("residencies")}"'), 1)
         self.assertEqual(self.client.get(reverse("residencies")).status_code, 200)
 
-    def test_anonymous_visitor_only_sees_and_can_access_portfolio(self):
+    def test_anonymous_visitor_only_sees_and_can_access_portfolio(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
@@ -253,7 +260,8 @@ class CareerAccessTests(TestCase):
         self.assertEqual(self.client.get(reverse("contact")).status_code, 200)
         self.assertEqual(self.client.get(reverse("admin:login")).status_code, 200)
 
-    def test_administrator_keeps_the_home_view(self):
+    def test_administrator_keeps_the_home_view(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         response = self.client.get(reverse("home"))
@@ -261,7 +269,8 @@ class CareerAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "app/home.html")
 
-    def test_home_page_uses_the_resume_summary_and_portfolio_links(self):
+    def test_home_page_uses_the_resume_summary_and_portfolio_links(self) -> None:
+        """Verifies the expected behavior."""
         ProfileSetting.objects.create(
             key="resume_summary",
             value="Database-backed professional summary.",
@@ -284,7 +293,8 @@ class CareerAccessTests(TestCase):
             )
             self.assertEqual(self.client.get(reverse(destination)).status_code, 200)
 
-    def test_other_signed_in_user_is_limited_to_portfolio(self):
+    def test_other_signed_in_user_is_limited_to_portfolio(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.other_user)
 
         response = self.client.get(reverse("experience"))
@@ -303,7 +313,8 @@ class CareerAccessTests(TestCase):
 
 
 class DjangoAdminAccessTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -317,7 +328,8 @@ class DjangoAdminAccessTests(TestCase):
             is_staff=True,
         )
 
-    def test_anonymous_admin_request_redirects_to_login_without_data(self):
+    def test_anonymous_admin_request_redirects_to_login_without_data(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("admin:index"))
 
         self.assertRedirects(
@@ -326,7 +338,8 @@ class DjangoAdminAccessTests(TestCase):
             fetch_redirect_response=False,
         )
 
-    def test_configured_administrator_can_open_admin_and_sees_admin_link(self):
+    def test_configured_administrator_can_open_admin_and_sees_admin_link(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         admin_response = self.client.get(reverse("admin:index"))
@@ -335,7 +348,8 @@ class DjangoAdminAccessTests(TestCase):
         self.assertEqual(admin_response.status_code, 200)
         self.assertContains(navigation_response, f'href="{reverse("admin:index")}"', html=False)
 
-    def test_other_staff_user_cannot_open_admin_or_see_admin_link(self):
+    def test_other_staff_user_cannot_open_admin_or_see_admin_link(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.other_staff_user)
 
         admin_response = self.client.get(reverse("admin:index"))
@@ -344,7 +358,8 @@ class DjangoAdminAccessTests(TestCase):
         self.assertEqual(admin_response.status_code, 403)
         self.assertNotContains(resume_response, f'href="{reverse("admin:index")}"', html=False)
 
-    def test_admin_logout_redirects_to_public_home_and_clears_session(self):
+    def test_admin_logout_redirects_to_public_home_and_clears_session(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         response = self.client.post(reverse("admin:logout"))
@@ -360,7 +375,8 @@ class DjangoAdminAccessTests(TestCase):
 
 
 class ResumeContactAccessTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -378,7 +394,8 @@ class ResumeContactAccessTests(TestCase):
             ]
         )
 
-    def test_administrator_can_use_the_contact_toggle(self):
+    def test_administrator_can_use_the_contact_toggle(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         response = self.client.get(reverse("resume"))
@@ -388,7 +405,8 @@ class ResumeContactAccessTests(TestCase):
         self.assertContains(response, "private.resume@example.com")
         self.assertContains(response, "555-0100")
 
-    def test_anonymous_visitor_cannot_receive_contact_information(self):
+    def test_anonymous_visitor_cannot_receive_contact_information(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(f"{reverse('resume')}?contact=1")
 
         self.assertEqual(response.status_code, 200)
@@ -404,7 +422,8 @@ class ResumeContactAccessTests(TestCase):
         self.assertEqual(response.content.decode().count("More Details"), 3)
         self.assertContains(response, ".resume-more-details-button", html=False)
 
-    def test_other_signed_in_user_cannot_receive_contact_information(self):
+    def test_other_signed_in_user_cannot_receive_contact_information(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.other_user)
 
         response = self.client.get(f"{reverse('resume')}?contact=true")
@@ -423,10 +442,12 @@ class ResumeContactAccessTests(TestCase):
     DEFAULT_FROM_EMAIL="personal@example.com",
 )
 class BusinessContactPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         cache.clear()
 
-    def _valid_submission(self, **overrides):
+    def _valid_submission(self, **overrides: Any) -> Any:
+        """Executes this callable."""
         data = {
             "name": "Taylor Visitor",
             "email": "taylor@example.com",
@@ -436,7 +457,8 @@ class BusinessContactPageTests(TestCase):
         data.update(overrides)
         return self.client.post(reverse("contact"), data)
 
-    def test_anonymous_visitor_can_access_contact_page(self):
+    def test_anonymous_visitor_can_access_contact_page(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("contact"))
 
         self.assertEqual(response.status_code, 200)
@@ -444,7 +466,8 @@ class BusinessContactPageTests(TestCase):
         self.assertContains(response, "Need a website for your business?")
         self.assertContains(response, f'href="{reverse("contact")}"', html=False)
 
-    def test_non_administrator_can_access_contact_page(self):
+    def test_non_administrator_can_access_contact_page(self) -> None:
+        """Verifies the expected behavior."""
         visitor = get_user_model().objects.create_user(
             username="contact-visitor",
             password="test-password",
@@ -455,7 +478,8 @@ class BusinessContactPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_valid_submission_sends_business_inquiry_with_reply_to(self):
+    def test_valid_submission_sends_business_inquiry_with_reply_to(self) -> None:
+        """Verifies the expected behavior."""
         response = self._valid_submission()
 
         self.assertRedirects(response, reverse("contact"), fetch_redirect_response=False)
@@ -468,14 +492,16 @@ class BusinessContactPageTests(TestCase):
         self.assertIn("Taylor Visitor", email.body)
         self.assertIn("taylor@example.com", email.body)
 
-    def test_invalid_submission_does_not_send_email(self):
+    def test_invalid_submission_does_not_send_email(self) -> None:
+        """Verifies the expected behavior."""
         response = self._valid_submission(email="not-an-email")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Enter a valid email address.")
         self.assertEqual(mail.outbox, [])
 
-    def test_honeypot_submission_does_not_send_email(self):
+    def test_honeypot_submission_does_not_send_email(self) -> None:
+        """Verifies the expected behavior."""
         response = self._valid_submission(website="https://spam.example.com")
 
         self.assertEqual(response.status_code, 200)
@@ -483,7 +509,8 @@ class BusinessContactPageTests(TestCase):
         self.assertEqual(mail.outbox, [])
 
     @patch("app.views.EmailMessage.send", return_value=0)
-    def test_delivery_failure_does_not_show_success_message(self, send_mock):
+    def test_delivery_failure_does_not_show_success_message(self, send_mock: Any) -> None:
+        """Verifies the expected behavior."""
         response = self._valid_submission(follow=True)
 
         send_mock.assert_called_once()
@@ -498,7 +525,8 @@ class BusinessContactPageTests(TestCase):
         EMAIL_HOST_PASSWORD="",
         BUSINESS_CONTACT_EMAIL="",
     )
-    def test_missing_smtp_configuration_is_handled_without_delivery(self):
+    def test_missing_smtp_configuration_is_handled_without_delivery(self) -> None:
+        """Verifies the expected behavior."""
         response = self._valid_submission(follow=True)
 
         self.assertContains(
@@ -508,7 +536,8 @@ class BusinessContactPageTests(TestCase):
         self.assertNotContains(response, "Your inquiry has been sent.")
         self.assertEqual(mail.outbox, [])
 
-    def test_submission_rate_limit_blocks_additional_delivery(self):
+    def test_submission_rate_limit_blocks_additional_delivery(self) -> None:
+        """Verifies the expected behavior."""
         for _ in range(5):
             self._valid_submission()
 
@@ -520,7 +549,8 @@ class BusinessContactPageTests(TestCase):
 
 
 class ResumeRoleDisplayTests(TestCase):
-    def test_resume_shows_only_the_resume_summary(self):
+    def test_resume_shows_only_the_resume_summary(self) -> None:
+        """Verifies the expected behavior."""
         ProfileSetting.objects.bulk_create(
             [
                 ProfileSetting(key="resume_summary", value="Resume summary text."),
@@ -534,7 +564,8 @@ class ResumeRoleDisplayTests(TestCase):
         self.assertNotContains(response, "Platform summary text.")
         self.assertNotContains(response, 'id="summary-view-select"', html=False)
 
-    def test_resume_hides_role_descriptions_but_shows_responsibilities(self):
+    def test_resume_hides_role_descriptions_but_shows_responsibilities(self) -> None:
+        """Verifies the expected behavior."""
         role = Role.objects.create(
             company=Company.objects.create(name="Example Co"),
             title="Data Engineer",
@@ -562,7 +593,8 @@ class ResumeRoleDisplayTests(TestCase):
 
 
 class ExperienceDisplayModeTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -595,7 +627,8 @@ class ExperienceDisplayModeTests(TestCase):
             is_public=False,
         )
 
-    def test_administrator_can_switch_and_remember_application_tools_mode(self):
+    def test_administrator_can_switch_and_remember_application_tools_mode(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         presentation_response = self.client.get(reverse("experience"))
@@ -620,7 +653,8 @@ class ExperienceDisplayModeTests(TestCase):
         self.assertTrue(hasattr(list(tools_response.context["roles"])[0], "copy_payload"))
         self.assertEqual(remembered_response.context["experience_mode"], "application_tools")
 
-    def test_anonymous_visitor_is_forced_to_public_presentation_mode(self):
+    def test_anonymous_visitor_is_forced_to_public_presentation_mode(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(
             reverse("experience"),
             {"mode": "application_tools"},
@@ -633,7 +667,8 @@ class ExperienceDisplayModeTests(TestCase):
         self.assertNotContains(response, "Copy All")
         self.assertFalse(hasattr(list(response.context["roles"])[0], "copy_payload"))
 
-    def test_other_signed_in_user_is_forced_to_public_presentation_mode(self):
+    def test_other_signed_in_user_is_forced_to_public_presentation_mode(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.other_user)
 
         response = self.client.get(
@@ -649,7 +684,8 @@ class ExperienceDisplayModeTests(TestCase):
 
 
 class ExperienceEditingTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -680,7 +716,8 @@ class ExperienceEditingTests(TestCase):
         self.other_skill = Skill.objects.create(name="SQL", type="Language")
         self.role.skills.add(self.skill)
 
-    def test_administrator_can_edit_and_save_individual_sections(self):
+    def test_administrator_can_edit_and_save_individual_sections(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         editing_response = self.client.get(reverse("experience"), {"mode": "editing"})
@@ -741,7 +778,8 @@ class ExperienceEditingTests(TestCase):
             [self.other_task, self.task],
         )
 
-    def test_invalid_role_section_returns_errors_without_saving(self):
+    def test_invalid_role_section_returns_errors_without_saving(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         response = self.client.post(
@@ -760,7 +798,8 @@ class ExperienceEditingTests(TestCase):
         self.role.refresh_from_db()
         self.assertEqual(self.role.title, "Original Title")
 
-    def test_non_owner_cannot_enable_or_save_editing_mode(self):
+    def test_non_owner_cannot_enable_or_save_editing_mode(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.other_user)
 
         page_response = self.client.get(reverse("experience"), {"mode": "editing"})
@@ -773,7 +812,8 @@ class ExperienceEditingTests(TestCase):
         self.assertNotContains(page_response, "Save Role Details")
         self.assertEqual(save_response.status_code, 403)
 
-    def test_edit_endpoint_requires_csrf_token(self):
+    def test_edit_endpoint_requires_csrf_token(self) -> None:
+        """Verifies the expected behavior."""
         secure_client = Client(enforce_csrf_checks=True)
         secure_client.force_login(self.administrator)
 
@@ -786,7 +826,8 @@ class ExperienceEditingTests(TestCase):
 
 
 class ProjectDisplayModeTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -819,7 +860,8 @@ class ProjectDisplayModeTests(TestCase):
             sort_order=1,
         )
 
-    def test_administrator_defaults_to_tools_and_can_switch_modes(self):
+    def test_administrator_defaults_to_tools_and_can_switch_modes(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         tools_response = self.client.get(reverse("projects"))
@@ -846,7 +888,8 @@ class ProjectDisplayModeTests(TestCase):
         self.assertContains(editing_response, 'draggable="true"', html=False)
         self.assertNotContains(editing_response, "Sort order")
 
-    def test_public_users_are_forced_to_presentation_mode(self):
+    def test_public_users_are_forced_to_presentation_mode(self) -> None:
+        """Verifies the expected behavior."""
         anonymous_response = self.client.get(
             reverse("projects"),
             {"mode": "editing"},
@@ -864,7 +907,8 @@ class ProjectDisplayModeTests(TestCase):
             self.assertNotContains(response, "Application Tools")
             self.assertNotContains(response, "Save Project Details")
 
-    def test_owner_can_save_project_sections_and_reordered_tasks(self):
+    def test_owner_can_save_project_sections_and_reordered_tasks(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         core_response = self.client.post(
@@ -923,7 +967,8 @@ class ProjectDisplayModeTests(TestCase):
             [self.second_task, self.first_task],
         )
 
-    def test_owner_can_add_project_task(self):
+    def test_owner_can_add_project_task(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         prefix = f"project-{self.public_project.pk}-tasks"
 
@@ -956,7 +1001,8 @@ class ProjectDisplayModeTests(TestCase):
 
 
 class ProjectManagementTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -968,7 +1014,8 @@ class ProjectManagementTests(TestCase):
         )
         self.project = Project.objects.create(title="Career App", toggl_tag_name="Career App")
 
-    def test_management_endpoints_require_career_administrator(self):
+    def test_management_endpoints_require_career_administrator(self) -> None:
+        """Verifies the expected behavior."""
         for client in (self.client, Client()):
             self.assertEqual(client.get(reverse("project_management")).status_code, 403)
             self.assertEqual(
@@ -1108,7 +1155,8 @@ class ProjectManagementTests(TestCase):
             "Days back must be a positive whole number.",
         )
 
-    def test_checklist_response_save_and_clear_completion_date(self):
+    def test_checklist_response_save_and_clear_completion_date(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         item = ChecklistItem.objects.create(name="Custom Standard")
         response = self.client.post(
@@ -1159,7 +1207,8 @@ class ProjectManagementTests(TestCase):
         with self.assertRaises(IntegrityError):
             ProjectChecklist.objects.create(project=self.project, checklist_item=item)
 
-    def test_checklist_archive_state_is_project_specific(self):
+    def test_checklist_archive_state_is_project_specific(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         item = ChecklistItem.objects.create(name="Archived Standard")
 
@@ -1199,7 +1248,8 @@ class ProjectManagementTests(TestCase):
         checklist.refresh_from_db()
         self.assertFalse(checklist.archived)
 
-    def test_checklist_items_sort_by_update_due_date_with_nulls_first(self):
+    def test_checklist_items_sort_by_update_due_date_with_nulls_first(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         undated_item = ChecklistItem.objects.create(
             name="Undated Standard",
@@ -1241,7 +1291,8 @@ class ProjectManagementTests(TestCase):
             [undated_item.name, sooner_due_item.name, later_due_item.name],
         )
 
-    def test_checklist_validation_renders_bound_card_without_saving(self):
+    def test_checklist_validation_renders_bound_card_without_saving(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         item = ChecklistItem.objects.create(name="Validation Standard")
 
@@ -1267,7 +1318,8 @@ class ProjectManagementTests(TestCase):
             ).exists()
         )
 
-    def test_zero_allocation_weights_and_action_lifecycle(self):
+    def test_zero_allocation_weights_and_action_lifecycle(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         self.project.allocation_weight = 0
         self.project.save(update_fields=["allocation_weight"])
@@ -1293,7 +1345,8 @@ class ProjectManagementTests(TestCase):
         item.refresh_from_db()
         self.assertIsNone(item.completed_at)
 
-    def test_project_alpha_dropdown_uses_valid_full_history_totals(self):
+    def test_project_alpha_dropdown_uses_valid_full_history_totals(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         no_time_project = Project.objects.create(
             title="No Time",
@@ -1318,7 +1371,8 @@ class ProjectManagementTests(TestCase):
         )
         started_at = timezone.now() - timedelta(days=90)
 
-        def create_entry(external_id, project, duration_seconds, **flags):
+        def create_entry(external_id: Any, project: Any, duration_seconds: Any, **flags: Any) -> None:
+            """Executes this callable."""
             TogglTimeEntry.objects.create(
                 external_id=external_id,
                 project=project,
@@ -1380,7 +1434,8 @@ class ProjectManagementTests(TestCase):
             {project.pk for project in inactive_response.context["search_projects"]},
         )
 
-    def test_unselected_project_dashboard_groups_valid_time_by_week(self):
+    def test_unselected_project_dashboard_groups_valid_time_by_week(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         other_project = Project.objects.create(title="Optimization Lab")
         inactive_project = Project.objects.create(
@@ -1395,7 +1450,8 @@ class ProjectManagementTests(TestCase):
             microsecond=0,
         )
 
-        def create_entry(external_id, project, started_at, duration_seconds, **flags):
+        def create_entry(external_id: Any, project: Any, started_at: Any, duration_seconds: Any, **flags: Any) -> None:
+            """Executes this callable."""
             TogglTimeEntry.objects.create(
                 external_id=external_id,
                 project=project,
@@ -1475,7 +1531,8 @@ class ProjectManagementTests(TestCase):
             {project.pk for project in inactive_response.context["dashboard_projects"]},
         )
 
-    def test_dashboard_checklist_item_formset_adds_edits_and_deletes_items(self):
+    def test_dashboard_checklist_item_formset_adds_edits_and_deletes_items(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         checklist_item = ChecklistItem.objects.create(
             name="Editable Standard",
@@ -1487,7 +1544,8 @@ class ProjectManagementTests(TestCase):
         self.assertContains(response, "Save Checklist Items")
         self.assertContains(response, "Add Checklist Item")
 
-        def formset_payload(items, *, delete_ids=()):
+        def formset_payload(items: Any, *, delete_ids: Any=()) -> Any:
+            """Executes this callable."""
             payload = {
                 "action": "save_checklist_items",
                 "checklist-items-TOTAL_FORMS": str(len(items)),
@@ -1552,7 +1610,8 @@ class ProjectManagementTests(TestCase):
         self.assertRedirects(delete_response, reverse("project_management"))
         self.assertFalse(ChecklistItem.objects.filter(pk=deletable_item.pk).exists())
 
-    def test_toggl_totals_include_only_completed_entries_for_selected_project(self):
+    def test_toggl_totals_include_only_completed_entries_for_selected_project(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         other_project = Project.objects.create(title="Event Planning")
         now = timezone.localtime()
@@ -1569,7 +1628,8 @@ class ProjectManagementTests(TestCase):
             coverage_end_date=now.date(),
         )
 
-        def create_entry(external_id, *, project, started_at, duration_seconds, **flags):
+        def create_entry(external_id: Any, *, project: Any, started_at: Any, duration_seconds: Any, **flags: Any) -> Any:
+            """Executes this callable."""
             return TogglTimeEntry.objects.create(
                 external_id=external_id,
                 project=project,
@@ -1618,7 +1678,8 @@ class ProjectManagementTests(TestCase):
         self.assertContains(response, "Project Communication")
         self.assertNotContains(response, "No Toggl project")
 
-    def test_toggl_breakdown_maps_missing_activity_names_and_shows_minutes(self):
+    def test_toggl_breakdown_maps_missing_activity_names_and_shows_minutes(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
         start = timezone.now() - timedelta(days=1)
         end = timezone.now()
@@ -1663,9 +1724,10 @@ class ProjectManagementTests(TestCase):
     @patch("app.services.toggl.fetch_toggl_projects")
     def test_toggl_sync_backfills_and_refreshes_activity_names(
         self,
-        fetch_toggl_projects_mock,
-        fetch_time_entries_mock,
-    ):
+        fetch_toggl_projects_mock: Any,
+        fetch_time_entries_mock: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         blank_name_entry = TogglTimeEntry.objects.create(
             external_id="blank-activity-name",
             project=self.project,
@@ -1702,7 +1764,8 @@ class ProjectManagementTests(TestCase):
         self.assertEqual(fetch_toggl_projects_mock.call_count, 2)
         self.assertEqual(fetch_time_entries_mock.call_count, 2)
 
-    def test_toggl_import_does_not_replace_a_known_name_with_blank(self):
+    def test_toggl_import_does_not_replace_a_known_name_with_blank(self) -> None:
+        """Verifies the expected behavior."""
         start = timezone.now() - timedelta(days=1)
         end = timezone.now()
         entry = TogglTimeEntry.objects.create(
@@ -1733,7 +1796,8 @@ class ProjectManagementTests(TestCase):
         entry.refresh_from_db()
         self.assertEqual(entry.source_project_name, "Project Communication")
 
-    def test_toggl_import_is_idempotent_and_flags_multiple_tag_matches(self):
+    def test_toggl_import_is_idempotent_and_flags_multiple_tag_matches(self) -> None:
+        """Verifies the expected behavior."""
         other_project = Project.objects.create(title="Event Planning", toggl_tag_name="Event Planning App")
         start = timezone.now() - timedelta(days=2)
         end = timezone.now()
@@ -1767,7 +1831,8 @@ class ProjectManagementTests(TestCase):
         self.assertIsNone(ambiguous.project)
         self.assertEqual(other_project.toggl_time_entries.count(), 0)
 
-    def test_toggl_reconciliation_only_marks_entries_inside_exact_window(self):
+    def test_toggl_reconciliation_only_marks_entries_inside_exact_window(self) -> None:
+        """Verifies the expected behavior."""
         end = timezone.now()
         start = end - timedelta(days=30)
         inside_entry = TogglTimeEntry.objects.create(
@@ -1791,7 +1856,8 @@ class ProjectManagementTests(TestCase):
         self.assertFalse(outside_entry.is_deleted_at_source)
 
     @override_settings(TOGGL_MAX_IMPORT_DAYS=30)
-    def test_toggl_import_days_are_positive_and_limited(self):
+    def test_toggl_import_days_are_positive_and_limited(self) -> None:
+        """Verifies the expected behavior."""
         self.assertEqual(validate_import_days(30), 30)
         with self.assertRaisesMessage(
             TogglSyncError,
@@ -1806,7 +1872,8 @@ class ProjectManagementTests(TestCase):
 
 
 class EducationDisplayModeTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         user_model = get_user_model()
         self.administrator = user_model.objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
@@ -1840,7 +1907,8 @@ class EducationDisplayModeTests(TestCase):
         self.other_skill = Skill.objects.create(name="SQL", type="Language")
         self.course.skills.add(self.skill)
 
-    def test_administrator_defaults_to_tools_and_can_switch_modes(self):
+    def test_administrator_defaults_to_tools_and_can_switch_modes(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         tools_response = self.client.get(reverse("courses"))
@@ -1874,7 +1942,8 @@ class EducationDisplayModeTests(TestCase):
         self.assertContains(editing_response, "Skills in Course")
         self.assertContains(editing_response, 'draggable="true"', html=False)
 
-    def test_public_users_are_forced_to_presentation_mode(self):
+    def test_public_users_are_forced_to_presentation_mode(self) -> None:
+        """Verifies the expected behavior."""
         anonymous_response = self.client.get(
             reverse("courses"),
             {"mode": "editing"},
@@ -1891,7 +1960,8 @@ class EducationDisplayModeTests(TestCase):
             self.assertNotContains(response, "Application Tools")
             self.assertNotContains(response, "Save Education")
 
-    def test_owner_can_save_education_and_course_sections(self):
+    def test_owner_can_save_education_and_course_sections(self) -> None:
+        """Verifies the expected behavior."""
         self.client.force_login(self.administrator)
 
         education_response = self.client.post(
@@ -1935,16 +2005,19 @@ class EducationDisplayModeTests(TestCase):
 
 
 class FreelancerSearchViewTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         cache.clear()
         self.search_url = reverse("freelancer_search")
         self.save_url = reverse("save_freelancer_project")
 
-    def test_freelancer_search_uses_renamed_path(self):
+    def test_freelancer_search_uses_renamed_path(self) -> None:
+        """Verifies the expected behavior."""
         self.assertEqual(self.search_url, "/freelancer_search")
 
     @patch("app.views.search_projects")
-    def test_single_api_call_then_local_pagination_uses_cache(self, mock_search_projects):
+    def test_single_api_call_then_local_pagination_uses_cache(self, mock_search_projects: Any) -> None:
+        """Verifies the expected behavior."""
         mock_search_projects.return_value = {
             "projects": [make_project(project_id) for project_id in range(1, 16)]
         }
@@ -1973,7 +2046,8 @@ class FreelancerSearchViewTests(TestCase):
         self.assertEqual(len(cached_response.context["projects"]), 5)
 
     @patch("app.views.search_projects")
-    def test_refresh_replaces_cached_results_with_one_api_call(self, mock_search_projects):
+    def test_refresh_replaces_cached_results_with_one_api_call(self, mock_search_projects: Any) -> None:
+        """Verifies the expected behavior."""
         mock_search_projects.side_effect = [
             {"projects": [make_project(1)]},
             {"projects": [make_project(2)]},
@@ -2003,8 +2077,9 @@ class FreelancerSearchViewTests(TestCase):
     @patch("app.views.search_projects")
     def test_rate_limited_projects_not_found_shows_friendly_message_and_is_not_cached(
         self,
-        mock_search_projects,
-    ):
+        mock_search_projects: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         mock_search_projects.side_effect = ProjectsNotFoundException(
             "You have made too many of these requests",
             "429",
@@ -2022,7 +2097,8 @@ class FreelancerSearchViewTests(TestCase):
         cache_key = _build_search_cache_key(normalized_query)
         self.assertIsNone(cache.get(cache_key))
 
-    def test_save_view_creates_project_and_skills_from_cached_results(self):
+    def test_save_view_creates_project_and_skills_from_cached_results(self) -> None:
+        """Verifies the expected behavior."""
         normalized_query = _normalize_search_query("Python Search")
         cache.set(
             _build_search_cache_key(normalized_query),
@@ -2080,7 +2156,8 @@ class FreelancerSearchViewTests(TestCase):
         messages = list(get_messages(response.wsgi_request))
         self.assertEqual(str(messages[0]), 'Saved "Project 101".')
 
-    def test_save_view_updates_existing_project_and_synchronizes_skills(self):
+    def test_save_view_updates_existing_project_and_synchronizes_skills(self) -> None:
+        """Verifies the expected behavior."""
         old_skill = FreelancerSkill.objects.create(id=21, name="Old Skill")
         project = FreelancerProject.objects.create(
             freelancer_id=202,
@@ -2121,7 +2198,8 @@ class FreelancerSearchViewTests(TestCase):
             [22],
         )
 
-    def test_save_view_shows_friendly_error_when_project_missing_from_cache(self):
+    def test_save_view_shows_friendly_error_when_project_missing_from_cache(self) -> None:
+        """Verifies the expected behavior."""
         normalized_query = _normalize_search_query("python")
         cache.set(
             _build_search_cache_key(normalized_query),
@@ -2143,7 +2221,8 @@ class FreelancerSearchViewTests(TestCase):
             "That Freelancer project is no longer available in the cached search results. Please search again.",
         )
 
-    def test_search_results_show_saved_indicator_for_existing_projects(self):
+    def test_search_results_show_saved_indicator_for_existing_projects(self) -> None:
+        """Verifies the expected behavior."""
         FreelancerProject.objects.create(
             freelancer_id=401,
             title="Saved Project",
@@ -2171,7 +2250,8 @@ class FreelancerSearchViewTests(TestCase):
 
 
 class CandidateBackgroundServiceTests(TestCase):
-    def test_builds_detailed_background_from_public_resume_data(self):
+    def test_builds_detailed_background_from_public_resume_data(self) -> None:
+        """Verifies the expected behavior."""
         school = School.objects.create(name="State University")
         education = Education.objects.create(
             school=school,
@@ -2263,9 +2343,10 @@ class JobEvaluationServiceTests(TestCase):
     @patch("app.services.job_evaluation.OpenAI")
     def test_evaluates_posting_with_structured_output(
         self,
-        mock_openai,
-        mock_build_background,
-    ):
+        mock_openai: Any,
+        mock_build_background: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -2312,9 +2393,10 @@ class JobEvaluationServiceTests(TestCase):
     @patch("app.services.job_evaluation.OpenAI")
     def test_evaluation_request_includes_assumptions_and_genuine_barriers(
         self,
-        mock_openai,
-        mock_build_background,
-    ):
+        mock_openai: Any,
+        mock_build_background: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Senior Backend Engineer",
             company_name="Example Co",
@@ -2360,9 +2442,10 @@ class JobEvaluationServiceTests(TestCase):
     @patch("app.services.job_evaluation.OpenAI")
     def test_evaluation_request_distinguishes_unknowns_from_gaps(
         self,
-        mock_openai,
-        mock_build_background,
-    ):
+        mock_openai: Any,
+        mock_build_background: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Backend Engineer",
             company_name="Example Co",
@@ -2399,9 +2482,10 @@ class JobEvaluationServiceTests(TestCase):
     @patch("app.services.job_evaluation.OpenAI")
     def test_evaluation_request_distinguishes_requirements_from_responsibilities(
         self,
-        mock_openai,
-        mock_build_background,
-    ):
+        mock_openai: Any,
+        mock_build_background: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Founding Engineer",
             company_name="Example Co",
@@ -2463,7 +2547,8 @@ class JobEvaluationServiceTests(TestCase):
     @override_settings(OPENAI_API_KEY="test-api-key")
     @patch("app.services.job_evaluation.build_candidate_background", return_value="Background")
     @patch("app.services.job_evaluation.OpenAI")
-    def test_rejects_refused_or_unparsed_evaluation(self, mock_openai, mock_background):
+    def test_rejects_refused_or_unparsed_evaluation(self, mock_openai: Any, mock_background: Any) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -2486,7 +2571,8 @@ class JobEvaluationServiceTests(TestCase):
             evaluate_job_posting(job_posting)
 
     @patch("app.management.commands.evaluate_job.evaluate_job_posting")
-    def test_evaluate_job_command_prints_evaluation_without_saving(self, mock_evaluate):
+    def test_evaluate_job_command_prints_evaluation_without_saving(self, mock_evaluate: Any) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -2505,7 +2591,8 @@ class JobEvaluationServiceTests(TestCase):
         job_posting.refresh_from_db()
         self.assertIsNone(job_posting.apply_to)
 
-    def test_evaluate_job_command_rejects_unknown_posting_id(self):
+    def test_evaluate_job_command_rejects_unknown_posting_id(self) -> None:
+        """Verifies the expected behavior."""
         with self.assertRaisesMessage(CommandError, "Job posting with ID 999 does not exist"):
             call_command("evaluate_job", 999)
 
@@ -2522,9 +2609,10 @@ class CoverLetterServiceTests(TestCase):
     @patch("app.services.cover_letter.OpenAI")
     def test_generates_cover_letter_from_application_context(
         self,
-        mock_openai,
-        mock_build_background,
-    ):
+        mock_openai: Any,
+        mock_build_background: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -2558,7 +2646,8 @@ class CoverLetterServiceTests(TestCase):
     @override_settings(OPENAI_API_KEY="test-api-key")
     @patch("app.services.cover_letter.build_candidate_background", return_value="Background")
     @patch("app.services.cover_letter.OpenAI")
-    def test_rejects_refused_or_empty_cover_letters(self, mock_openai, mock_background):
+    def test_rejects_refused_or_empty_cover_letters(self, mock_openai: Any, mock_background: Any) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -2586,7 +2675,8 @@ class CoverLetterServiceTests(TestCase):
         "app.services.cover_letter_pdf.timezone.localdate",
         return_value=date(2026, 10, 7),
     )
-    def test_builds_pdf_with_a_sanitized_filename(self, mock_localdate):
+    def test_builds_pdf_with_a_sanitized_filename(self, mock_localdate: Any) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -2605,7 +2695,8 @@ class CoverLetterServiceTests(TestCase):
 
 
 class ApplicationReferencePageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.country = Country.objects.create(name="United States", code="USA")
         self.state = State.objects.create(
             name="Montana",
@@ -2640,7 +2731,8 @@ class ApplicationReferencePageTests(TestCase):
         self.sql_skill = Skill.objects.create(name="SQL", type="Technology")
         self.research_skill = Skill.objects.create(name="Research", type="Domain")
 
-    def test_experience_page_uses_complete_role_data_and_hides_supervisors(self):
+    def test_experience_page_uses_complete_role_data_and_hides_supervisors(self) -> None:
+        """Verifies the expected behavior."""
         earlier_role = Role.objects.create(
             company=self.company,
             title="Analyst",
@@ -2743,7 +2835,8 @@ class ApplicationReferencePageTests(TestCase):
             html=False,
         )
 
-    def test_residencies_page_shows_reverse_chronological_address_history(self):
+    def test_residencies_page_shows_reverse_chronological_address_history(self) -> None:
+        """Verifies the expected behavior."""
         earlier_residency = Residency.objects.create(
             address=self.address,
             start_date="2022-01-01",
@@ -2791,7 +2884,8 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, "Address:\n1 Main St\nSuite 200\nHelena, MT 59601", html=False)
         self.assertContains(response, "Notes:\nMost recent residence.", html=False)
 
-    def test_projects_page_uses_ordered_tasks_and_complete_project_fields(self):
+    def test_projects_page_uses_ordered_tasks_and_complete_project_fields(self) -> None:
+        """Verifies the expected behavior."""
         project = Project.objects.create(
             title="Career Portal",
             short_description="A concise summary.",
@@ -2840,7 +2934,8 @@ class ApplicationReferencePageTests(TestCase):
         self.assertContains(response, "Short description:\nA concise summary.", html=False)
         self.assertContains(response, "Tasks:\n- First project task\n- Second project task", html=False)
 
-    def test_courses_page_uses_sort_order_and_related_education(self):
+    def test_courses_page_uses_sort_order_and_related_education(self) -> None:
+        """Verifies the expected behavior."""
         later_course = Course.objects.create(
             education=self.education,
             title="Advanced Analytics",
@@ -2927,14 +3022,16 @@ class ApplicationReferencePageTests(TestCase):
 
 
 class PlatformPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_platforms_page_paginates_one_platform_with_arrow_navigation(self):
+    def test_platforms_page_paginates_one_platform_with_arrow_navigation(self) -> None:
+        """Verifies the expected behavior."""
         first_platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
@@ -2968,7 +3065,8 @@ class PlatformPageTests(TestCase):
             html=False,
         )
 
-    def test_platforms_page_shows_add_delete_column_and_buttons(self):
+    def test_platforms_page_shows_add_delete_column_and_buttons(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
@@ -2993,7 +3091,8 @@ class PlatformPageTests(TestCase):
         self.assertNotContains(response, 'name="form-0-DELETE"', html=False)
         self.assertNotContains(response, ">New<", html=False)
 
-    def test_add_platform_modal_shows_validation_errors(self):
+    def test_add_platform_modal_shows_validation_errors(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("platforms"),
             data={
@@ -3011,7 +3110,8 @@ class PlatformPageTests(TestCase):
             html=False,
         )
 
-    def test_platforms_page_shows_only_current_platform_search_paths(self):
+    def test_platforms_page_shows_only_current_platform_search_paths(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
@@ -3038,7 +3138,8 @@ class PlatformPageTests(TestCase):
             html=False,
         )
 
-    def test_platform_search_path_edit_saves_only_the_current_platform_path(self):
+    def test_platform_search_path_edit_saves_only_the_current_platform_path(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(name="Alpha Platform")
         search_path = SearchPath.objects.create(platform=platform)
 
@@ -3058,7 +3159,8 @@ class PlatformPageTests(TestCase):
         self.assertEqual(search_path.url, "https://jobs.example.com")
         self.assertTrue(search_path.active)
 
-    def test_platform_search_paths_sort_by_success_probability_descending(self):
+    def test_platform_search_paths_sort_by_success_probability_descending(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(name="Alpha Platform")
         lower_probability_path = SearchPath.objects.create(
             platform=platform,
@@ -3089,7 +3191,8 @@ class PlatformPageTests(TestCase):
         self.assertLess(content.index("Python"), content.index("Django"))
         self.assertEqual(lower_probability_path.platform_id, platform.pk)
 
-    def test_platforms_save_updates_existing_rows_without_creating_top_row(self):
+    def test_platforms_save_updates_existing_rows_without_creating_top_row(self) -> None:
+        """Verifies the expected behavior."""
         existing_platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
@@ -3119,7 +3222,8 @@ class PlatformPageTests(TestCase):
         self.assertTrue(existing_platform.job_search_enabled)
         self.assertFalse(Platform.objects.filter(name="Should Not Save").exists())
 
-    def test_platforms_add_button_creates_platform(self):
+    def test_platforms_add_button_creates_platform(self) -> None:
+        """Verifies the expected behavior."""
         skill = Skill.objects.create(name="Python", type="Language")
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
@@ -3170,7 +3274,8 @@ class PlatformPageTests(TestCase):
             {first_feature.pk, second_feature.pk},
         )
 
-    def test_platforms_delete_button_removes_existing_platform(self):
+    def test_platforms_delete_button_removes_existing_platform(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(
             name="Alpha Platform",
             url="https://alpha.example.com",
@@ -3196,14 +3301,16 @@ class PlatformPageTests(TestCase):
 
 
 class ProfessionalPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(self.administrator)
 
-    def test_professional_reverse_connections_use_professional_relation(self):
+    def test_professional_reverse_connections_use_professional_relation(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         connection = ProfessionalConnect.objects.create(
             professional=professional,
@@ -3219,7 +3326,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(list(professional.connects.all()), [connection])
         self.assertContains(response, "Ada Lovelace")
 
-    def test_professionals_page_shows_modal_add_form_and_existing_cards(self):
+    def test_professionals_page_shows_modal_add_form_and_existing_cards(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(
             name="Ada Lovelace",
             linkedin_url="https://www.linkedin.com/in/ada-lovelace",
@@ -3289,7 +3397,8 @@ class ProfessionalPageTests(TestCase):
         self.assertNotContains(response, "15 days")
         self.assertContains(response, '<tr style="background: #f4cccc;">', html=False)
 
-    def test_professionals_wait_column_displays_months(self):
+    def test_professionals_wait_column_displays_months(self) -> None:
+        """Verifies the expected behavior."""
         Professional.objects.create(
             name="Ada Lovelace",
             wait=timedelta(days=15),
@@ -3300,7 +3409,8 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, "0.5 months")
         self.assertNotContains(response, "15 days")
 
-    def test_professionals_page_shows_cc_button_for_carroll_connect_url(self):
+    def test_professionals_page_shows_cc_button_for_carroll_connect_url(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(
             name="Ada Lovelace",
             carrollconnect_url="https://carrollconnect.example.com/ada",
@@ -3316,7 +3426,8 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertContains(response, ">CC</a>", html=False)
 
-    def test_professionals_add_button_creates_professional(self):
+    def test_professionals_add_button_creates_professional(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("professionals"),
             data={
@@ -3350,7 +3461,8 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertEqual(str(professional.wait), "15 days, 0:00:00")
 
-    def test_professionals_search_displays_selected_professional(self):
+    def test_professionals_search_displays_selected_professional(self) -> None:
+        """Verifies the expected behavior."""
         first_professional = Professional.objects.create(name="Ada Lovelace")
         selected_professional = Professional.objects.create(name="Grace Hopper")
 
@@ -3385,7 +3497,8 @@ class ProfessionalPageTests(TestCase):
         )
         self.assertNotContains(response, "Professional 1 of 2")
 
-    def test_professionals_page_displays_current_professionals_companies(self):
+    def test_professionals_page_displays_current_professionals_companies(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         company = Company.objects.create(
             name="Analytical Engines",
@@ -3425,7 +3538,8 @@ class ProfessionalPageTests(TestCase):
             html=False,
         )
 
-    def test_professionals_page_removes_company_from_current_professional(self):
+    def test_professionals_page_removes_company_from_current_professional(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         company = Company.objects.create(name="Analytical Engines")
         professional.companies.add(company)
@@ -3447,7 +3561,8 @@ class ProfessionalPageTests(TestCase):
         self.assertFalse(professional.companies.filter(pk=company.pk).exists())
         self.assertTrue(Company.objects.filter(pk=company.pk).exists())
 
-    def test_professionals_page_adds_company_to_current_professional(self):
+    def test_professionals_page_adds_company_to_current_professional(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         company = Company.objects.create(name="Analytical Engines")
 
@@ -3478,7 +3593,8 @@ class ProfessionalPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(list(professional.companies.all()), [company])
 
-    def test_professionals_page_creates_and_links_new_company(self):
+    def test_professionals_page_creates_and_links_new_company(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         active_search_term = SearchTerm.objects.create(term="Python")
 
@@ -3523,7 +3639,8 @@ class ProfessionalPageTests(TestCase):
             SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
         )
 
-    def test_professionals_page_displays_current_professionals_referrals(self):
+    def test_professionals_page_displays_current_professionals_referrals(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         referral = Professional.objects.create(
             name="Grace Hopper",
@@ -3552,7 +3669,8 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, referral.email)
         self.assertContains(response, referral.phone)
 
-    def test_professionals_page_adds_existing_referral(self):
+    def test_professionals_page_adds_existing_referral(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         referral = Professional.objects.create(name="Grace Hopper")
 
@@ -3578,7 +3696,8 @@ class ProfessionalPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(list(professional.referrals.all()), [referral])
 
-    def test_professionals_page_creates_and_links_new_referral(self):
+    def test_professionals_page_creates_and_links_new_referral(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         response = self.client.post(
@@ -3601,7 +3720,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(list(professional.referrals.all()), [referral])
         self.assertEqual(referral.phone, "555-0101")
 
-    def test_professionals_page_displays_current_professionals_referrers(self):
+    def test_professionals_page_displays_current_professionals_referrers(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         referrer = Professional.objects.create(
             name="Grace Hopper",
@@ -3629,7 +3749,8 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(response, referrer.email)
         self.assertContains(response, referrer.phone)
 
-    def test_professionals_page_adds_existing_referrer(self):
+    def test_professionals_page_adds_existing_referrer(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         referrer = Professional.objects.create(name="Grace Hopper")
 
@@ -3654,7 +3775,8 @@ class ProfessionalPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(list(professional.referred_by.all()), [referrer])
 
-    def test_professionals_page_creates_and_links_new_referrer(self):
+    def test_professionals_page_creates_and_links_new_referrer(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         response = self.client.post(
@@ -3676,7 +3798,8 @@ class ProfessionalPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('professionals')}?page=1")
         self.assertEqual(list(professional.referred_by.all()), [referrer])
 
-    def test_professionals_page_shows_current_professionals_invitations(self):
+    def test_professionals_page_shows_current_professionals_invitations(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         other_professional = Professional.objects.create(name="Grace Hopper")
         older_invitation = ProfessionalConnect.objects.create(
@@ -3738,7 +3861,8 @@ class ProfessionalPageTests(TestCase):
         )
 
     @patch("app.views.sync_professional_connect")
-    def test_professionals_page_edits_current_professionals_invitation(self, mock_sync):
+    def test_professionals_page_edits_current_professionals_invitation(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
             professional=professional,
@@ -3772,8 +3896,9 @@ class ProfessionalPageTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_professionals_page_keeps_connection_save_when_google_sync_fails(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
             professional=professional,
@@ -3805,7 +3930,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(invitation.rating, 4)
         self.assertEqual(invitation.notes, "Saved despite sync failure")
 
-    def test_professionals_page_builds_notes_from_connections_newest_first(self):
+    def test_professionals_page_builds_notes_from_connections_newest_first(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
             professional=professional,
@@ -3845,7 +3971,8 @@ class ProfessionalPageTests(TestCase):
             ["Newest invite note", "Meeting note", "Old invite note"],
         )
 
-    def test_professionals_page_groups_directions_by_resolution_and_meeting_date(self):
+    def test_professionals_page_groups_directions_by_resolution_and_meeting_date(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         other_professional = Professional.objects.create(name="Grace Hopper")
         recent_connection = ProfessionalConnect.objects.create(
@@ -3916,8 +4043,9 @@ class ProfessionalPageTests(TestCase):
 
     @patch("app.views.delete_meeting_event")
     def test_professionals_page_deletes_current_professionals_connection(
-        self, mock_delete_meeting_event
-    ):
+        self, mock_delete_meeting_event: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         invitation = ProfessionalConnect.objects.create(
             professional=professional,
@@ -3938,7 +4066,8 @@ class ProfessionalPageTests(TestCase):
         mock_delete_meeting_event.assert_called_once()
 
     @patch("app.views.sync_professional_connect")
-    def test_professionals_page_adds_connection_for_current_professional(self, mock_sync):
+    def test_professionals_page_adds_connection_for_current_professional(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         mock_sync.return_value = {
             "meeting": {"status": "created", "message": "Meeting created."}
@@ -3979,8 +4108,9 @@ class ProfessionalPageTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_professionals_connection_form_preserves_explicit_meeting_end(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         mock_sync.return_value = {"meeting": {"status": "created"}}
 
@@ -4005,8 +4135,9 @@ class ProfessionalPageTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_professionals_connection_form_rejects_nonpositive_meeting_interval(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         response = self.client.post(
@@ -4031,7 +4162,8 @@ class ProfessionalPageTests(TestCase):
         mock_sync.assert_not_called()
 
     @patch("app.views.sync_professional_connect")
-    def test_professionals_connection_time_matches_connections_calendar(self, mock_sync):
+    def test_professionals_connection_time_matches_connections_calendar(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         mock_sync.return_value = {
             "meeting": {"status": "created", "message": "Meeting created."}
@@ -4055,7 +4187,8 @@ class ProfessionalPageTests(TestCase):
         calendar_event = self.client.get(reverse("connection_events")).json()[0]
         self.assertEqual(calendar_event["start"], "2026-09-10T22:25:00")
 
-    def test_professionals_connections_table_uses_am_pm_for_meeting_time(self):
+    def test_professionals_connections_table_uses_am_pm_for_meeting_time(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
             professional=professional,
@@ -4067,7 +4200,8 @@ class ProfessionalPageTests(TestCase):
 
         self.assertContains(response, "2026-09-10 8:25 AM")
 
-    def test_professionals_edit_existing_cards(self):
+    def test_professionals_edit_existing_cards(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(
             name="Ada Lovelace",
             linkedin_url="https://www.linkedin.com/in/ada-lovelace",
@@ -4096,7 +4230,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(professional.phone, "555-0100")
         self.assertEqual(str(professional.wait), "32 days, 0:00:00")
 
-    def test_professionals_page_uses_latest_connection_dates(self):
+    def test_professionals_page_uses_latest_connection_dates(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(
             name="Ada Lovelace",
             wait=timedelta(days=15),
@@ -4125,7 +4260,8 @@ class ProfessionalPageTests(TestCase):
             date(2026, 8, 17),
         )
 
-    def test_professional_connect_due_uses_calendar_months(self):
+    def test_professional_connect_due_uses_calendar_months(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(
             name="Jacob Pyrett",
             wait=timedelta(days=90),
@@ -4137,7 +4273,8 @@ class ProfessionalPageTests(TestCase):
 
         self.assertEqual(professional.connect_due, date(2026, 9, 13))
 
-    def test_professionals_page_calculates_average_rating(self):
+    def test_professionals_page_calculates_average_rating(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(professional=professional, rating=4)
         ProfessionalConnect.objects.create(professional=professional, rating=5)
@@ -4150,7 +4287,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(displayed_professional.average_rating_stars, "★★★★★")
         self.assertContains(response, "★★★★★")
 
-    def test_professionals_page_calculates_invite_success(self):
+    def test_professionals_page_calculates_invite_success(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
             professional=professional,
@@ -4165,7 +4303,8 @@ class ProfessionalPageTests(TestCase):
         self.assertAlmostEqual(displayed_professional.invite_success, 100 / 3)
         self.assertContains(response, "33.3%")
 
-    def test_professionals_page_calculates_invite_without_database_field(self):
+    def test_professionals_page_calculates_invite_without_database_field(self) -> None:
+        """Verifies the expected behavior."""
         never_invited = Professional.objects.create(name="Never Invited")
         overdue_invite = Professional.objects.create(name="Overdue Invite")
         current_connect = Professional.objects.create(
@@ -4214,7 +4353,8 @@ class ProfessionalPageTests(TestCase):
             [field.name for field in Professional._meta.get_fields()],
         )
 
-    def test_professionals_page_sorts_by_invite_and_due_dates(self):
+    def test_professionals_page_sorts_by_invite_and_due_dates(self) -> None:
+        """Verifies the expected behavior."""
         current_date = timezone.localdate()
         current_datetime = timezone.now()
         first = Professional.objects.create(
@@ -4292,7 +4432,8 @@ class ProfessionalPageTests(TestCase):
         self.assertContains(second_page_response, "&larr;", html=False)
         self.assertContains(second_page_response, "&rarr;", html=False)
 
-    def test_professionals_invite_creates_connect_and_shows_message(self):
+    def test_professionals_invite_creates_connect_and_shows_message(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         invite_response = self.client.post(
@@ -4331,8 +4472,9 @@ class ProfessionalPageTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_professionals_connection_form_prevents_overlapping_meeting(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         mountain_timezone = ZoneInfo("America/Denver")
         professional = Professional.objects.create(name="Ada Lovelace")
         ProfessionalConnect.objects.create(
@@ -4357,7 +4499,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(ProfessionalConnect.objects.count(), 1)
         mock_sync.assert_not_called()
 
-    def test_professionals_pass_deletes_professional_and_logs_connection(self):
+    def test_professionals_pass_deletes_professional_and_logs_connection(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         response = self.client.post(
@@ -4376,7 +4519,8 @@ class ProfessionalPageTests(TestCase):
         self.assertEqual(passed_connection.invite_date, timezone.localdate())
         self.assertIsNone(passed_connection.professional)
 
-    def test_professionals_delete_existing_cards_from_edit_modal(self):
+    def test_professionals_delete_existing_cards_from_edit_modal(self) -> None:
+        """Verifies the expected behavior."""
         professional = Professional.objects.create(name="Ada Lovelace")
 
         delete_response = self.client.post(
@@ -4392,14 +4536,16 @@ class ProfessionalPageTests(TestCase):
 
 
 class CompanyPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_companies_page_paginates_one_company_per_page_with_arrow_navigation(self):
+    def test_companies_page_paginates_one_company_per_page_with_arrow_navigation(self) -> None:
+        """Verifies the expected behavior."""
         companies = [
             Company(name=f"Company {index:02d}") for index in range(1, 12)
         ]
@@ -4425,7 +4571,8 @@ class CompanyPageTests(TestCase):
             html=False,
         )
 
-    def test_companies_page_displays_companies_and_add_modal(self):
+    def test_companies_page_displays_companies_and_add_modal(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(
             name="Analytical Engines",
             website="https://analytical-engines.example.com",
@@ -4449,7 +4596,8 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, "Yes")
         self.assertContains(response, "Job Search Paths")
 
-    def test_companies_page_creates_company_from_modal_form(self):
+    def test_companies_page_creates_company_from_modal_form(self) -> None:
+        """Verifies the expected behavior."""
         active_search_term = SearchTerm.objects.create(term="Python")
         response = self.client.post(
             reverse("companies"),
@@ -4472,7 +4620,8 @@ class CompanyPageTests(TestCase):
             SearchPath.objects.filter(company=company, search_term=active_search_term).exists()
         )
 
-    def test_companies_page_edits_and_deletes_company_from_edit_modal(self):
+    def test_companies_page_edits_and_deletes_company_from_edit_modal(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(
             name="Analytical Engines",
             website="https://analytical-engines.example.com",
@@ -4524,7 +4673,8 @@ class CompanyPageTests(TestCase):
         self.assertRedirects(delete_response, f"{reverse('companies')}?page=1")
         self.assertFalse(Company.objects.filter(pk=company.pk).exists())
 
-    def test_companies_page_edit_returns_to_current_page(self):
+    def test_companies_page_edit_returns_to_current_page(self) -> None:
+        """Verifies the expected behavior."""
         Company.objects.bulk_create(
             [Company(name=f"Company {index:02d}") for index in range(1, 3)]
         )
@@ -4548,7 +4698,8 @@ class CompanyPageTests(TestCase):
         company.refresh_from_db()
         self.assertEqual(company.name, "Company Updated")
 
-    def test_companies_page_shows_and_edits_current_company_search_paths(self):
+    def test_companies_page_shows_and_edits_current_company_search_paths(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Alpha Company")
         other_company = Company.objects.create(name="Beta Company")
         python_term = SearchTerm.objects.create(term="Python")
@@ -4610,7 +4761,8 @@ class CompanyPageTests(TestCase):
         lower_probability_path.refresh_from_db()
         self.assertEqual(lower_probability_path.url, "https://jobs.example.com")
 
-    def test_company_search_form_selects_company_from_filtered_datalist(self):
+    def test_company_search_form_selects_company_from_filtered_datalist(self) -> None:
+        """Verifies the expected behavior."""
         first_company = Company.objects.create(name="Alpha Company")
         selected_company = Company.objects.create(name="Beta Company")
 
@@ -4643,14 +4795,16 @@ class CompanyPageTests(TestCase):
 
 
 class SearchTermsPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_search_terms_page_displays_terms_alphabetically(self):
+    def test_search_terms_page_displays_terms_alphabetically(self) -> None:
+        """Verifies the expected behavior."""
         SearchTerm.objects.create(term="Python", active=False)
         SearchTerm.objects.create(term="Data Engineer")
 
@@ -4671,7 +4825,8 @@ class SearchTermsPageTests(TestCase):
         self.assertNotContains(second_page_response, "Data Engineer")
         self.assertContains(second_page_response, "No")
 
-    def test_search_terms_page_creates_and_edits_search_term(self):
+    def test_search_terms_page_creates_and_edits_search_term(self) -> None:
+        """Verifies the expected behavior."""
         create_response = self.client.post(
             reverse("search_terms"),
             {
@@ -4697,7 +4852,8 @@ class SearchTermsPageTests(TestCase):
         self.assertEqual(search_term.term, "Django")
         self.assertFalse(search_term.active)
 
-    def test_deleting_search_term_preserves_paths_and_observations(self):
+    def test_deleting_search_term_preserves_paths_and_observations(self) -> None:
+        """Verifies the expected behavior."""
         search_term = SearchTerm.objects.create(term="Python")
         platform = Platform.objects.create(name="Example Platform")
         search_path = SearchPath.objects.create(
@@ -4720,7 +4876,8 @@ class SearchTermsPageTests(TestCase):
         self.assertIsNone(search_path.search_term)
         self.assertTrue(SearchObservation.objects.filter(pk=observation.pk).exists())
 
-    def test_search_terms_page_shows_and_edits_selected_terms_search_paths(self):
+    def test_search_terms_page_shows_and_edits_selected_terms_search_paths(self) -> None:
+        """Verifies the expected behavior."""
         search_term = SearchTerm.objects.create(term="Python")
         other_term = SearchTerm.objects.create(term="SQL")
         higher_probability_path = SearchPath.objects.create(
@@ -4780,7 +4937,8 @@ class SearchTermsPageTests(TestCase):
 
 
 class CreateSearchPathsCommandTests(TestCase):
-    def test_command_creates_only_missing_valid_search_paths_idempotently(self):
+    def test_command_creates_only_missing_valid_search_paths_idempotently(self) -> None:
+        """Verifies the expected behavior."""
         active_first = SearchTerm.objects.create(term="Django")
         active_second = SearchTerm.objects.create(term="Python")
         inactive = SearchTerm.objects.create(term="Inactive", active=False)
@@ -4841,7 +4999,8 @@ class CreateSearchPathsCommandTests(TestCase):
 
 
 class CompanySearchPathServiceTests(TestCase):
-    def test_creates_all_active_company_paths_idempotently(self):
+    def test_creates_all_active_company_paths_idempotently(self) -> None:
+        """Verifies the expected behavior."""
         active_first = SearchTerm.objects.create(term="Django")
         active_second = SearchTerm.objects.create(term="Python")
         inactive = SearchTerm.objects.create(term="Inactive", active=False)
@@ -4868,7 +5027,8 @@ class CompanySearchPathServiceTests(TestCase):
         self.assertEqual(repeated_result.existing, 3)
         self.assertEqual(SearchPath.objects.filter(company=company).count(), 3)
 
-    def test_creates_only_blank_path_without_terms_and_skips_disabled_companies(self):
+    def test_creates_only_blank_path_without_terms_and_skips_disabled_companies(self) -> None:
+        """Verifies the expected behavior."""
         SearchTerm.objects.create(term="Python")
         company_without_terms = Company.objects.create(
             name="Company Without Terms",
@@ -4889,7 +5049,8 @@ class CompanySearchPathServiceTests(TestCase):
 
 
 class PlatformSearchPathServiceTests(TestCase):
-    def test_creates_active_term_paths_idempotently_for_an_enabled_platform(self):
+    def test_creates_active_term_paths_idempotently_for_an_enabled_platform(self) -> None:
+        """Verifies the expected behavior."""
         active_first = SearchTerm.objects.create(term="Django")
         active_second = SearchTerm.objects.create(term="Python")
         inactive = SearchTerm.objects.create(term="Inactive", active=False)
@@ -4926,7 +5087,8 @@ class PlatformSearchPathServiceTests(TestCase):
         self.assertEqual(repeated_result.existing, 2)
         self.assertEqual(SearchPath.objects.filter(platform=platform).count(), 2)
 
-    def test_skips_disabled_platform(self):
+    def test_skips_disabled_platform(self) -> None:
+        """Verifies the expected behavior."""
         SearchTerm.objects.create(term="Python")
         platform = Platform.objects.create(
             name="Disabled Platform",
@@ -4941,14 +5103,16 @@ class PlatformSearchPathServiceTests(TestCase):
 
 
 class JobPostingsPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_job_postings_page_shows_add_posting_modal(self):
+    def test_job_postings_page_shows_add_posting_modal(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("job_postings"))
 
         self.assertContains(response, 'id="open-add-job-posting-modal"', html=False)
@@ -4968,7 +5132,8 @@ class JobPostingsPageTests(TestCase):
             self.assertEqual(attrs["data-lpignore"], "true")
             self.assertEqual(attrs["data-1p-ignore"], "true")
 
-    def test_job_postings_can_create_a_posting_from_the_add_modal(self):
+    def test_job_postings_can_create_a_posting_from_the_add_modal(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("job_postings"),
             {
@@ -4992,7 +5157,8 @@ class JobPostingsPageTests(TestCase):
         self.assertFalse(SearchObservation.objects.filter(job_posting=job_posting).exists())
         self.assertContains(response, "Job posting created.")
 
-    def test_job_posting_modal_preserves_invalid_submission(self):
+    def test_job_posting_modal_preserves_invalid_submission(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("job_postings"),
             {
@@ -5016,7 +5182,8 @@ class JobPostingsPageTests(TestCase):
         self.assertContains(response, "Enter a valid URL.")
         self.assertEqual(JobPosting.objects.count(), 0)
 
-    def test_job_postings_are_grouped_by_apply_decision_and_application_status(self):
+    def test_job_postings_are_grouped_by_apply_decision_and_application_status(self) -> None:
+        """Verifies the expected behavior."""
         apply_without_application = JobPosting.objects.create(
             title="Apply Without Application",
             company_name="Company A",
@@ -5130,7 +5297,8 @@ class JobPostingsPageTests(TestCase):
         self.assertLess(content.index("Apply In Progress"), content.index("Apply Submitted"))
         self.assertLess(content.index("Apply Submitted"), content.index("Do Not Apply"))
 
-    def test_job_postings_can_mark_a_posting_expired(self):
+    def test_job_postings_can_mark_a_posting_expired(self) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Expired Role",
             company_name="Example Co",
@@ -5147,7 +5315,8 @@ class JobPostingsPageTests(TestCase):
         self.assertFalse(job_posting.apply_to)
         self.assertTrue(job_posting.expired)
 
-    def test_job_postings_can_update_apply_to(self):
+    def test_job_postings_can_update_apply_to(self) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Undecided Role",
             company_name="Example Co",
@@ -5169,8 +5338,9 @@ class JobPostingsPageTests(TestCase):
     @patch("app.views.evaluate_job_posting")
     def test_job_postings_ai_evaluation_updates_recommendation_and_decision(
         self,
-        mock_evaluate,
-    ):
+        mock_evaluate: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -5202,7 +5372,8 @@ class JobPostingsPageTests(TestCase):
         )
         self.assertContains(response, "AI evaluation completed.")
 
-    def test_job_postings_can_create_an_application(self):
+    def test_job_postings_can_create_an_application(self) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -5217,7 +5388,8 @@ class JobPostingsPageTests(TestCase):
         application = Application.objects.get(job_posting=job_posting)
         self.assertEqual(application.job_posting, job_posting)
 
-    def test_job_postings_drag_drop_endpoint_updates_apply_to(self):
+    def test_job_postings_drag_drop_endpoint_updates_apply_to(self) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Undecided Role",
             company_name="Example Co",
@@ -5234,7 +5406,8 @@ class JobPostingsPageTests(TestCase):
         job_posting.refresh_from_db()
         self.assertTrue(job_posting.apply_to)
 
-    def test_job_postings_can_unmark_an_expired_posting(self):
+    def test_job_postings_can_unmark_an_expired_posting(self) -> None:
+        """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
             title="Expired Role",
             company_name="Example Co",
@@ -5253,7 +5426,8 @@ class JobPostingsPageTests(TestCase):
         self.assertFalse(job_posting.apply_to)
 
 class JobApplicationsPageTests(TestCase):
-    def test_job_applications_are_grouped_and_sorted_by_submission_status(self):
+    def test_job_applications_are_grouped_and_sorted_by_submission_status(self) -> None:
+        """Verifies the expected behavior."""
         to_apply_older = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="To Apply Older",
@@ -5335,7 +5509,8 @@ class JobApplicationsPageTests(TestCase):
         self.assertLess(content.index("To Apply Newer"), content.index("Applied Newer"))
         self.assertLess(content.index("Applied Newer"), content.index("Stopped Newer"))
 
-    def test_job_application_modal_renders_description_and_saves_company(self):
+    def test_job_application_modal_renders_description_and_saves_company(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Co")
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
@@ -5414,7 +5589,8 @@ class JobApplicationsPageTests(TestCase):
         self.assertEqual(application.company, company)
         self.assertEqual(application.stop_reason, Application.StopReason.OTHER)
 
-    def test_application_details_page_shows_application_title(self):
+    def test_application_details_page_shows_application_title(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Co")
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
@@ -5481,7 +5657,8 @@ class JobApplicationsPageTests(TestCase):
         self.assertContains(response, "const renderMarkdown = markdown", html=False)
 
     @patch("app.views.generate_cover_letter", return_value="Generated cover letter.")
-    def test_application_details_generates_and_saves_cover_letter(self, mock_generate):
+    def test_application_details_generates_and_saves_cover_letter(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5508,7 +5685,8 @@ class JobApplicationsPageTests(TestCase):
         )
 
     @patch("app.views.generate_cover_letter")
-    def test_cover_letter_generation_failure_preserves_existing_draft(self, mock_generate):
+    def test_cover_letter_generation_failure_preserves_existing_draft(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5527,7 +5705,8 @@ class JobApplicationsPageTests(TestCase):
         self.assertEqual(application.cover_letter, "Existing draft.")
         self.assertContains(response, "AI cover letter generation failed")
 
-    def test_application_details_can_save_a_manual_cover_letter_edit(self):
+    def test_application_details_can_save_a_manual_cover_letter_edit(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5552,7 +5731,8 @@ class JobApplicationsPageTests(TestCase):
         "app.services.cover_letter_pdf.timezone.localdate",
         return_value=date(2026, 10, 7),
     )
-    def test_cover_letter_download_returns_a_pdf(self, mock_localdate):
+    def test_cover_letter_download_returns_a_pdf(self, mock_localdate: Any) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5573,7 +5753,8 @@ class JobApplicationsPageTests(TestCase):
         )
         self.assertTrue(response.content.startswith(b"%PDF"))
 
-    def test_cover_letter_download_requires_saved_body(self):
+    def test_cover_letter_download_requires_saved_body(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5590,14 +5771,16 @@ class JobApplicationsPageTests(TestCase):
         self.assertRedirects(response, details_url)
         self.assertContains(response, "Generate or save a cover letter before downloading it.")
 
-    def test_portfolio_embed_pages_hide_the_navigation(self):
+    def test_portfolio_embed_pages_hide_the_navigation(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(f"{reverse('resume')}?embed=1")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
         self.assertNotContains(response, 'class="sidebar"', html=False)
 
-    def test_application_details_can_set_and_edit_submitted_date(self):
+    def test_application_details_can_set_and_edit_submitted_date(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5647,7 +5830,8 @@ class JobApplicationsPageTests(TestCase):
         application.refresh_from_db()
         self.assertIsNone(application.submitted)
 
-    def test_job_application_modal_shows_company_last_applied_in_days(self):
+    def test_job_application_modal_shows_company_last_applied_in_days(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Applied Company")
         Application.objects.create(
             job_posting=JobPosting.objects.create(
@@ -5671,7 +5855,8 @@ class JobApplicationsPageTests(TestCase):
             html=False,
         )
 
-    def test_job_application_can_create_and_attach_a_new_company(self):
+    def test_job_application_can_create_and_attach_a_new_company(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Software Engineer",
@@ -5704,7 +5889,8 @@ class JobApplicationsPageTests(TestCase):
 
 
 class ApplicationEmailModelTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5712,7 +5898,8 @@ class ApplicationEmailModelTests(TestCase):
             )
         )
 
-    def test_my_response_forces_outgoing_on_create_and_update_fields_save(self):
+    def test_my_response_forces_outgoing_on_create_and_update_fields_save(self) -> None:
+        """Verifies the expected behavior."""
         application_email = ApplicationEmail.objects.create(
             application=self.application,
             gmail_message_id="message-1",
@@ -5730,7 +5917,8 @@ class ApplicationEmailModelTests(TestCase):
 
         self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
 
-    def test_reclassifying_from_my_response_preserves_existing_direction(self):
+    def test_reclassifying_from_my_response_preserves_existing_direction(self) -> None:
+        """Verifies the expected behavior."""
         application_email = ApplicationEmail.objects.create(
             application=self.application,
             gmail_message_id="message-1",
@@ -5747,13 +5935,15 @@ class ApplicationEmailModelTests(TestCase):
 
 
 class SearchObservationSuccessTests(TestCase):
-    def create_observation(self, *, complete=True, job_posting=None):
+    def create_observation(self, *, complete: Any=True, job_posting: Any=None) -> Any:
+        """Executes this callable."""
         return SearchObservation.objects.create(
             complete=complete,
             job_posting=job_posting,
         )
 
-    def create_application(self, **application_fields):
+    def create_application(self, **application_fields: Any) -> Any:
+        """Executes this callable."""
         job_posting = JobPosting.objects.create(
             title="Data Engineer",
             company_name="Example Co",
@@ -5761,7 +5951,8 @@ class SearchObservationSuccessTests(TestCase):
         )
         return Application.objects.create(job_posting=job_posting, **application_fields)
 
-    def test_existing_observation_success_rules_are_preserved(self):
+    def test_existing_observation_success_rules_are_preserved(self) -> None:
+        """Verifies the expected behavior."""
         self.assertIsNone(self.create_observation(complete=False).success)
         self.assertFalse(self.create_observation().success)
 
@@ -5786,7 +5977,8 @@ class SearchObservationSuccessTests(TestCase):
         )
         self.assertTrue(self.create_observation(job_posting=applied_posting).success)
 
-    def test_stopped_application_is_unsuccessful_regardless_of_outcome_and_stage(self):
+    def test_stopped_application_is_unsuccessful_regardless_of_outcome_and_stage(self) -> None:
+        """Verifies the expected behavior."""
         application = self.create_application(
             stop_reason=Application.StopReason.OTHER,
             outcome=Application.Outcome.ACCEPTED,
@@ -5795,7 +5987,8 @@ class SearchObservationSuccessTests(TestCase):
 
         self.assertFalse(self.create_observation(job_posting=application.job_posting).success)
 
-    def test_application_success_uses_outcome_and_highest_stage(self):
+    def test_application_success_uses_outcome_and_highest_stage(self) -> None:
+        """Verifies the expected behavior."""
         for outcome in Application.Outcome:
             for stage in Application.Stage:
                 with self.subTest(outcome=outcome, stage=stage):
@@ -5814,7 +6007,8 @@ class SearchObservationSuccessTests(TestCase):
                     )
                     self.assertEqual(observation.success, expected)
 
-    def test_application_defaults_and_stage_are_not_automatically_decreased_on_rejection(self):
+    def test_application_defaults_and_stage_are_not_automatically_decreased_on_rejection(self) -> None:
+        """Verifies the expected behavior."""
         application = self.create_application()
         self.assertEqual(application.outcome, Application.Outcome.IN_PROCESS)
         self.assertEqual(application.stage, Application.Stage.SUBMITTED)
@@ -5829,7 +6023,8 @@ class SearchObservationSuccessTests(TestCase):
 
 
 class ApplicationProgressTests(TestCase):
-    def test_application_details_saves_outcome_and_stage(self):
+    def test_application_details_saves_outcome_and_stage(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Data Engineer",
@@ -5857,7 +6052,8 @@ class ApplicationProgressTests(TestCase):
         self.assertContains(page_response, "Rejected")
         self.assertContains(page_response, "Interviewed")
 
-    def test_job_search_statistics_reflect_outcome_and_stage_changes(self):
+    def test_job_search_statistics_reflect_outcome_and_stage_changes(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Co")
         search_path = SearchPath.objects.create(company=company)
         application = Application.objects.create(
@@ -5873,7 +6069,8 @@ class ApplicationProgressTests(TestCase):
             complete=True,
         )
 
-        def success_count():
+        def success_count() -> Any:
+            """Executes this callable."""
             response = self.client.get(reverse("job_search"))
             displayed_path = next(
                 path
@@ -5899,9 +6096,10 @@ class EmailsPageTests(TestCase):
     @patch("app.views.search_emails")
     def test_emails_page_lists_inbox_messages_without_saving_them(
         self,
-        mock_search_emails,
-        mock_get_email,
-    ):
+        mock_search_emails: Any,
+        mock_get_email: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         mock_search_emails.return_value = {
             "messages": [
                 {"message_id": "message-new", "thread_id": "thread-new"},
@@ -5944,7 +6142,8 @@ class EmailsPageTests(TestCase):
         )
 
     @patch("app.views.get_email")
-    def test_email_options_prioritize_applications_with_matching_sender(self, mock_get_email):
+    def test_email_options_prioritize_applications_with_matching_sender(self, mock_get_email: Any) -> None:
+        """Verifies the expected behavior."""
         older_match = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Older Match", company_name="A")
         )
@@ -5999,10 +6198,11 @@ class EmailsPageTests(TestCase):
     @patch("app.views.get_email")
     def test_assigning_email_saves_it_labels_it_and_archives_it(
         self,
-        mock_get_email,
-        mock_get_or_create_label,
-        mock_apply_labels_and_archive,
-    ):
+        mock_get_email: Any,
+        mock_get_or_create_label: Any,
+        mock_apply_labels_and_archive: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Co")
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co"),
@@ -6054,10 +6254,11 @@ class EmailsPageTests(TestCase):
     @patch("app.views.get_email")
     def test_assignment_is_preserved_when_gmail_labeling_and_archiving_fails(
         self,
-        mock_get_email,
-        mock_get_or_create_label,
-        mock_apply_labels_and_archive,
-    ):
+        mock_get_email: Any,
+        mock_get_or_create_label: Any,
+        mock_apply_labels_and_archive: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Co")
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co"),
@@ -6088,7 +6289,8 @@ class EmailsPageTests(TestCase):
         )
 
     @patch("app.views.get_email")
-    def test_assigning_existing_gmail_message_does_not_create_a_duplicate(self, mock_get_email):
+    def test_assigning_existing_gmail_message_does_not_create_a_duplicate(self, mock_get_email: Any) -> None:
+        """Verifies the expected behavior."""
         original_application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Original", company_name="A")
         )
@@ -6122,7 +6324,8 @@ class EmailsPageTests(TestCase):
         assigned_email = ApplicationEmail.objects.get(gmail_message_id="message-1")
         self.assertEqual(assigned_email.application, original_application)
 
-    def test_application_details_groups_emails_by_thread_and_orders_them(self):
+    def test_application_details_groups_emails_by_thread_and_orders_them(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
         )
@@ -6177,7 +6380,8 @@ class EmailsPageTests(TestCase):
             [older_email, newer_email],
         )
 
-    def test_application_details_can_update_saved_email_classification(self):
+    def test_application_details_can_update_saved_email_classification(self) -> None:
+        """Verifies the expected behavior."""
         application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
         )
@@ -6204,7 +6408,8 @@ class EmailsPageTests(TestCase):
 
 
 class InterviewPracticeTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.application = Application.objects.create(
             job_posting=JobPosting.objects.create(
                 title="Backend Engineer",
@@ -6228,9 +6433,10 @@ class InterviewPracticeTests(TestCase):
     @patch("app.views.build_interview_context")
     def test_creating_session_saves_snapshot_and_selected_interview_email(
         self,
-        mock_build_context,
-        mock_start_interview,
-    ):
+        mock_build_context: Any,
+        mock_start_interview: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         mock_build_context.return_value = {"candidate_background": "Candidate Background"}
 
         response = self.client.post(
@@ -6251,7 +6457,8 @@ class InterviewPracticeTests(TestCase):
 
     @patch("app.views.start_interview")
     @patch("app.views.build_interview_context", return_value={})
-    def test_session_rejects_email_from_another_application(self, mock_context, mock_start):
+    def test_session_rejects_email_from_another_application(self, mock_context: Any, mock_start: Any) -> None:
+        """Verifies the expected behavior."""
         other_application = Application.objects.create(
             job_posting=JobPosting.objects.create(title="Other", company_name="Other Co")
         )
@@ -6275,7 +6482,8 @@ class InterviewPracticeTests(TestCase):
 
     @patch("app.views.start_interview")
     @patch("app.views.build_interview_context", return_value={})
-    def test_session_rejects_non_interview_email(self, mock_context, mock_start):
+    def test_session_rejects_non_interview_email(self, mock_context: Any, mock_start: Any) -> None:
+        """Verifies the expected behavior."""
         non_interview_email = ApplicationEmail.objects.create(
             application=self.application,
             gmail_message_id="confirmation-email",
@@ -6295,7 +6503,8 @@ class InterviewPracticeTests(TestCase):
         mock_start.assert_not_called()
 
     @patch("app.services.interview_practice.build_candidate_background")
-    def test_context_snapshot_includes_expected_application_data(self, mock_background):
+    def test_context_snapshot_includes_expected_application_data(self, mock_background: Any) -> None:
+        """Verifies the expected behavior."""
         mock_background.return_value = "Candidate Background"
         session = InterviewPracticeSession.objects.create(
             application=self.application,
@@ -6310,7 +6519,8 @@ class InterviewPracticeTests(TestCase):
         self.assertEqual(context["interview_request_email"]["subject"], "Interview details")
 
     @patch("app.services.interview_practice.build_candidate_background", return_value="Candidate Background")
-    def test_context_snapshot_allows_missing_cover_letter_and_interview_email(self, mock_background):
+    def test_context_snapshot_allows_missing_cover_letter_and_interview_email(self, mock_background: Any) -> None:
+        """Verifies the expected behavior."""
         self.application.cover_letter = ""
         self.application.save(update_fields=["cover_letter"])
         session = InterviewPracticeSession.objects.create(application=self.application)
@@ -6321,7 +6531,8 @@ class InterviewPracticeTests(TestCase):
         self.assertIsNone(context["interview_request_email"])
 
     @patch("app.services.interview_practice._generate_text", return_value="What interests you about this role?")
-    def test_start_interview_creates_only_one_opening_question(self, mock_generate):
+    def test_start_interview_creates_only_one_opening_question(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         session = InterviewPracticeSession.objects.create(
             application=self.application,
             context_snapshot={"candidate_background": "Snapshot"},
@@ -6336,7 +6547,8 @@ class InterviewPracticeTests(TestCase):
         mock_generate.assert_called_once()
 
     @patch("app.views.generate_interviewer_response", return_value="Tell me about a Django project.")
-    def test_message_endpoint_saves_user_and_assistant_messages(self, mock_generate):
+    def test_message_endpoint_saves_user_and_assistant_messages(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         session = InterviewPracticeSession.objects.create(
             application=self.application,
             context_snapshot={"candidate_background": "Snapshot"},
@@ -6365,7 +6577,8 @@ class InterviewPracticeTests(TestCase):
         mock_generate.assert_called_once_with(session)
 
     @patch("app.views.generate_interviewer_response")
-    def test_failed_ai_response_can_retry_without_duplicate_user_message(self, mock_generate):
+    def test_failed_ai_response_can_retry_without_duplicate_user_message(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         session = InterviewPracticeSession.objects.create(
             application=self.application,
             context_snapshot={"candidate_background": "Snapshot"},
@@ -6399,7 +6612,8 @@ class InterviewPracticeTests(TestCase):
         self.assertEqual(session.messages.filter(role=InterviewPracticeMessage.Role.ASSISTANT).count(), 2)
 
     @patch("app.services.interview_practice._generate_text", return_value="First session question")
-    def test_interviewer_response_uses_only_its_own_session_history(self, mock_generate):
+    def test_interviewer_response_uses_only_its_own_session_history(self, mock_generate: Any) -> None:
+        """Verifies the expected behavior."""
         first_session = InterviewPracticeSession.objects.create(
             application=self.application,
             context_snapshot={"candidate_background": "First snapshot"},
@@ -6428,7 +6642,8 @@ class InterviewPracticeTests(TestCase):
         self.assertNotIn("Second snapshot", serialized_input)
 
     @patch("app.views.generate_interview_feedback", return_value="Strengths\n- Clear answers")
-    def test_ending_session_saves_feedback_and_blocks_new_messages(self, mock_feedback):
+    def test_ending_session_saves_feedback_and_blocks_new_messages(self, mock_feedback: Any) -> None:
+        """Verifies the expected behavior."""
         session = InterviewPracticeSession.objects.create(
             application=self.application,
             context_snapshot={"candidate_background": "Snapshot"},
@@ -6458,7 +6673,8 @@ class InterviewPracticeTests(TestCase):
 
 
 class SearchPathHidePropertyTests(TestCase):
-    def test_hides_paths_for_disabled_platforms(self):
+    def test_hides_paths_for_disabled_platforms(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             platform=Platform.objects.create(
                 name="Disabled platform",
@@ -6468,7 +6684,8 @@ class SearchPathHidePropertyTests(TestCase):
 
         self.assertTrue(path.hide)
 
-    def test_hides_paths_for_disabled_companies(self):
+    def test_hides_paths_for_disabled_companies(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             company=Company.objects.create(
                 name="Disabled company",
@@ -6478,7 +6695,8 @@ class SearchPathHidePropertyTests(TestCase):
 
         self.assertTrue(path.hide)
 
-    def test_hides_company_term_paths_when_company_does_not_support_terms(self):
+    def test_hides_company_term_paths_when_company_does_not_support_terms(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(
             name="No term searches",
             supports_job_search_terms=False,
@@ -6492,7 +6710,8 @@ class SearchPathHidePropertyTests(TestCase):
         self.assertTrue(term_path.hide)
         self.assertFalse(unqualified_path.hide)
 
-    def test_hides_path_with_recent_completed_observation_without_job_posting(self):
+    def test_hides_path_with_recent_completed_observation_without_job_posting(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Empty recent search")
         )
@@ -6513,7 +6732,8 @@ class SearchPathHidePropertyTests(TestCase):
 
         self.assertTrue(path.hide)
 
-    def test_does_not_hide_path_when_latest_completed_observation_has_job_posting(self):
+    def test_does_not_hide_path_when_latest_completed_observation_has_job_posting(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Populated recent search")
         )
@@ -6556,7 +6776,8 @@ class SearchPathHidePropertyTests(TestCase):
 
         self.assertFalse(path.hide)
 
-    def test_does_not_hide_path_when_latest_empty_observation_is_older_than_day(self):
+    def test_does_not_hide_path_when_latest_empty_observation_is_older_than_day(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Old empty search")
         )
@@ -6577,14 +6798,16 @@ class SearchPathHidePropertyTests(TestCase):
 
         self.assertFalse(path.hide)
 
-    def test_does_not_hide_path_without_completed_observations(self):
+    def test_does_not_hide_path_without_completed_observations(self) -> None:
+        """Verifies the expected behavior."""
         path = SearchPath.objects.create(
             platform=Platform.objects.create(name="No completed searches")
         )
 
         self.assertFalse(path.hide)
 
-    def test_preserves_inactive_recent_application_and_source_alternation_rules(self):
+    def test_preserves_inactive_recent_application_and_source_alternation_rules(self) -> None:
+        """Verifies the expected behavior."""
         inactive_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Inactive platform"),
             active=False,
@@ -6614,14 +6837,16 @@ class SearchPathHidePropertyTests(TestCase):
 
 
 class JobSearchPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(self.administrator)
 
-    def test_job_search_hides_recently_applied_company_paths_without_a_search(self):
+    def test_job_search_hides_recently_applied_company_paths_without_a_search(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Recently Applied Co")
         search_path = SearchPath.objects.create(company=company)
         job_posting = JobPosting.objects.create(
@@ -6648,7 +6873,8 @@ class JobSearchPageTests(TestCase):
             [search_path],
         )
 
-    def test_job_search_shows_pending_observations_for_current_search_path(self):
+    def test_job_search_shows_pending_observations_for_current_search_path(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6671,7 +6897,8 @@ class JobSearchPageTests(TestCase):
             [pending_observation],
         )
 
-    def test_job_search_adds_job_posting_to_pending_observation(self):
+    def test_job_search_adds_job_posting_to_pending_observation(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6710,7 +6937,8 @@ class JobSearchPageTests(TestCase):
         self.assertEqual(observation.job_posting.title, "Data Engineer")
         self.assertTrue(observation.job_posting.apply_to)
 
-    def test_job_search_edits_job_posting_for_pending_observation(self):
+    def test_job_search_edits_job_posting_for_pending_observation(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6745,7 +6973,8 @@ class JobSearchPageTests(TestCase):
         self.assertEqual(posting.title, "Updated Title")
         self.assertFalse(posting.apply_to)
 
-    def test_job_search_includes_description_preview_for_job_postings(self):
+    def test_job_search_includes_description_preview_for_job_postings(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6777,7 +7006,8 @@ class JobSearchPageTests(TestCase):
             html=False,
         )
 
-    def test_job_search_updates_job_posting_apply_to_from_preview(self):
+    def test_job_search_updates_job_posting_apply_to_from_preview(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6806,7 +7036,8 @@ class JobSearchPageTests(TestCase):
         self.assertTrue(posting.apply_to)
 
     @patch("app.views.evaluate_job_posting")
-    def test_job_search_ai_evaluation_updates_posting_recommendation(self, mock_evaluate):
+    def test_job_search_ai_evaluation_updates_posting_recommendation(self, mock_evaluate: Any) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6845,7 +7076,8 @@ class JobSearchPageTests(TestCase):
             "The candidate's Python and SQL background matches the role.",
         )
 
-    def test_job_search_deletes_job_posting_for_pending_observation(self):
+    def test_job_search_deletes_job_posting_for_pending_observation(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6879,7 +7111,8 @@ class JobSearchPageTests(TestCase):
         observation.refresh_from_db()
         self.assertIsNone(observation.job_posting)
 
-    def test_job_search_marks_current_pending_observation_complete(self):
+    def test_job_search_marks_current_pending_observation_complete(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6900,7 +7133,8 @@ class JobSearchPageTests(TestCase):
         pending_observation.refresh_from_db()
         self.assertTrue(pending_observation.complete)
 
-    def test_job_search_deletes_current_pending_observation(self):
+    def test_job_search_deletes_current_pending_observation(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -6929,7 +7163,8 @@ class JobSearchPageTests(TestCase):
             SearchObservation.objects.filter(pk=pending_observation.pk).exists()
         )
 
-    def test_job_search_search_button_creates_pending_observation(self):
+    def test_job_search_search_button_creates_pending_observation(self) -> None:
+        """Verifies the expected behavior."""
         search_path = SearchPath.objects.create(
             platform=Platform.objects.create(
                 name="Search Platform",
@@ -6966,7 +7201,8 @@ class JobSearchPageTests(TestCase):
             ).exists()
         )
 
-    def test_job_search_source_button_opens_and_saves_company_form(self):
+    def test_job_search_source_button_opens_and_saves_company_form(self) -> None:
+        """Verifies the expected behavior."""
         company = Company.objects.create(name="Example Company")
         search_path = SearchPath.objects.create(company=company)
 
@@ -7006,7 +7242,8 @@ class JobSearchPageTests(TestCase):
         self.assertEqual(company.name, "Updated Company")
         self.assertEqual(SearchPath.objects.get(pk=search_path.pk).company, company)
 
-    def test_job_search_source_button_opens_and_saves_platform_form(self):
+    def test_job_search_source_button_opens_and_saves_platform_form(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(name="Example Platform")
         search_path = SearchPath.objects.create(platform=platform)
 
@@ -7036,7 +7273,8 @@ class JobSearchPageTests(TestCase):
         self.assertEqual(platform.url, "https://platform.example.com")
         self.assertEqual(SearchPath.objects.get(pk=search_path.pk).platform, platform)
 
-    def test_job_search_sorts_pending_paths_before_lower_alpha_paths(self):
+    def test_job_search_sorts_pending_paths_before_lower_alpha_paths(self) -> None:
+        """Verifies the expected behavior."""
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
@@ -7081,7 +7319,8 @@ class JobSearchPageTests(TestCase):
         self.assertTrue(response.context["formset"].forms[0].instance.pending)
         self.assertGreater(pending_path.alpha, nonpending_path.alpha)
 
-    def test_job_search_filters_search_paths_by_text(self):
+    def test_job_search_filters_search_paths_by_text(self) -> None:
+        """Verifies the expected behavior."""
         matching_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Alpha Platform")
         )
@@ -7107,7 +7346,8 @@ class JobSearchPageTests(TestCase):
             html=False,
         )
 
-    def test_search_path_effective_url_prefers_its_url_then_its_source_url(self):
+    def test_search_path_effective_url_prefers_its_url_then_its_source_url(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(
             name="Example Platform",
             url="https://platform.example.com",
@@ -7119,7 +7359,8 @@ class JobSearchPageTests(TestCase):
         search_path.url = "https://search.example.com"
         self.assertEqual(search_path.effective_url, search_path.url)
 
-    def test_job_search_sorts_equal_alpha_paths_by_name(self):
+    def test_job_search_sorts_equal_alpha_paths_by_name(self) -> None:
+        """Verifies the expected behavior."""
         later_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Zebra Platform")
         )
@@ -7132,7 +7373,8 @@ class JobSearchPageTests(TestCase):
         self.assertContains(response, str(first_path))
         self.assertEqual(response.context["formset"].forms[0].instance.pk, first_path.pk)
 
-    def test_job_search_uses_constant_queries_for_many_search_paths(self):
+    def test_job_search_uses_constant_queries_for_many_search_paths(self) -> None:
+        """Verifies the expected behavior."""
         platforms = [Platform(name=f"Platform {index}") for index in range(12)]
         Platform.objects.bulk_create(platforms)
         SearchPath.objects.bulk_create(
@@ -7144,7 +7386,8 @@ class JobSearchPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_job_search_filters_hidden_paths_and_sorts_visible_paths_by_alpha(self):
+    def test_job_search_filters_hidden_paths_and_sorts_visible_paths_by_alpha(self) -> None:
+        """Verifies the expected behavior."""
         low_platform = Platform.objects.create(name="Low Alpha Platform")
         high_platform = Platform.objects.create(name="High Alpha Platform")
         company = Company.objects.create(name="Most Recently Searched Company")
@@ -7197,7 +7440,8 @@ class JobSearchPageTests(TestCase):
         self.assertContains(second_page, str(high_path))
         self.assertContains(second_page, "Job Search 2 of 2")
 
-    def test_job_search_can_select_hidden_path_from_search_options(self):
+    def test_job_search_can_select_hidden_path_from_search_options(self) -> None:
+        """Verifies the expected behavior."""
         platform_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Visible Platform")
         )
@@ -7236,7 +7480,8 @@ class JobSearchPageTests(TestCase):
             platform_path.pk,
         )
 
-    def test_job_search_saves_the_current_search_path_formset(self):
+    def test_job_search_saves_the_current_search_path_formset(self) -> None:
+        """Verifies the expected behavior."""
         platform = Platform.objects.create(name="Example Platform")
         search_path = SearchPath.objects.create(platform=platform)
 
@@ -7261,14 +7506,16 @@ class JobSearchPageTests(TestCase):
 
 
 class RecruiterPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_recruiters_wait_column_displays_months(self):
+    def test_recruiters_wait_column_displays_months(self) -> None:
+        """Verifies the expected behavior."""
         Recruiter.objects.create(
             name="Ada Recruiter",
             wait=timedelta(days=15),
@@ -7279,7 +7526,8 @@ class RecruiterPageTests(TestCase):
         self.assertContains(response, "0.5 months")
         self.assertNotContains(response, "15 days")
 
-    def test_recruiters_page_adds_recruiter_and_selects_it(self):
+    def test_recruiters_page_adds_recruiter_and_selects_it(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("recruiters"),
             {
@@ -7301,7 +7549,8 @@ class RecruiterPageTests(TestCase):
             f"{reverse('recruiters')}?page=1&recruiter_id={recruiter.pk}",
         )
 
-    def test_recruiter_invitation_uses_recruiter_specific_message(self):
+    def test_recruiter_invitation_uses_recruiter_specific_message(self) -> None:
+        """Verifies the expected behavior."""
         recruiter = Recruiter.objects.create(name="Ada Recruiter")
 
         response = self.client.get(
@@ -7316,7 +7565,8 @@ class RecruiterPageTests(TestCase):
             "recruiting for those kind of roles?",
         )
 
-    def test_recruiters_page_creates_company_search_paths(self):
+    def test_recruiters_page_creates_company_search_paths(self) -> None:
+        """Verifies the expected behavior."""
         recruiter = Recruiter.objects.create(name="Ada Recruiter")
         active_search_term = SearchTerm.objects.create(term="Python")
 
@@ -7343,8 +7593,9 @@ class RecruiterPageTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_recruiter_connection_uses_shared_connect_without_professional(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         recruiter = Recruiter.objects.create(name="Ada Recruiter")
         professional = Professional.objects.create(name="Ada Professional")
         mock_sync.return_value = {"meeting": {"status": "created"}}
@@ -7368,7 +7619,8 @@ class RecruiterPageTests(TestCase):
         mock_sync.assert_called_once_with(connection)
 
     @patch("app.views.sync_professional_connect")
-    def test_recruiter_connection_conflicts_with_professional_meeting(self, mock_sync):
+    def test_recruiter_connection_conflicts_with_professional_meeting(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         mountain_timezone = ZoneInfo("America/Denver")
         professional = Professional.objects.create(name="Ada Professional")
         recruiter = Recruiter.objects.create(name="Ada Recruiter")
@@ -7396,7 +7648,8 @@ class RecruiterPageTests(TestCase):
 
 
 class DirectionsPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
@@ -7404,7 +7657,8 @@ class DirectionsPageTests(TestCase):
         self.professional = Professional.objects.create(name="Ada Lovelace")
         self.recruiter = Recruiter.objects.create(name="Grace Hopper")
 
-    def test_directions_are_grouped_and_sorted_by_meeting_date(self):
+    def test_directions_are_grouped_and_sorted_by_meeting_date(self) -> None:
+        """Verifies the expected behavior."""
         later_connection = Connect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 16, 9, 0, tzinfo=UTC),
@@ -7475,12 +7729,14 @@ class DirectionsPageTests(TestCase):
         self.assertRedirects(delete_response, reverse("directions"))
         self.assertFalse(Direction.objects.filter(pk=later.pk).exists())
 
-    def test_directions_page_requires_career_administrator(self):
+    def test_directions_page_requires_career_administrator(self) -> None:
+        """Verifies the expected behavior."""
         self.assertEqual(self.client.get(reverse("directions")).status_code, 403)
 
 
 class ConnectionsCalendarTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
@@ -7488,7 +7744,8 @@ class ConnectionsCalendarTests(TestCase):
         self.client.force_login(administrator)
         self.professional = Professional.objects.create(name="Calendar Professional")
 
-    def test_connections_page_includes_editable_fullcalendar(self):
+    def test_connections_page_includes_editable_fullcalendar(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.get(reverse("connections"))
 
         self.assertEqual(response.status_code, 200)
@@ -7526,7 +7783,8 @@ class ConnectionsCalendarTests(TestCase):
         self.assertContains(response, 'event.target.closest(".connection-panels")')
         self.assertContains(response, reverse("connection_events"))
 
-    def test_connection_events_returns_only_scheduled_connections(self):
+    def test_connection_events_returns_only_scheduled_connections(self) -> None:
+        """Verifies the expected behavior."""
         scheduled_at = datetime(2026, 9, 15, 14, 20, tzinfo=UTC)
         scheduled = ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -7563,8 +7821,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_calendar_update_rejects_overlapping_meeting_before_google_sync(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         mountain_timezone = ZoneInfo("America/Denver")
         ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -7605,7 +7864,8 @@ class ConnectionsCalendarTests(TestCase):
         mock_sync.assert_not_called()
 
     @patch("app.views.sync_professional_connect")
-    def test_connection_event_update_saves_then_syncs_to_google_calendar(self, mock_sync):
+    def test_connection_event_update_saves_then_syncs_to_google_calendar(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
@@ -7656,7 +7916,8 @@ class ConnectionsCalendarTests(TestCase):
         mock_sync.assert_called_once_with(connection)
 
     @patch("app.views.sync_professional_connect")
-    def test_connection_event_update_preserves_save_when_google_sync_fails(self, mock_sync):
+    def test_connection_event_update_preserves_save_when_google_sync_fails(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
@@ -7693,8 +7954,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_connection_event_update_interprets_naive_datetime_as_mountain_time(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(professional=self.professional)
         mock_sync.return_value = {
             "meeting": {"status": "created", "message": "Meeting created."}
@@ -7724,8 +7986,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_connection_event_date_update_preserves_mountain_clock_times(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         mountain_timezone = ZoneInfo("America/Denver")
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -7764,7 +8027,8 @@ class ConnectionsCalendarTests(TestCase):
         )
         mock_sync.assert_called_once_with(connection)
 
-    def test_connection_events_supports_all_day_invite_date_mode(self):
+    def test_connection_events_supports_all_day_invite_date_mode(self) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             invite_date=date(2026, 9, 15),
@@ -7789,7 +8053,8 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(event["start"], "2026-09-15")
         self.assertTrue(event["allDay"])
 
-    def test_connection_events_split_invites_by_relationship_type(self):
+    def test_connection_events_split_invites_by_relationship_type(self) -> None:
+        """Verifies the expected behavior."""
         recruiter = Recruiter.objects.create(name="Calendar Recruiter")
         professional_invite = Connect.objects.create(
             professional=self.professional,
@@ -7820,7 +8085,8 @@ class ConnectionsCalendarTests(TestCase):
             [str(recruiter_invite.pk)],
         )
 
-    def test_connection_events_to_review_includes_incomplete_meetings_in_order(self):
+    def test_connection_events_to_review_includes_incomplete_meetings_in_order(self) -> None:
+        """Verifies the expected behavior."""
         first = Connect.objects.create(
             professional=self.professional,
             description="Needs notes",
@@ -7860,7 +8126,8 @@ class ConnectionsCalendarTests(TestCase):
         )
 
     @patch("app.views.sync_professional_connect")
-    def test_connection_to_review_mode_saves_as_a_meeting(self, mock_sync):
+    def test_connection_to_review_mode_saves_as_a_meeting(self, mock_sync: Any) -> None:
+        """Verifies the expected behavior."""
         connection = Connect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 9, 0, tzinfo=UTC),
@@ -7896,7 +8163,8 @@ class ConnectionsCalendarTests(TestCase):
         self.assertEqual(connection.notes, "Completed follow-up notes.")
         mock_sync.assert_called_once_with(connection)
 
-    def test_connection_weekly_total_uses_the_active_date_mode(self):
+    def test_connection_weekly_total_uses_the_active_date_mode(self) -> None:
+        """Verifies the expected behavior."""
         today = timezone.localdate()
         week_start = today - timedelta(days=today.weekday())
         in_week_meeting = datetime.combine(
@@ -7928,8 +8196,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_connection_invite_date_update_requires_csrf_and_updates_invite_date(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -7963,8 +8232,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.delete_meeting_event")
     def test_connection_event_delete_requires_csrf_and_deletes_connection(
-        self, mock_delete_meeting_event
-    ):
+        self, mock_delete_meeting_event: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
@@ -7987,8 +8257,9 @@ class ConnectionsCalendarTests(TestCase):
 
     @patch("app.views.sync_professional_connect")
     def test_connection_event_update_removes_google_event_when_meeting_is_cleared(
-        self, mock_sync
-    ):
+        self, mock_sync: Any
+    ) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
@@ -8020,7 +8291,8 @@ class ConnectionsCalendarTests(TestCase):
         self.assertIsNone(connection.meeting_end)
         mock_sync.assert_called_once_with(connection)
 
-    def test_connection_directions_can_be_loaded_added_and_resolved(self):
+    def test_connection_directions_can_be_loaded_added_and_resolved(self) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             meeting_at=datetime(2026, 9, 15, 16, 30, tzinfo=UTC),
@@ -8079,10 +8351,12 @@ class ConnectionsCalendarTests(TestCase):
 
 
 class GoogleCalendarSyncTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         self.professional = Professional.objects.create(name="Calendar Professional")
 
-    def test_professional_connect_defaults_meeting_end_to_one_hour(self):
+    def test_professional_connect_defaults_meeting_end_to_one_hour(self) -> None:
+        """Verifies the expected behavior."""
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -8103,7 +8377,8 @@ class GoogleCalendarSyncTests(TestCase):
         )
         self.assertIsNone(no_meeting.meeting_end)
 
-    def test_meeting_overlap_validation_allows_adjacent_meetings(self):
+    def test_meeting_overlap_validation_allows_adjacent_meetings(self) -> None:
+        """Verifies the expected behavior."""
         mountain_timezone = ZoneInfo("America/Denver")
         ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -8130,7 +8405,8 @@ class GoogleCalendarSyncTests(TestCase):
         self.assertIn("First connection", str(error.exception))
         self.assertIn("conflicts with", str(error.exception))
 
-    def test_meeting_sync_creates_then_updates_one_google_event(self):
+    def test_meeting_sync_creates_then_updates_one_google_event(self) -> None:
+        """Verifies the expected behavior."""
         meeting_at = datetime(2026, 9, 15, 16, 30, tzinfo=UTC)
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
@@ -8171,7 +8447,8 @@ class GoogleCalendarSyncTests(TestCase):
             body=insert_body,
         )
 
-    def test_meeting_sync_deletes_linked_event_when_meeting_is_removed(self):
+    def test_meeting_sync_deletes_linked_event_when_meeting_is_removed(self) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             google_meeting_event_id="meeting-event-id",
@@ -8189,7 +8466,8 @@ class GoogleCalendarSyncTests(TestCase):
         self.assertEqual(connection.google_meeting_event_id, "")
 
     @patch("app.services.google_calendar.get_calendar_service")
-    def test_invite_only_connection_does_not_sync_to_google_calendar(self, mock_service):
+    def test_invite_only_connection_does_not_sync_to_google_calendar(self, mock_service: Any) -> None:
+        """Verifies the expected behavior."""
         connection = ProfessionalConnect.objects.create(
             professional=self.professional,
             description="Ian x Calendar Professional",
@@ -8207,9 +8485,10 @@ class GoogleCalendarSyncTests(TestCase):
     @patch("app.services.google_calendar.get_google_credentials")
     def test_calendar_service_uses_shared_google_credentials(
         self,
-        mock_credentials,
-        mock_build,
-    ):
+        mock_credentials: Any,
+        mock_build: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         credentials = MagicMock()
         mock_credentials.return_value = credentials
 
@@ -8220,7 +8499,8 @@ class GoogleCalendarSyncTests(TestCase):
 
 
 class GoogleAuthTests(TestCase):
-    def test_calendar_only_scope_is_detected_as_insufficient(self):
+    def test_calendar_only_scope_is_detected_as_insufficient(self) -> None:
+        """Verifies the expected behavior."""
         missing = _missing_scopes(["https://www.googleapis.com/auth/calendar"])
 
         self.assertEqual(missing, {"https://www.googleapis.com/auth/gmail.modify"})
@@ -8229,9 +8509,10 @@ class GoogleAuthTests(TestCase):
     @patch("app.services.google_auth.credential_paths")
     def test_calendar_only_token_reauthorizes_for_both_services(
         self,
-        mock_paths,
-        mock_authorize,
-    ):
+        mock_paths: Any,
+        mock_authorize: Any,
+    ) -> None:
+        """Verifies the expected behavior."""
         from tempfile import TemporaryDirectory
         from pathlib import Path
 
@@ -8257,7 +8538,8 @@ class GoogleAuthTests(TestCase):
 
 class GmailServiceTests(TestCase):
     @patch("app.services.gmail.get_gmail_service")
-    def test_search_returns_identifiers_and_next_page_token(self, mock_service):
+    def test_search_returns_identifiers_and_next_page_token(self, mock_service: Any) -> None:
+        """Verifies the expected behavior."""
         mock_service.return_value.users.return_value.messages.return_value.list.return_value.execute.return_value = {
             "messages": [{"id": "message-1", "threadId": "thread-1"}],
             "nextPageToken": "next-page",
@@ -8280,7 +8562,8 @@ class GmailServiceTests(TestCase):
         )
 
     @patch("app.services.gmail.get_gmail_service")
-    def test_get_email_parses_multipart_bodies_and_headers(self, mock_service):
+    def test_get_email_parses_multipart_bodies_and_headers(self, mock_service: Any) -> None:
+        """Verifies the expected behavior."""
         plain_text = "Hello from Gmail".encode()
         html_text = "<p>Hello from Gmail</p>".encode()
         mock_service.return_value.users.return_value.messages.return_value.get.return_value.execute.return_value = {
@@ -8326,7 +8609,8 @@ class GmailServiceTests(TestCase):
         self.assertEqual(parsed["label_ids"], ["INBOX", "Label_1"])
 
     @patch("app.services.gmail.get_gmail_service")
-    def test_label_helpers_preserve_unrelated_labels(self, mock_service):
+    def test_label_helpers_preserve_unrelated_labels(self, mock_service: Any) -> None:
+        """Verifies the expected behavior."""
         service = mock_service.return_value
         service.users.return_value.labels.return_value.list.return_value.execute.return_value = {
             "labels": [{"id": "Label_Company", "name": "Career/Companies/Example"}]
@@ -8344,7 +8628,8 @@ class GmailServiceTests(TestCase):
         self.assertEqual(modify.call_args_list[1].kwargs["body"], {"removeLabelIds": ["Label_Type"]})
 
     @patch("app.services.gmail.get_gmail_service")
-    def test_apply_labels_and_archive_removes_only_inbox(self, mock_service):
+    def test_apply_labels_and_archive_removes_only_inbox(self, mock_service: Any) -> None:
+        """Verifies the expected behavior."""
         apply_labels_and_archive("message-1", ["Label_Company", "Label_Type"])
 
         mock_service.return_value.users.return_value.messages.return_value.modify.assert_called_once_with(
@@ -8358,14 +8643,16 @@ class GmailServiceTests(TestCase):
 
 
 class SkillPageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_skills_page_shows_add_delete_header_and_add_button(self):
+    def test_skills_page_shows_add_delete_header_and_add_button(self) -> None:
+        """Verifies the expected behavior."""
         Skill.objects.create(name="Python", type="Language")
 
         response = self.client.get(reverse("skills"))
@@ -8383,7 +8670,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="form-0-resume_ready"', html=False)
         self.assertNotContains(response, ">New<", html=False)
 
-    def test_skills_page_uses_arrow_navigation_labels(self):
+    def test_skills_page_uses_arrow_navigation_labels(self) -> None:
+        """Verifies the expected behavior."""
         Skill.objects.create(name="Alpha", type="Language")
         Skill.objects.create(name="Beta", type="Technology")
 
@@ -8396,7 +8684,8 @@ class SkillPageTests(TestCase):
         self.assertNotContains(response, '">Next<', html=False)
         self.assertNotContains(response, '">Previous<', html=False)
 
-    def test_search_skill_form_filters_table_by_skill_id_without_pagination(self):
+    def test_search_skill_form_filters_table_by_skill_id_without_pagination(self) -> None:
+        """Verifies the expected behavior."""
         python_skill = Skill.objects.create(name="Python", type="Language")
         sql_skill = Skill.objects.create(name="SQL", type="Technology")
 
@@ -8412,7 +8701,8 @@ class SkillPageTests(TestCase):
         self.assertNotContains(response, "Skill 1 of", html=False)
         self.assertNotContains(response, 'aria-label="Next skill"', html=False)
 
-    def test_search_skill_options_are_alphabetized_by_name(self):
+    def test_search_skill_options_are_alphabetized_by_name(self) -> None:
+        """Verifies the expected behavior."""
         Skill.objects.create(name="Zulu", type="Technology")
         Skill.objects.create(name="Alpha", type="Language")
         Skill.objects.create(name="Mike", type="Domain")
@@ -8424,7 +8714,8 @@ class SkillPageTests(TestCase):
         self.assertLess(content.index('<option value="Alpha"'), content.index('<option value="Mike"'))
         self.assertLess(content.index('<option value="Mike"'), content.index('<option value="Zulu"'))
 
-    def test_selected_skill_shows_roles_without_and_with_skill_in_side_by_side_tables(self):
+    def test_selected_skill_shows_roles_without_and_with_skill_in_side_by_side_tables(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         other_skill = Skill.objects.create(name="Python", type="Language")
         company = Company.objects.create(name="Example Company")
@@ -8466,7 +8757,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="role_with_skill_')
         self.assertContains(response, "Projects")
 
-    def test_displayed_skill_is_used_for_role_tables_when_no_skill_is_selected(self):
+    def test_displayed_skill_is_used_for_role_tables_when_no_skill_is_selected(self) -> None:
+        """Verifies the expected behavior."""
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
         Skill.objects.create(name="Zulu", type="Language")
         company = Company.objects.create(name="Example Company")
@@ -8496,7 +8788,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, "<td>Analyst</td>", html=True)
         self.assertContains(response, "<td>Engineer</td>", html=True)
 
-    def test_selected_skill_shows_projects_without_and_with_skill(self):
+    def test_selected_skill_shows_projects_without_and_with_skill(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         other_skill = Skill.objects.create(name="Python", type="Language")
         project_without_skill = Project.objects.create(title="Alpha Project")
@@ -8524,7 +8817,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="project_without_skill_')
         self.assertContains(response, 'name="project_with_skill_')
 
-    def test_selected_skill_shows_platform_boxes_using_platformskill_filters(self):
+    def test_selected_skill_shows_platform_boxes_using_platformskill_filters(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         platform_not_listed_true_false = Platform.objects.create(name="Alpha Platform")
         platform_not_listed_null_null = Platform.objects.create(name="Beta Platform")
@@ -8587,7 +8881,8 @@ class SkillPageTests(TestCase):
             html=False,
         )
 
-    def test_displayed_skill_is_used_for_platform_boxes_when_no_skill_is_selected(self):
+    def test_displayed_skill_is_used_for_platform_boxes_when_no_skill_is_selected(self) -> None:
+        """Verifies the expected behavior."""
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
         Skill.objects.create(name="Zulu", type="Language")
         platform_not_listed = Platform.objects.create(name="Alpha Platform")
@@ -8620,7 +8915,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, "Alpha Platform")
         self.assertContains(response, "Beta Platform")
 
-    def test_selected_skill_and_platform_show_bottom_skill_boxes_with_requested_ordering(self):
+    def test_selected_skill_and_platform_show_bottom_skill_boxes_with_requested_ordering(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
         platform = Platform.objects.create(name="Target Platform")
         high_rating_not_listed = Skill.objects.create(name="Python", type="Language", rating=5)
@@ -8697,7 +8993,8 @@ class SkillPageTests(TestCase):
             html=False,
         )
 
-    def test_platforms_section_save_updates_selected_skill_date_and_swaps_listing(self):
+    def test_platforms_section_save_updates_selected_skill_date_and_swaps_listing(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
         platform = Platform.objects.create(name="Target Platform")
         editable_skill = Skill.objects.create(name="Python", type="Language", rating=5)
@@ -8766,7 +9063,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(untouched_platform_skill.listed)
         self.assertEqual(str(untouched_platform_skill.updated), "2026-09-04")
 
-    def test_selected_skill_shows_platform_skill_formset_table_scoped_to_skill(self):
+    def test_selected_skill_shows_platform_skill_formset_table_scoped_to_skill(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         other_skill = Skill.objects.create(name="Python", type="Language")
         alpha_platform = Platform.objects.create(name="Alpha Platform", url="https://alpha.example.com")
@@ -8839,7 +9137,8 @@ class SkillPageTests(TestCase):
         )
 
     @patch("app.views.timezone.now")
-    def test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date(self, mock_now):
+    def test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date(self, mock_now: Any) -> None:
+        """Verifies the expected behavior."""
         mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         today_platform = Platform.objects.create(name="Today Platform", url="https://today.example.com")
@@ -8911,7 +9210,8 @@ class SkillPageTests(TestCase):
         self.assertNotIn("background: #f4cccc;", recent_no_row)
 
     @patch("app.views.timezone.now")
-    def test_selected_feature_platform_features_only_mark_unavailable_rows_red_when_stale_or_null(self, mock_now):
+    def test_selected_feature_platform_features_only_mark_unavailable_rows_red_when_stale_or_null(self, mock_now: Any) -> None:
+        """Verifies the expected behavior."""
         mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
         feature = Feature.objects.create(name="Billing")
         stale_yes_platform = Platform.objects.create(name="Stale Yes Platform")
@@ -8958,7 +9258,8 @@ class SkillPageTests(TestCase):
         recent_no_row = html[html.rfind("<tr", 0, recent_no_index):html.find("</tr>", recent_no_index)]
         self.assertNotIn("background: #f4cccc;", recent_no_row)
 
-    def test_selected_skill_platform_skill_formset_save_updates_only_chosen_skill_rows(self):
+    def test_selected_skill_platform_skill_formset_save_updates_only_chosen_skill_rows(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         other_skill = Skill.objects.create(name="Python", type="Language")
         alpha_platform = Platform.objects.create(name="Alpha Platform")
@@ -9030,7 +9331,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(other_platform_skill.listed)
         self.assertEqual(str(other_platform_skill.updated), "2026-08-16")
 
-    def test_selected_skill_shows_courses_grouped_by_education(self):
+    def test_selected_skill_shows_courses_grouped_by_education(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         school_one = School.objects.create(name="School One")
         school_two = School.objects.create(name="School Two")
@@ -9102,7 +9404,8 @@ class SkillPageTests(TestCase):
         self.assertContains(response, 'name="course_without_skill_')
         self.assertContains(response, 'name="course_with_skill_')
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_roles(self):
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_roles(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         company = Company.objects.create(name="Example Company")
         role_without_skill = Role.objects.create(
@@ -9140,7 +9443,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(role_without_skill.skills.filter(pk=selected_skill.pk).exists())
         self.assertFalse(role_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
-    def test_swap_button_uses_displayed_skill_when_no_selected_skill_is_provided(self):
+    def test_swap_button_uses_displayed_skill_when_no_selected_skill_is_provided(self) -> None:
+        """Verifies the expected behavior."""
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
         Skill.objects.create(name="Zulu", type="Language")
         company = Company.objects.create(name="Example Company")
@@ -9178,7 +9482,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(role_without_skill.skills.filter(pk=displayed_skill.pk).exists())
         self.assertFalse(role_with_skill.skills.filter(pk=displayed_skill.pk).exists())
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_projects(self):
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_projects(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         project_without_skill = Project.objects.create(title="Alpha Project")
         project_with_skill = Project.objects.create(title="Beta Project")
@@ -9207,7 +9512,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(project_without_skill.skills.filter(pk=selected_skill.pk).exists())
         self.assertFalse(project_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_courses(self):
+    def test_swap_button_adds_and_removes_selected_skill_for_checked_courses(self) -> None:
+        """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         school = School.objects.create(name="School One")
         education = Education.objects.create(
@@ -9248,7 +9554,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(course_without_skill.skills.filter(pk=selected_skill.pk).exists())
         self.assertFalse(course_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
-    def test_add_skill_button_creates_skill_and_redirects(self):
+    def test_add_skill_button_creates_skill_and_redirects(self) -> None:
+        """Verifies the expected behavior."""
         response = self.client.post(
             reverse("skills"),
             data={
@@ -9272,7 +9579,8 @@ class SkillPageTests(TestCase):
         self.assertTrue(created_skill.resume_ready)
         self.assertIsNone(created_skill.updated)
 
-    def test_add_skill_with_invalid_name_returns_error_on_page(self):
+    def test_add_skill_with_invalid_name_returns_error_on_page(self) -> None:
+        """Verifies the expected behavior."""
         existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
 
         response = self.client.post(
@@ -9306,7 +9614,8 @@ class SkillPageTests(TestCase):
         self.assertEqual(Skill.objects.filter(name="Existing Skill").count(), 1)
         self.assertEqual(Skill.objects.count(), 1)
 
-    def test_delete_skill_button_removes_existing_skill(self):
+    def test_delete_skill_button_removes_existing_skill(self) -> None:
+        """Verifies the expected behavior."""
         existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
 
         response = self.client.post(
@@ -9330,7 +9639,8 @@ class SkillPageTests(TestCase):
         self.assertRedirects(response, reverse("skills"))
         self.assertFalse(Skill.objects.filter(pk=existing_skill.pk).exists())
 
-    def test_save_button_does_not_add_top_row_skill_and_sets_updated_on_existing_skill(self):
+    def test_save_button_does_not_add_top_row_skill_and_sets_updated_on_existing_skill(self) -> None:
+        """Verifies the expected behavior."""
         existing_skill = Skill.objects.create(name="Existing Skill", type="Technology")
 
         response = self.client.post(
@@ -9360,7 +9670,8 @@ class SkillPageTests(TestCase):
         self.assertEqual(str(existing_skill.updated), "2026-09-04")
         self.assertFalse(Skill.objects.filter(name="Should Not Be Added").exists())
 
-    def test_save_button_sets_updated_on_unchanged_existing_skill(self):
+    def test_save_button_sets_updated_on_unchanged_existing_skill(self) -> None:
+        """Verifies the expected behavior."""
         existing_skill = Skill.objects.create(
             name="Existing Skill",
             type="Technology",
@@ -9389,14 +9700,16 @@ class SkillPageTests(TestCase):
 
 
 class FeaturePageTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Executes this callable."""
         administrator = get_user_model().objects.create_user(
             username=settings.CAREER_ADMIN_USERNAME,
             password="test-password",
         )
         self.client.force_login(administrator)
 
-    def test_features_page_shows_single_existing_feature_row_with_pagination_and_search(self):
+    def test_features_page_shows_single_existing_feature_row_with_pagination_and_search(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(
             name="Auth",
             updated="2026-09-01",
@@ -9464,7 +9777,8 @@ class FeaturePageTests(TestCase):
         )
         self.assertEqual(response.context["feature_page_obj"].number, 1)
 
-    def test_features_page_paginates_to_next_feature(self):
+    def test_features_page_paginates_to_next_feature(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(
             name="Auth",
             updated="2026-09-01",
@@ -9487,7 +9801,8 @@ class FeaturePageTests(TestCase):
         self.assertEqual([form.instance.pk for form in response.context["formset"].forms], [first_feature.pk])
 
     @patch("app.views.timezone.now")
-    def test_features_page_marks_row_red_when_due_date_is_today(self, mock_now):
+    def test_features_page_marks_row_red_when_due_date_is_today(self, mock_now: Any) -> None:
+        """Verifies the expected behavior."""
         mock_now.return_value = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
         feature = Feature.objects.create(
             name="Billing",
@@ -9505,7 +9820,8 @@ class FeaturePageTests(TestCase):
         )
         self.assertContains(response, "2026-09-04")
 
-    def test_search_feature_form_filters_table_by_feature_id_without_pagination(self):
+    def test_search_feature_form_filters_table_by_feature_id_without_pagination(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
 
@@ -9521,7 +9837,8 @@ class FeaturePageTests(TestCase):
         self.assertNotContains(response, "Feature 1 of", html=False)
         self.assertNotContains(response, 'aria-label="Next feature"', html=False)
 
-    def test_selected_feature_shows_links_section_scoped_to_feature(self):
+    def test_selected_feature_shows_links_section_scoped_to_feature(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
         first_link = FeatureLink.objects.create(feature=first_feature, url="https://auth.example.com")
@@ -9555,7 +9872,8 @@ class FeaturePageTests(TestCase):
             [second_link.pk],
         )
 
-    def test_selected_feature_shows_platforms_section_scoped_to_feature(self):
+    def test_selected_feature_shows_platforms_section_scoped_to_feature(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(name="Auth")
         second_feature = Feature.objects.create(name="Billing")
         first_platform = Platform.objects.create(name="Alpha", url="https://alpha.example.com")
@@ -9613,7 +9931,8 @@ class FeaturePageTests(TestCase):
             [second_platform_feature.pk],
         )
 
-    def test_links_section_uses_displayed_feature_when_feature_id_is_not_set(self):
+    def test_links_section_uses_displayed_feature_when_feature_id_is_not_set(self) -> None:
+        """Verifies the expected behavior."""
         first_feature = Feature.objects.create(
             name="Auth",
             updated="2026-09-01",
@@ -9648,7 +9967,8 @@ class FeaturePageTests(TestCase):
             [displayed_link.pk],
         )
 
-    def test_links_section_resolves_relative_link_text_from_base_url(self):
+    def test_links_section_resolves_relative_link_text_from_base_url(self) -> None:
+        """Verifies the expected behavior."""
         feature = Feature.objects.create(name="Billing")
         relative_link = FeatureLink.objects.create(feature=feature, url="docs/guide")
 
@@ -9666,7 +9986,8 @@ class FeaturePageTests(TestCase):
         )
         self.assertEqual(response.context["feature_link_formset"].forms[0].instance.pk, relative_link.pk)
 
-    def test_due_date_uses_calendar_month_addition(self):
+    def test_due_date_uses_calendar_month_addition(self) -> None:
+        """Verifies the expected behavior."""
         feature = Feature.objects.create(
             name="Addresses",
             updated="2026-03-04",
@@ -9683,7 +10004,8 @@ class FeaturePageTests(TestCase):
         )
         self.assertEqual(str(feature_form.instance.due_date), "2026-09-04")
 
-    def test_add_feature_button_creates_feature_and_redirects(self):
+    def test_add_feature_button_creates_feature_and_redirects(self) -> None:
+        """Verifies the expected behavior."""
         first_platform = Platform.objects.create(name="Alpha Platform")
         second_platform = Platform.objects.create(name="Beta Platform")
 
@@ -9721,7 +10043,8 @@ class FeaturePageTests(TestCase):
             {first_platform.pk, second_platform.pk},
         )
 
-    def test_add_feature_link_button_creates_link_for_selected_feature(self):
+    def test_add_feature_link_button_creates_link_for_selected_feature(self) -> None:
+        """Verifies the expected behavior."""
         selected_feature = Feature.objects.create(name="Billing")
         other_feature = Feature.objects.create(name="Auth")
 
@@ -9763,7 +10086,8 @@ class FeaturePageTests(TestCase):
             ).exists()
         )
 
-    def test_delete_feature_button_removes_existing_feature(self):
+    def test_delete_feature_button_removes_existing_feature(self) -> None:
+        """Verifies the expected behavior."""
         existing_feature = Feature.objects.create(name="Search")
 
         response = self.client.post(
@@ -9788,7 +10112,8 @@ class FeaturePageTests(TestCase):
         self.assertRedirects(response, f"{reverse('features')}?page=1")
         self.assertFalse(Feature.objects.filter(pk=existing_feature.pk).exists())
 
-    def test_delete_feature_link_button_removes_existing_link(self):
+    def test_delete_feature_link_button_removes_existing_link(self) -> None:
+        """Verifies the expected behavior."""
         selected_feature = Feature.objects.create(name="Billing")
         existing_link = FeatureLink.objects.create(
             feature=selected_feature,
@@ -9823,7 +10148,8 @@ class FeaturePageTests(TestCase):
         self.assertRedirects(response, f"{reverse('features')}?feature_id={selected_feature.pk}")
         self.assertFalse(FeatureLink.objects.filter(pk=existing_link.pk).exists())
 
-    def test_save_platforms_button_updates_existing_platform_features(self):
+    def test_save_platforms_button_updates_existing_platform_features(self) -> None:
+        """Verifies the expected behavior."""
         selected_feature = Feature.objects.create(name="Billing")
         platform = Platform.objects.create(name="Alpha")
         platform_feature = PlatformFeature.objects.create(
@@ -9868,7 +10194,8 @@ class FeaturePageTests(TestCase):
         self.assertTrue(platform_feature.available)
         self.assertEqual(str(platform_feature.updated), "2026-09-04")
 
-    def test_save_button_updates_existing_features(self):
+    def test_save_button_updates_existing_features(self) -> None:
+        """Verifies the expected behavior."""
         existing_feature = Feature.objects.create(name="Search")
 
         response = self.client.post(

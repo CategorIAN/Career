@@ -1,3 +1,4 @@
+from typing import Any
 from dataclasses import dataclass
 
 from app.models import Company, Platform, SearchPath, SearchTerm
@@ -12,7 +13,7 @@ class SearchPathCreationResult:
 def create_company_search_paths(
     company: Company,
     *,
-    active_search_terms=None,
+    active_search_terms: Any=None,
 ) -> SearchPathCreationResult:
     """Create every valid SearchPath for an enabled Company."""
     if not company.job_search_enabled:
@@ -21,7 +22,8 @@ def create_company_search_paths(
     created_count = 0
     existing_count = 0
 
-    def create_path(search_term):
+    def create_path(search_term: Any) -> None:
+        """Executes this callable."""
         nonlocal created_count, existing_count
         _, created = SearchPath.objects.get_or_create(
             company=company,
@@ -49,7 +51,7 @@ def create_company_search_paths(
 def create_platform_search_paths(
     platform: Platform,
     *,
-    active_search_terms=None,
+    active_search_terms: Any=None,
 ) -> SearchPathCreationResult:
     """Create every valid SearchPath for an enabled Platform."""
     if not platform.job_search_enabled:

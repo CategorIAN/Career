@@ -1,3 +1,4 @@
+from typing import Any
 from django.contrib import admin
 from .models import (Company, Role, RoleTask, Address, City,
                      State, Country, County, School, Education,
@@ -155,7 +156,8 @@ class ProjectActionItemAdmin(admin.ModelAdmin):
     list_filter = ("completed_at", "project")
 
     @staticmethod
-    def short_description(obj):
+    def short_description(obj: Any) -> Any:
+        """Executes this callable."""
         return obj.description[:80]
 
 
@@ -179,7 +181,8 @@ class ProjectTaskAdmin(admin.ModelAdmin):
     search_fields = ("description", "project__title")
 
     @staticmethod
-    def short_description(obj):
+    def short_description(obj: Any) -> Any:
+        """Executes this callable."""
         return obj.description[:80]
 
 
@@ -259,7 +262,8 @@ class ProfileSettingAdmin(admin.ModelAdmin):
     search_fields = ("key", "value", "notes")
 
     @admin.display(description="Value")
-    def short_value(self, obj):
+    def short_value(self, obj: Any) -> Any:
+        """Executes this callable."""
         return obj.value[:80] + "..." if len(obj.value) > 80 else obj.value
 
 
@@ -339,15 +343,18 @@ class SearchPathAdmin(admin.ModelAdmin):
     ordering = ("id",)
 
     @admin.display(description="Source")
-    def source(self, obj):
+    def source(self, obj: Any) -> Any:
+        """Executes this callable."""
         return obj.platform or obj.company
 
     @admin.display(description="Success Probability")
-    def success_probability_display(self, obj):
+    def success_probability_display(self, obj: Any) -> Any:
+        """Executes this callable."""
         return f"{obj.success_probability:.1%}"
 
     @admin.display(description="Alpha")
-    def alpha_display(self, obj):
+    def alpha_display(self, obj: Any) -> Any:
+        """Executes this callable."""
         return f"{obj.alpha:.2f}"
 
 

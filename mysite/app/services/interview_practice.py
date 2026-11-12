@@ -1,3 +1,4 @@
+from typing import Any
 import json
 
 from django.conf import settings
@@ -23,7 +24,7 @@ class InterviewPracticeParseError(InterviewPracticeError):
     """OpenAI did not return a complete interview-practice response."""
 
 
-def build_interview_context(session: InterviewPracticeSession):
+def build_interview_context(session: InterviewPracticeSession) -> dict[str, Any]:
     """Build the immutable application context stored when a session begins."""
     application = session.application
     posting = application.job_posting
@@ -49,7 +50,8 @@ def build_interview_context(session: InterviewPracticeSession):
     }
 
 
-def _response_refusal(response):
+def _response_refusal(response: Any) -> Any:
+    """Executes this callable."""
     for output in getattr(response, "output", []):
         for content in getattr(output, "content", []):
             refusal = getattr(content, "refusal", None)
@@ -58,7 +60,8 @@ def _response_refusal(response):
     return None
 
 
-def _interview_instructions(session: InterviewPracticeSession):
+def _interview_instructions(session: InterviewPracticeSession) -> Any:
+    """Executes this callable."""
     type_focus = {
         InterviewPracticeSession.InterviewType.GENERAL: (
             "Focus on qualifications, interest in the role, strengths, and career goals."
@@ -84,7 +87,8 @@ Interview type: {session.get_interview_type_display()}
 """.strip()
 
 
-def _generate_text(input_messages):
+def _generate_text(input_messages: Any) -> Any:
+    """Executes this callable."""
     if not settings.OPENAI_API_KEY:
         raise InterviewPracticeAPIError("Set the OPENAI_API_KEY environment variable.")
     try:
@@ -104,7 +108,7 @@ def _generate_text(input_messages):
     return text
 
 
-def generate_interviewer_response(session: InterviewPracticeSession):
+def generate_interviewer_response(session: InterviewPracticeSession) -> Any:
     """Return the next interviewer question using only this session's saved snapshot/history."""
     messages = [
         {"role": "system", "content": _interview_instructions(session)},
@@ -121,7 +125,7 @@ def generate_interviewer_response(session: InterviewPracticeSession):
     return _generate_text(messages)
 
 
-def start_interview(session: InterviewPracticeSession):
+def start_interview(session: InterviewPracticeSession) -> Any:
     """Create exactly one opening interviewer question for a session."""
     existing = session.messages.filter(role=InterviewPracticeMessage.Role.ASSISTANT).first()
     if existing is not None:
@@ -134,7 +138,7 @@ def start_interview(session: InterviewPracticeSession):
     )
 
 
-def generate_interview_feedback(session: InterviewPracticeSession):
+def generate_interview_feedback(session: InterviewPracticeSession) -> Any:
     """Generate end-of-session feedback from this session's conversation only."""
     conversation = "\n\n".join(
         f"{message.get_role_display()}: {message.content}"

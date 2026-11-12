@@ -1,3 +1,4 @@
+from typing import Any
 from django.conf import settings
 from openai import APIError, OpenAI
 from pydantic import BaseModel, ValidationError
@@ -122,7 +123,8 @@ preferences, qualifications, experience, or concerns.
 """.strip()
 
 
-def _job_posting_text(job_posting):
+def _job_posting_text(job_posting: Any) -> Any:
+    """Executes this callable."""
     lines = [
         "JOB POSTING",
         f"Title: {job_posting.title}",
@@ -135,7 +137,8 @@ def _job_posting_text(job_posting):
     return "\n".join(lines)
 
 
-def _response_refusal(response):
+def _response_refusal(response: Any) -> Any:
+    """Executes this callable."""
     for output in getattr(response, "output", []):
         for content in getattr(output, "content", []):
             refusal = getattr(content, "refusal", None)

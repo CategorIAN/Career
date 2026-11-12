@@ -1,3 +1,4 @@
+from typing import Any
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMessage
@@ -179,11 +180,13 @@ CONTACT_SUBMISSION_WINDOW_SECONDS = 60 * 60
 logger = logging.getLogger(__name__)
 
 
-def _normalized_email_address(value):
+def _normalized_email_address(value: Any) -> Any:
+    """Executes this callable."""
     return parseaddr(value or "")[1].strip().lower()
 
 
-def _email_received_at(email):
+def _email_received_at(email: Any) -> Any:
+    """Executes this callable."""
     if email.get("received_at") is not None:
         return email["received_at"]
     try:
@@ -197,7 +200,8 @@ def _email_received_at(email):
     return received_at
 
 
-def _applications_for_sender(sender_email):
+def _applications_for_sender(sender_email: Any) -> Any:
+    """Executes this callable."""
     sender_matches = ApplicationEmail.objects.filter(
         application_id=OuterRef("pk"),
         sender__iexact=sender_email,
@@ -210,7 +214,8 @@ def _applications_for_sender(sender_email):
 USER_TIMEZONE = ZoneInfo("America/Denver")
 
 
-def _sync_connection_after_save(connection):
+def _sync_connection_after_save(connection: Any) -> bool:
+    """Executes this callable."""
     try:
         results = sync_professional_connect(connection)
     except Exception:
@@ -225,7 +230,8 @@ def _sync_connection_after_save(connection):
     return True
 
 
-def _delete_connection_with_google_event(connection):
+def _delete_connection_with_google_event(connection: Any) -> None:
+    """Executes this callable."""
     if connection.google_meeting_event_id:
         try:
             delete_meeting_event(connection)
@@ -236,13 +242,15 @@ def _delete_connection_with_google_event(connection):
     connection.delete()
 
 
-def _calendar_datetime_value(datetime_value):
+def _calendar_datetime_value(datetime_value: Any) -> Any:
+    """Executes this callable."""
     if timezone.is_naive(datetime_value):
         datetime_value = timezone.make_aware(datetime_value, USER_TIMEZONE)
     return timezone.localtime(datetime_value, USER_TIMEZONE).replace(tzinfo=None).isoformat()
 
 
-def _meeting_conflict_message(error_messages):
+def _meeting_conflict_message(error_messages: Any) -> Any:
+    """Executes this callable."""
     return next(
         (
             str(error_message)
@@ -254,17 +262,20 @@ def _meeting_conflict_message(error_messages):
     )
 
 
-def _join_copy_parts(parts):
+def _join_copy_parts(parts: Any) -> Any:
+    """Executes this callable."""
     return "\n".join(part for part in parts if part).strip()
 
 
-def _format_month_year(date_value):
+def _format_month_year(date_value: Any) -> Any:
+    """Executes this callable."""
     if not date_value:
         return ""
     return date_value.strftime("%B %Y")
 
 
-def _format_date_range(start_date, end_date=None, is_current=False):
+def _format_date_range(start_date: Any, end_date: Any=None, is_current: Any=False) -> Any:
+    """Executes this callable."""
     start_text = _format_month_year(start_date)
     end_text = "Present" if is_current else _format_month_year(end_date)
 
@@ -275,7 +286,8 @@ def _format_date_range(start_date, end_date=None, is_current=False):
     return end_text
 
 
-def _build_date_copy_payload(date_value):
+def _build_date_copy_payload(date_value: Any) -> dict[str, Any]:
+    """Executes this callable."""
     if not date_value:
         return {
             "display": "",
@@ -292,11 +304,13 @@ def _build_date_copy_payload(date_value):
     }
 
 
-def _format_location_from_company(company):
+def _format_location_from_company(company: Any) -> Any:
+    """Executes this callable."""
     return _format_location_from_address(getattr(company, "address", None))
 
 
-def _format_location_from_address(address):
+def _format_location_from_address(address: Any) -> Any:
+    """Executes this callable."""
     city = getattr(address, "city", None) if address else None
     state = getattr(city, "state", None) if city else None
 
@@ -307,7 +321,8 @@ def _format_location_from_address(address):
     return ""
 
 
-def _build_address_copy_payload(address):
+def _build_address_copy_payload(address: Any) -> dict[str, Any]:
+    """Executes this callable."""
     city = getattr(address, "city", None) if address else None
     state = getattr(city, "state", None) if city else None
 
@@ -342,17 +357,20 @@ def _build_address_copy_payload(address):
     }
 
 
-def _build_company_address_copy_payload(company):
+def _build_company_address_copy_payload(company: Any) -> Any:
+    """Executes this callable."""
     return _build_address_copy_payload(getattr(company, "address", None))
 
 
-def _format_pay_amount(amount):
+def _format_pay_amount(amount: Any) -> Any:
+    """Executes this callable."""
     if not amount:
         return ""
     return f"${amount:,.2f}"
 
 
-def _build_role_copy_payload(role):
+def _build_role_copy_payload(role: Any) -> dict[str, Any]:
+    """Executes this callable."""
     task_lines = [f"- {task.description}" for task in role.tasks.all()]
     skills_text = ", ".join(skill.name for skill in role.skills.all())
     address_payload = _build_company_address_copy_payload(role.company)
@@ -454,7 +472,8 @@ def _build_role_copy_payload(role):
     }
 
 
-def _build_residency_copy_payload(residency):
+def _build_residency_copy_payload(residency: Any) -> dict[str, Any]:
+    """Executes this callable."""
     address_payload = _build_address_copy_payload(residency.address)
     location_text = address_payload["location"]
     date_range = _format_date_range(
@@ -506,7 +525,8 @@ def _build_residency_copy_payload(residency):
     }
 
 
-def _build_project_copy_payload(project):
+def _build_project_copy_payload(project: Any) -> dict[str, Any]:
+    """Executes this callable."""
     task_lines = [f"- {task.description}" for task in project.tasks.all()]
     skills_text = ", ".join(skill.name for skill in project.skills.all())
     date_range = _format_date_range(project.start_date, project.end_date, not project.end_date)
@@ -559,7 +579,8 @@ def _build_project_copy_payload(project):
     }
 
 
-def _build_course_copy_payload(course):
+def _build_course_copy_payload(course: Any) -> dict[str, Any]:
+    """Executes this callable."""
     education = course.education
     school_name = education.school.name
     program_name = ", ".join(
@@ -591,7 +612,8 @@ def _build_course_copy_payload(course):
     }
 
 
-def home_view(request):
+def home_view(request: Any) -> Any:
+    """Executes this callable."""
     professional_summary = (
         ProfileSetting.objects.filter(key="resume_summary")
         .values_list("value", flat=True)
@@ -605,13 +627,15 @@ def home_view(request):
     )
 
 
-def _contact_rate_limit_key(request):
+def _contact_rate_limit_key(request: Any) -> Any:
+    """Executes this callable."""
     client_address = request.META.get("REMOTE_ADDR", "unknown")
     address_hash = hashlib.sha256(client_address.encode("utf-8")).hexdigest()
     return f"contact-submissions:{address_hash}"
 
 
-def _contact_submission_is_rate_limited(request):
+def _contact_submission_is_rate_limited(request: Any) -> Any:
+    """Executes this callable."""
     cache_key = _contact_rate_limit_key(request)
     if cache.add(cache_key, 1, timeout=CONTACT_SUBMISSION_WINDOW_SECONDS):
         return False
@@ -625,7 +649,8 @@ def _contact_submission_is_rate_limited(request):
 
 
 @require_http_methods(["GET", "POST"])
-def contact_view(request):
+def contact_view(request: Any) -> Any:
+    """Executes this callable."""
     form = ContactForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         if form.cleaned_data["website"]:
@@ -680,7 +705,8 @@ def contact_view(request):
     return render(request, "app/contact.html", {"form": form})
 
 
-def _create_platform_skills_for_platform(platform):
+def _create_platform_skills_for_platform(platform: Any) -> None:
+    """Executes this callable."""
     skills = Skill.objects.all()
     PlatformSkill.objects.bulk_create(
         [
@@ -693,7 +719,8 @@ def _create_platform_skills_for_platform(platform):
     )
 
 
-def _create_platform_features_for_platform(platform):
+def _create_platform_features_for_platform(platform: Any) -> None:
+    """Executes this callable."""
     features = Feature.objects.all()
     PlatformFeature.objects.bulk_create(
         [
@@ -706,7 +733,8 @@ def _create_platform_features_for_platform(platform):
     )
 
 
-def _create_platform_skills_for_skill(skill):
+def _create_platform_skills_for_skill(skill: Any) -> None:
+    """Executes this callable."""
     platforms = Platform.objects.all()
     PlatformSkill.objects.bulk_create(
         [
@@ -719,7 +747,8 @@ def _create_platform_skills_for_skill(skill):
     )
 
 
-def skill_formset_view(request):
+def skill_formset_view(request: Any) -> Any:
+    """Executes this callable."""
     selected_skill_id = request.POST.get("skill_id") or request.GET.get("skill_id", "")
     selected_skill_id = selected_skill_id.strip()
     selected_platform_id = request.POST.get("platform_id") or request.GET.get("platform_id", "")
@@ -860,7 +889,8 @@ def skill_formset_view(request):
     elif page_obj is not None:
         redirect_params["page"] = page_obj.number
 
-    def _build_redirect_url(params):
+    def _build_redirect_url(params: Any) -> Any:
+        """Executes this callable."""
         if params:
             return f"{request.path}?{urlencode(params)}"
         return request.path
@@ -1052,7 +1082,8 @@ def skill_formset_view(request):
         },
     )
 
-def _search_paths_with_success_probability(source):
+def _search_paths_with_success_probability(source: Any) -> Any:
+    """Executes this callable."""
     completed_observation_filter = Q(observations__complete=True) & ~Q(
         observations__job_posting__expired=True
     )
@@ -1111,7 +1142,8 @@ def _search_paths_with_success_probability(source):
     return search_paths
 
 
-def _wait_months_display(wait_value):
+def _wait_months_display(wait_value: Any) -> Any:
+    """Executes this callable."""
     if not wait_value:
         return ""
 
@@ -1121,7 +1153,8 @@ def _wait_months_display(wait_value):
     return f"{formatted_months} {unit}"
 
 
-def platform_formset_view(request):
+def platform_formset_view(request: Any) -> Any:
+    """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     queryset = Platform.objects.all().order_by("name")
     paginator = Paginator(queryset, 1)
@@ -1210,7 +1243,8 @@ def platform_formset_view(request):
     )
 
 
-def professional_formset_view(request):
+def professional_formset_view(request: Any) -> Any:
+    """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     selected_professional_id = (
         request.POST.get("professional_id") or request.GET.get("professional_id", "")
@@ -1680,7 +1714,8 @@ def professional_formset_view(request):
     )
 
 
-def companies_view(request):
+def companies_view(request: Any) -> Any:
+    """Executes this callable."""
     show_add_modal = False
     show_edit_company_id = None
     submitted_edit_form = None
@@ -1797,7 +1832,8 @@ def companies_view(request):
     )
 
 
-def search_terms_view(request):
+def search_terms_view(request: Any) -> Any:
+    """Executes this callable."""
     show_add_modal = False
     show_edit_search_term_id = None
     submitted_edit_form = None
@@ -1906,7 +1942,8 @@ def search_terms_view(request):
     )
 
 
-def job_postings_view(request):
+def job_postings_view(request: Any) -> Any:
+    """Executes this callable."""
     new_job_posting_form = JobPostingCreateForm()
     show_add_job_posting_modal = False
     if request.method == "POST":
@@ -1960,6 +1997,8 @@ def job_postings_view(request):
 
             return redirect("job_postings")
 
+    # Keep decision and application-lifecycle states separate so a posting only
+    # appears at the next actionable stage of the application workflow.
     job_postings = JobPosting.objects.select_related("application").order_by(
         "-created",
         "-pk",
@@ -1990,7 +2029,8 @@ def job_postings_view(request):
     )
 
 
-def emails_view(request):
+def emails_view(request: Any) -> Any:
+    """Executes this callable."""
     page_token = request.GET.get("page_token", "").strip() or None
     if request.method == "POST" and request.POST.get("action") == "assign_email":
         page_token = request.POST.get("page_token", "").strip() or page_token
@@ -2113,7 +2153,8 @@ def emails_view(request):
 
 
 @require_http_methods(["GET"])
-def email_application_options_view(request, message_id):
+def email_application_options_view(request: Any, message_id: Any) -> Any:
+    """Executes this callable."""
     assigned_email = (
         ApplicationEmail.objects.select_related("application__company", "application__job_posting")
         .filter(gmail_message_id=message_id)
@@ -2163,7 +2204,8 @@ def email_application_options_view(request, message_id):
     )
 
 
-def job_applications_view(request):
+def job_applications_view(request: Any) -> Any:
+    """Executes this callable."""
     application_company_form = ApplicationCompanyForm()
     new_company_form = CompanyForm(prefix="new-company")
     show_application_modal_id = None
@@ -2221,7 +2263,8 @@ def job_applications_view(request):
     )
 
 
-def application_details_view(request):
+def application_details_view(request: Any) -> Any:
+    """Executes this callable."""
     application = get_object_or_404(
         Application.objects.select_related("company", "job_posting"),
         pk=request.GET.get("application_id"),
@@ -2360,7 +2403,8 @@ def application_details_view(request):
     )
 
 
-def _interview_message_payload(message):
+def _interview_message_payload(message: Any) -> dict[str, Any]:
+    """Executes this callable."""
     return {
         "id": message.pk,
         "role": message.role,
@@ -2370,7 +2414,8 @@ def _interview_message_payload(message):
     }
 
 
-def interview_practice_session_view(request, session_id):
+def interview_practice_session_view(request: Any, session_id: Any) -> Any:
+    """Executes this callable."""
     interview_session = get_object_or_404(
         InterviewPracticeSession.objects.select_related(
             "application__job_posting",
@@ -2390,7 +2435,8 @@ def interview_practice_session_view(request, session_id):
 
 
 @require_POST
-def interview_practice_opening_view(request, session_id):
+def interview_practice_opening_view(request: Any, session_id: Any) -> Any:
+    """Executes this callable."""
     interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
     if interview_session.ended_at is not None:
         return JsonResponse({"error": "This interview session has ended."}, status=400)
@@ -2402,7 +2448,8 @@ def interview_practice_opening_view(request, session_id):
 
 
 @require_POST
-def interview_practice_message_view(request, session_id):
+def interview_practice_message_view(request: Any, session_id: Any) -> Any:
+    """Executes this callable."""
     interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
     if interview_session.ended_at is not None:
         return JsonResponse({"error": "This interview session has ended."}, status=400)
@@ -2468,7 +2515,8 @@ def interview_practice_message_view(request, session_id):
 
 
 @require_POST
-def end_interview_practice_session_view(request, session_id):
+def end_interview_practice_session_view(request: Any, session_id: Any) -> Any:
+    """Executes this callable."""
     interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
     if interview_session.ended_at is None:
         interview_session.ended_at = timezone.now()
@@ -2487,7 +2535,8 @@ def end_interview_practice_session_view(request, session_id):
 
 
 @require_POST
-def retry_interview_practice_feedback_view(request, session_id):
+def retry_interview_practice_feedback_view(request: Any, session_id: Any) -> Any:
+    """Executes this callable."""
     interview_session = get_object_or_404(InterviewPracticeSession, pk=session_id)
     if interview_session.ended_at is None:
         messages.error(request, "End the interview session before requesting feedback.")
@@ -2504,7 +2553,8 @@ def retry_interview_practice_feedback_view(request, session_id):
 
 
 @require_POST
-def generate_application_cover_letter_view(request, application_id):
+def generate_application_cover_letter_view(request: Any, application_id: Any) -> Any:
+    """Executes this callable."""
     application = get_object_or_404(
         Application.objects.select_related("job_posting"),
         pk=application_id,
@@ -2523,7 +2573,8 @@ def generate_application_cover_letter_view(request, application_id):
 
 
 @require_http_methods(["GET"])
-def download_application_cover_letter_view(request, application_id):
+def download_application_cover_letter_view(request: Any, application_id: Any) -> Any:
+    """Executes this callable."""
     application = get_object_or_404(
         Application.objects.select_related("company", "job_posting"),
         pk=application_id,
@@ -2550,7 +2601,8 @@ def download_application_cover_letter_view(request, application_id):
 
 
 @require_POST
-def update_job_posting_apply_to_view(request, job_posting_id):
+def update_job_posting_apply_to_view(request: Any, job_posting_id: Any) -> Any:
+    """Executes this callable."""
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2567,7 +2619,8 @@ def update_job_posting_apply_to_view(request, job_posting_id):
     return JsonResponse({"apply_to": apply_to})
 
 
-def job_search_view(request):
+def job_search_view(request: Any) -> Any:
+    """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     search_text = (
         request.POST.get("search", "").strip()
@@ -3003,7 +3056,8 @@ def job_search_view(request):
     )
 
 
-def _feature_wait_parts(wait_value):
+def _feature_wait_parts(wait_value: Any) -> Any:
+    """Executes this callable."""
     if not wait_value:
         return 0, 0, 0
 
@@ -3015,7 +3069,8 @@ def _feature_wait_parts(wait_value):
     return months, weeks, days
 
 
-def _add_calendar_months(date_value, months):
+def _add_calendar_months(date_value: Any, months: Any) -> Any:
+    """Executes this callable."""
     if not months:
         return date_value
 
@@ -3026,11 +3081,13 @@ def _add_calendar_months(date_value, months):
     return date_value.replace(year=year, month=month, day=day)
 
 
-def _one_year_ago(date_value):
+def _one_year_ago(date_value: Any) -> Any:
+    """Executes this callable."""
     return _add_calendar_months(date_value, -12)
 
 
-def _feature_due_date(feature):
+def _feature_due_date(feature: Any) -> Any:
+    """Executes this callable."""
     if not feature.updated or not feature.wait:
         return None
 
@@ -3039,13 +3096,15 @@ def _feature_due_date(feature):
     return due_date + timedelta(weeks=weeks, days=days)
 
 
-def _resolve_feature_link_url(request, link_text):
+def _resolve_feature_link_url(request: Any, link_text: Any) -> Any:
+    """Executes this callable."""
     if link_text.startswith("https://"):
         return link_text
     return urljoin(request.build_absolute_uri("/"), link_text)
 
 
-def _ordered_feature_queryset():
+def _ordered_feature_queryset() -> Any:
+    """Executes this callable."""
     features = list(Feature.objects.all())
     ordered_ids = [
         feature.pk
@@ -3070,7 +3129,8 @@ def _ordered_feature_queryset():
     return Feature.objects.filter(pk__in=ordered_ids).order_by(preserved_order)
 
 
-def features_view(request):
+def features_view(request: Any) -> Any:
+    """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     selected_feature_id = request.POST.get("feature_id") or request.GET.get("feature_id", "")
     selected_feature_id = selected_feature_id.strip()
@@ -3246,36 +3306,43 @@ def features_view(request):
     )
 
 
-def _normalize_search_query(query):
+def _normalize_search_query(query: Any) -> Any:
+    """Executes this callable."""
     return re.sub(r"\s+", " ", query.strip()).casefold()
 
 
-def _build_search_cache_key(query):
+def _build_search_cache_key(query: Any) -> Any:
+    """Executes this callable."""
     normalized_query = _normalize_search_query(query)
     query_hash = hashlib.sha256(normalized_query.encode("utf-8")).hexdigest()
     return f"freelancer-project-search:{query_hash}"
 
 
-def _build_search_redirect_url(query, page_number=None):
+def _build_search_redirect_url(query: Any, page_number: Any=None) -> Any:
+    """Executes this callable."""
     query_params = {"query": query}
     if page_number:
         query_params["page"] = page_number
     return f"{reverse('freelancer_search')}?{urlencode(query_params)}"
 
 
-def _timestamp_to_datetime(timestamp):
+def _timestamp_to_datetime(timestamp: Any) -> Any:
+    """Executes this callable."""
     if timestamp is None:
         return None
     return datetime.fromtimestamp(timestamp, UTC)
 
 
-def _get_cached_projects_for_query(query):
+def _get_cached_projects_for_query(query: Any) -> Any:
+    """Executes this callable."""
     normalized_query = _normalize_search_query(query)
+    # Cache keys use normalized input so equivalent user queries share results.
     cache_key = _build_search_cache_key(normalized_query)
     return normalized_query, cache.get(cache_key)
 
 
-def _get_project_from_cached_results(query, freelancer_project_id):
+def _get_project_from_cached_results(query: Any, freelancer_project_id: Any) -> Any:
+    """Executes this callable."""
     normalized_query, cached_projects = _get_cached_projects_for_query(query)
     logger.info(
         "Freelancer project save cache lookup",
@@ -3299,7 +3366,8 @@ def _get_project_from_cached_results(query, freelancer_project_id):
     return normalized_query, selected_project
 
 
-def _save_freelancer_project(project_data):
+def _save_freelancer_project(project_data: Any) -> Any:
+    """Executes this callable."""
     freelancer_project_id = project_data["id"]
     budget = project_data.get("budget") or {}
     bid_stats = project_data.get("bid_stats") or {}
@@ -3354,7 +3422,8 @@ def _save_freelancer_project(project_data):
     return freelancer_project
 
 
-def _fetch_all_projects_from_api(query):
+def _fetch_all_projects_from_api(query: Any) -> Any:
+    """Executes this callable."""
     session = Session(oauth_token=settings.FREELANCER_TOKEN)
     project_details = create_get_projects_project_details_object(
         full_description=True,
@@ -3388,7 +3457,8 @@ def _fetch_all_projects_from_api(query):
     return projects
 
 
-def _fetch_all_projects(query, force_refresh=False):
+def _fetch_all_projects(query: Any, force_refresh: Any=False) -> Any:
+    """Executes this callable."""
     normalized_query = _normalize_search_query(query)
     cache_key = _build_search_cache_key(normalized_query)
     logger.info(
@@ -3434,7 +3504,8 @@ def _fetch_all_projects(query, force_refresh=False):
     return projects, False
 
 
-def search_view(request):
+def search_view(request: Any) -> Any:
+    """Executes this callable."""
     if request.method == "POST":
         query = request.POST.get("query", "").strip()
         if not query:
@@ -3504,7 +3575,8 @@ def search_view(request):
 
 
 @require_POST
-def save_freelancer_project_view(request):
+def save_freelancer_project_view(request: Any) -> Any:
+    """Executes this callable."""
     freelancer_project_id = request.POST.get("project_id", "").strip()
     query = request.POST.get("query", "").strip()
     page_number = request.POST.get("page", "").strip()
@@ -3551,7 +3623,8 @@ def save_freelancer_project_view(request):
 
 
 @xframe_options_sameorigin
-def resume_view(request):
+def resume_view(request: Any) -> Any:
+    """Executes this callable."""
     is_administrator = is_career_administrator(request.user)
     profile_settings = ProfileSetting.objects.filter(
         key__in=[
@@ -3610,7 +3683,8 @@ def resume_view(request):
 
 
 @xframe_options_sameorigin
-def references_view(request):
+def references_view(request: Any) -> Any:
+    """Executes this callable."""
     references = (
         Reference.objects
         .select_related(
@@ -3632,7 +3706,8 @@ def references_view(request):
 
 
 @xframe_options_sameorigin
-def experience_view(request):
+def experience_view(request: Any) -> Any:
+    """Executes this callable."""
     is_administrator = is_career_administrator(request.user)
     if is_administrator:
         requested_mode = request.GET.get("mode")
@@ -3719,7 +3794,8 @@ def experience_view(request):
 
 
 @require_POST
-def save_experience_role_section_view(request, role_id, section):
+def save_experience_role_section_view(request: Any, role_id: Any, section: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -3746,7 +3822,8 @@ def save_experience_role_section_view(request, role_id, section):
 
 
 @require_POST
-def save_experience_role_tasks_view(request, role_id):
+def save_experience_role_tasks_view(request: Any, role_id: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -3781,7 +3858,8 @@ def save_experience_role_tasks_view(request, role_id):
 
 
 @xframe_options_sameorigin
-def residencies_view(request):
+def residencies_view(request: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         raise PermissionDenied("This page is only available to the Career administrator.")
 
@@ -3806,7 +3884,8 @@ def residencies_view(request):
 
 
 @xframe_options_sameorigin
-def projects_view(request):
+def projects_view(request: Any) -> Any:
+    """Executes this callable."""
     is_administrator = is_career_administrator(request.user)
     if is_administrator:
         requested_mode = request.GET.get("mode")
@@ -3878,7 +3957,8 @@ def projects_view(request):
     )
 
 
-def _project_management_redirect(include_inactive, selected_project_id=""):
+def _project_management_redirect(include_inactive: Any, selected_project_id: Any="") -> Any:
+    """Executes this callable."""
     query_params = {}
     if include_inactive:
         query_params["inactive"] = "1"
@@ -3888,12 +3968,14 @@ def _project_management_redirect(include_inactive, selected_project_id=""):
     return redirect(f"{reverse('project_management')}{suffix}")
 
 
-def _project_management_access_denied(request):
+def _project_management_access_denied(request: Any) -> None:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         raise PermissionDenied("This page is only available to the Career administrator.")
 
 
-def _format_toggl_duration(duration_seconds):
+def _format_toggl_duration(duration_seconds: Any) -> Any:
+    """Executes this callable."""
     hours, remaining_seconds = divmod(duration_seconds, 3600)
     minutes, seconds = divmod(remaining_seconds, 60)
     parts = []
@@ -3906,7 +3988,8 @@ def _format_toggl_duration(duration_seconds):
     return " ".join(parts)
 
 
-def project_management_view(request):
+def project_management_view(request: Any) -> Any:
+    """Executes this callable."""
     _project_management_access_denied(request)
     seed_default_checklist_items()
     include_inactive = request.GET.get("inactive") == "1" or request.POST.get("inactive") == "1"
@@ -4301,7 +4384,8 @@ def project_management_view(request):
 
 
 @require_POST
-def sync_toggl_view(request):
+def sync_toggl_view(request: Any) -> Any:
+    """Executes this callable."""
     _project_management_access_denied(request)
     days_back_value = request.POST.get("days_back", "").strip()
     try:
@@ -4327,7 +4411,8 @@ def sync_toggl_view(request):
 
 
 @require_POST
-def save_project_section_view(request, project_id, section):
+def save_project_section_view(request: Any, project_id: Any, section: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -4354,7 +4439,8 @@ def save_project_section_view(request, project_id, section):
 
 
 @require_POST
-def save_project_tasks_view(request, project_id):
+def save_project_tasks_view(request: Any, project_id: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -4389,7 +4475,8 @@ def save_project_tasks_view(request, project_id):
 
 
 @require_POST
-def save_project_order_view(request):
+def save_project_order_view(request: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -4416,7 +4503,8 @@ def save_project_order_view(request):
 
 
 @xframe_options_sameorigin
-def courses_view(request):
+def courses_view(request: Any) -> Any:
+    """Executes this callable."""
     is_administrator = is_career_administrator(request.user)
     if is_administrator:
         requested_mode = request.GET.get("mode")
@@ -4551,7 +4639,8 @@ def courses_view(request):
 
 
 @require_POST
-def save_education_view(request, education_id):
+def save_education_view(request: Any, education_id: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -4569,7 +4658,8 @@ def save_education_view(request, education_id):
 
 
 @require_POST
-def save_course_section_view(request, course_id, section):
+def save_course_section_view(request: Any, course_id: Any, section: Any) -> Any:
+    """Executes this callable."""
     if not is_career_administrator(request.user):
         return JsonResponse({"error": "Unauthorized."}, status=403)
 
@@ -4595,12 +4685,14 @@ def save_course_section_view(request, course_id, section):
 
 
 @ensure_csrf_cookie
-def connections_view(request):
+def connections_view(request: Any) -> Any:
+    """Executes this callable."""
     return render(request, "app/connections.html")
 
 
 @require_http_methods(["GET", "POST"])
-def directions_view(request):
+def directions_view(request: Any) -> Any:
+    """Executes this callable."""
     if request.method == "POST":
         direction = get_object_or_404(
             Direction,
@@ -4645,7 +4737,8 @@ def directions_view(request):
     )
 
 
-def connection_events_view(request):
+def connection_events_view(request: Any) -> Any:
+    """Executes this callable."""
     date_mode = request.GET.get("date_mode", "meeting")
     if date_mode in {"invite", "invite-professionals", "invite-recruiters"}:
         invite_filters = {"invite_date__isnull": False}
@@ -4705,7 +4798,8 @@ def connection_events_view(request):
     return JsonResponse(events, safe=False)
 
 
-def connection_weekly_total_view(request):
+def connection_weekly_total_view(request: Any) -> Any:
+    """Executes this callable."""
     date_mode = request.GET.get("date_mode", "meeting")
     today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
@@ -4733,7 +4827,8 @@ def connection_weekly_total_view(request):
 
 
 @require_POST
-def update_connection_meeting_view(request):
+def update_connection_meeting_view(request: Any) -> Any:
+    """Executes this callable."""
     try:
         payload = json.loads(request.body)
     except (TypeError, json.JSONDecodeError):
@@ -4879,7 +4974,8 @@ def update_connection_meeting_view(request):
 
 
 @require_POST
-def delete_connection_view(request):
+def delete_connection_view(request: Any) -> Any:
+    """Executes this callable."""
     try:
         payload = json.loads(request.body)
     except (TypeError, json.JSONDecodeError):
@@ -4899,7 +4995,8 @@ def delete_connection_view(request):
 
 
 @require_http_methods(["GET", "POST"])
-def connection_directions_view(request, connection_id):
+def connection_directions_view(request: Any, connection_id: Any) -> Any:
+    """Executes this callable."""
     try:
         connection = Connect.objects.get(pk=connection_id)
     except Connect.DoesNotExist:
@@ -4929,7 +5026,8 @@ def connection_directions_view(request, connection_id):
 
 
 @require_POST
-def update_direction_view(request, direction_id):
+def update_direction_view(request: Any, direction_id: Any) -> Any:
+    """Executes this callable."""
     try:
         payload = json.loads(request.body)
     except (TypeError, json.JSONDecodeError):
@@ -4956,7 +5054,8 @@ def update_direction_view(request, direction_id):
 
 
 @require_POST
-def delete_direction_view(request, direction_id):
+def delete_direction_view(request: Any, direction_id: Any) -> Any:
+    """Executes this callable."""
     try:
         direction = Direction.objects.get(pk=direction_id)
     except Direction.DoesNotExist:
@@ -4966,7 +5065,8 @@ def delete_direction_view(request, direction_id):
     return JsonResponse({"id": direction_id})
 
 
-def recruiter_formset_view(request):
+def recruiter_formset_view(request: Any) -> Any:
+    """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
     selected_recruiter_id = (
         request.POST.get("recruiter_id") or request.GET.get("recruiter_id", "")

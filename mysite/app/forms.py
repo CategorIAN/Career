@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -107,7 +108,8 @@ class CompanyForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
 
 
@@ -120,7 +122,8 @@ class RoleCoreEditForm(forms.ModelForm):
             "end_date": forms.DateInput(attrs={"type": "date"}),
         }
 
-    def clean(self):
+    def clean(self) -> Any:
+        """Validates the model state."""
         cleaned_data = super().clean()
         start_date = cleaned_data.get("start_date")
         end_date = cleaned_data.get("end_date")
@@ -187,7 +190,8 @@ class ProjectCoreEditForm(forms.ModelForm):
             "end_date": forms.DateInput(attrs={"type": "date"}),
         }
 
-    def clean(self):
+    def clean(self) -> Any:
+        """Validates the model state."""
         cleaned_data = super().clean()
         start_date = cleaned_data.get("start_date")
         end_date = cleaned_data.get("end_date")
@@ -324,7 +328,8 @@ class EducationEditForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 5}),
         }
 
-    def clean(self):
+    def clean(self) -> Any:
+        """Validates the model state."""
         cleaned_data = super().clean()
         start_date = cleaned_data.get("start_date")
         end_date = cleaned_data.get("end_date")
@@ -459,7 +464,8 @@ class InterviewPracticeSessionForm(forms.ModelForm):
         model = InterviewPracticeSession
         fields = ["interview_type", "interview_email"]
 
-    def __init__(self, *args, application, **kwargs):
+    def __init__(self, *args: Any, application: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         self.application = application
         self.instance.application = application
@@ -472,7 +478,8 @@ class InterviewPracticeSessionForm(forms.ModelForm):
         self.fields["interview_email"].required = False
         self.fields["interview_email"].label = "Interview Request email (optional)"
 
-    def clean_interview_email(self):
+    def clean_interview_email(self) -> Any:
+        """Executes this callable."""
         interview_email = self.cleaned_data.get("interview_email")
         if interview_email is None:
             return None
@@ -500,7 +507,8 @@ class ApplicationCompanyForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         self.fields["company"].queryset = Company.objects.order_by("name", "pk")
 
@@ -561,18 +569,21 @@ class SkillForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
 
-    def clean_name(self):
+    def clean_name(self) -> Any:
+        """Executes this callable."""
         name = (self.cleaned_data.get("name") or "").strip()
         if not name:
             raise ValidationError("Invalid Name")
         return name
 
-    def clean_rating(self):
+    def clean_rating(self) -> Any:
+        """Executes this callable."""
         rating = self.cleaned_data.get("rating")
         return 0 if rating in (None, "") else rating
 
@@ -590,17 +601,20 @@ class PlatformForm(forms.ModelForm):
         model = Platform
         fields = ["name", "url", "job_search_enabled"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
 
-    def clean_name(self):
+    def clean_name(self) -> Any:
+        """Executes this callable."""
         return self.cleaned_data.get("name") or ""
 
 
 class PlatformCreateForm(PlatformForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         self.fields["name"].required = True
         for field_name in ("name", "url"):
@@ -673,7 +687,8 @@ class PlatformSkillForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
@@ -720,7 +735,8 @@ class PlatformFeatureForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
@@ -742,7 +758,8 @@ PlatformFeatureFormSet = modelformset_factory(
 class DurationWidget(forms.MultiWidget):
     template_name = "app/widgets/duration_widget.html"
 
-    def __init__(self, attrs=None):
+    def __init__(self, attrs: Any=None) -> None:
+        """Initializes the instance."""
         widget_attrs = {
             "min": 0,
             "style": "width: 4rem;",
@@ -754,7 +771,8 @@ class DurationWidget(forms.MultiWidget):
         ]
         super().__init__(widgets, attrs)
 
-    def decompress(self, value):
+    def decompress(self, value: Any) -> list[Any]:
+        """Executes this callable."""
         if not value:
             return [None, None, None]
         if isinstance(value, str):
@@ -773,7 +791,8 @@ class DurationWidget(forms.MultiWidget):
 class DurationFormField(forms.MultiValueField):
     widget = DurationWidget
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         fields = [
             forms.IntegerField(min_value=0, required=False),
             forms.IntegerField(min_value=0, required=False),
@@ -781,7 +800,8 @@ class DurationFormField(forms.MultiValueField):
         ]
         super().__init__(fields=fields, require_all_fields=False, *args, **kwargs)
 
-    def compress(self, data_list):
+    def compress(self, data_list: Any) -> Any:
+        """Executes this callable."""
         if not data_list or all(value in (None, "") for value in data_list):
             return None
 
@@ -811,14 +831,16 @@ class FeatureForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
 
 
 class FeatureCreateForm(FeatureForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         self.fields["name"].required = True
         self.fields["name"].widget.attrs.update(
@@ -894,7 +916,8 @@ class ProfessionalForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field_name in (
             "linkedin_url",
@@ -906,7 +929,8 @@ class ProfessionalForm(forms.ModelForm):
             if field_name in self.fields:
                 self.fields[field_name].required = False
 
-    def clean_name(self):
+    def clean_name(self) -> Any:
+        """Executes this callable."""
         name = (self.cleaned_data.get("name") or "").strip()
         if not name:
             raise ValidationError("Invalid Name")
@@ -948,7 +972,8 @@ class ProfessionalConnectForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 3, "style": "width: 20rem;"}),
         }
 
-    def __init__(self, *args, require_invite_date=False, **kwargs):
+    def __init__(self, *args: Any, require_invite_date: Any=False, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field_name in ("meeting_at", "meeting_end", "rating"):
             self.fields[field_name].required = False
@@ -956,7 +981,8 @@ class ProfessionalConnectForm(forms.ModelForm):
         for field_name in ("meeting_at", "meeting_end"):
             self.fields[field_name].input_formats = ["%Y-%m-%dT%H:%M"]
 
-    def _clean_local_datetime(self, field_name):
+    def _clean_local_datetime(self, field_name: Any) -> Any:
+        """Executes this callable."""
         value = self.cleaned_data.get(field_name)
         if value is None:
             return None
@@ -971,13 +997,16 @@ class ProfessionalConnectForm(forms.ModelForm):
 
         return timezone.localtime(value, MOUNTAIN_TIME_ZONE)
 
-    def clean_meeting_at(self):
+    def clean_meeting_at(self) -> Any:
+        """Executes this callable."""
         return self._clean_local_datetime("meeting_at")
 
-    def clean_meeting_end(self):
+    def clean_meeting_end(self) -> Any:
+        """Executes this callable."""
         return self._clean_local_datetime("meeting_end")
 
-    def clean(self):
+    def clean(self) -> Any:
+        """Validates the model state."""
         cleaned_data = super().clean()
         meeting_at = cleaned_data.get("meeting_at")
         meeting_end = cleaned_data.get("meeting_end")
@@ -1022,12 +1051,14 @@ class FeatureLinkForm(forms.ModelForm):
         model = FeatureLink
         fields = ["url"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the instance."""
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
 
-    def clean_url(self):
+    def clean_url(self) -> Any:
+        """Executes this callable."""
         url = (self.cleaned_data.get("url") or "").strip()
         if not url:
             raise ValidationError("This field is required.")

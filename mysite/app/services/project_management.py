@@ -1,3 +1,4 @@
+from typing import Any
 from django.utils import timezone
 
 from app.models import ChecklistItem, ProjectChecklist
@@ -14,7 +15,7 @@ DEFAULT_CHECKLIST_ITEMS = (
 )
 
 
-def seed_default_checklist_items():
+def seed_default_checklist_items() -> None:
     """Create the shared project-review standards without duplicating them."""
     for name, guidance, interval in DEFAULT_CHECKLIST_ITEMS:
         ChecklistItem.objects.get_or_create(
@@ -26,7 +27,8 @@ def seed_default_checklist_items():
         )
 
 
-def review_is_due(response, now=None):
+def review_is_due(response: Any, now: Any=None) -> Any:
+    """Executes this callable."""
     if response.update_due is None:
         return False
     today = now or timezone.localdate()

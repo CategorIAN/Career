@@ -1,25 +1,29 @@
+from typing import Any
 from django.db.models import Prefetch
 
 from app.models import Course, Education, Project, ProjectTask, Role, RoleTask, Skill
 
 
-def _date_range(start_date, end_date, current=False):
+def _date_range(start_date: Any, end_date: Any, current: Any=False) -> Any:
+    """Executes this callable."""
     start = start_date.strftime("%b %Y") if start_date else "Unknown start"
     end = "Present" if current else end_date.strftime("%b %Y") if end_date else "Unknown end"
     return f"{start} – {end}"
 
 
-def _skills_text(skills):
+def _skills_text(skills: Any) -> Any:
+    """Executes this callable."""
     return ", ".join(skill.name for skill in skills)
 
 
-def _append_detail(lines, label, value, indent="  "):
+def _append_detail(lines: Any, label: Any, value: Any, indent: Any="  ") -> None:
+    """Executes this callable."""
     value = (value or "").strip()
     if value:
         lines.append(f"{indent}{label}: {value}")
 
 
-def build_candidate_background():
+def build_candidate_background() -> Any:
     """Build factual candidate context from resume-related Career app records."""
     educations = Education.objects.select_related("school").prefetch_related(
         Prefetch(

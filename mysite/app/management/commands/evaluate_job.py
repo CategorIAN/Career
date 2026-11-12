@@ -1,3 +1,4 @@
+from typing import Any
 from django.core.management.base import BaseCommand, CommandError
 
 from app.models import JobPosting
@@ -7,10 +8,12 @@ from app.services.job_evaluation import JobEvaluationError, evaluate_job_posting
 class Command(BaseCommand):
     help = "Evaluate a JobPosting against the candidate background using OpenAI."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: Any) -> None:
+        """Executes this callable."""
         parser.add_argument("job_posting_id", type=int)
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Runs the management command."""
         job_posting_id = options["job_posting_id"]
         try:
             job_posting = JobPosting.objects.get(pk=job_posting_id)

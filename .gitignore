@@ -211,3 +211,8 @@ mysite/credentials.json
 mysite/token.json
 token.json
 mysite/private/
+
+# Generated AST audit reports
+/ast_annotation_uncertaintites.json
+/ast_inventory_after.json
+/ast_inventory_before.json

@@ -1,3 +1,4 @@
+from typing import Any
 from django.core.management.base import BaseCommand
 import pandas as pd
 from ...models import Skill
@@ -5,8 +6,9 @@ from ...models import Skill
 
 class Command(BaseCommand):
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args: Any, **kwargs: Any) -> None:
 
+        """Runs the management command."""
         df = pd.read_csv("skills.csv")
 
         for _, row in df.iterrows():

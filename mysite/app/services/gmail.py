@@ -1,4 +1,5 @@
 """Gmail API operations with no Django database persistence."""
+from typing import Any
 
 import base64
 import binascii
@@ -14,11 +15,12 @@ class GmailError(RuntimeError):
     """A Gmail API operation failed."""
 
 
-def get_gmail_service():
+def get_gmail_service() -> Any:
+    """Executes this callable."""
     return build("gmail", "v1", credentials=get_google_credentials())
 
 
-def search_emails(query="", max_results=50, page_token=None):
+def search_emails(query: Any="", max_results: Any=50, page_token: Any=None) -> dict[str, Any]:
     """Return Gmail message/thread identifiers and an optional next-page token."""
     request = {
         "userId": "me",
@@ -41,7 +43,8 @@ def search_emails(query="", max_results=50, page_token=None):
     }
 
 
-def _decode_body(data):
+def _decode_body(data: Any) -> Any:
+    """Executes this callable."""
     if not data:
         return ""
     padding = "=" * (-len(data) % 4)
@@ -51,7 +54,8 @@ def _decode_body(data):
         return ""
 
 
-def _body_parts(part):
+def _body_parts(part: Any) -> Any:
+    """Executes this callable."""
     if part.get("filename"):
         return [], []
 
@@ -71,11 +75,12 @@ def _body_parts(part):
     return plain_parts, html_parts
 
 
-def _header_map(headers):
+def _header_map(headers: Any) -> Any:
+    """Executes this callable."""
     return {header.get("name", "").lower(): header.get("value", "") for header in headers}
 
 
-def get_email(message_id):
+def get_email(message_id: Any) -> dict[str, Any]:
     """Fetch and parse one complete Gmail message without rendering its HTML."""
     try:
         message = (
@@ -118,7 +123,7 @@ def get_email(message_id):
     }
 
 
-def get_or_create_label(name):
+def get_or_create_label(name: Any) -> Any:
     """Return the Gmail label ID for a user label, creating it when absent."""
     service = get_gmail_service()
     try:
@@ -144,7 +149,7 @@ def get_or_create_label(name):
         raise GmailError(f"Unable to get or create Gmail label {name!r}.") from error
 
 
-def apply_labels(message_id, label_ids):
+def apply_labels(message_id: Any, label_ids: Any) -> Any:
     """Apply only the supplied Gmail labels to a message."""
     try:
         return (
@@ -162,7 +167,7 @@ def apply_labels(message_id, label_ids):
         raise GmailError(f"Unable to label Gmail message {message_id}.") from error
 
 
-def apply_labels_and_archive(message_id, label_ids):
+def apply_labels_and_archive(message_id: Any, label_ids: Any) -> Any:
     """Apply supplied labels and remove only Gmail's INBOX label."""
     try:
         return (
@@ -183,7 +188,7 @@ def apply_labels_and_archive(message_id, label_ids):
         raise GmailError(f"Unable to label and archive Gmail message {message_id}.") from error
 
 
-def remove_labels(message_id, label_ids):
+def remove_labels(message_id: Any, label_ids: Any) -> Any:
     """Remove only the supplied Gmail labels from a message."""
     try:
         return (

@@ -1,3 +1,4 @@
+from typing import Any
 import os
 
 from django.core.management.base import BaseCommand, CommandError
@@ -7,7 +8,8 @@ from openai import OpenAI
 class Command(BaseCommand):
     help = "Send a basic prompt through the OpenAI Responses API."
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Runs the management command."""
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise CommandError(

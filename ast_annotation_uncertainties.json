@@ -1,0 +1,2084 @@
+[
+  {
+    "file": "mysite\\app\\access.py",
+    "line": 5,
+    "name": "is_career_administrator",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\access.py",
+    "line": 14,
+    "name": "career_access",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 159,
+    "name": "short_description",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 184,
+    "name": "short_description",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 265,
+    "name": "short_value",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 346,
+    "name": "source",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 351,
+    "name": "success_probability_display",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\admin.py",
+    "line": 356,
+    "name": "alpha_display",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 111,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 125,
+    "name": "clean",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 193,
+    "name": "clean",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 331,
+    "name": "clean",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 467,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 481,
+    "name": "clean_interview_email",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 510,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 572,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 578,
+    "name": "clean_name",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 585,
+    "name": "clean_rating",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 604,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 610,
+    "name": "clean_name",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 616,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 690,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 738,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 761,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 774,
+    "name": "decompress",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 794,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 803,
+    "name": "compress",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 834,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 842,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 919,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 932,
+    "name": "clean_name",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 975,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 984,
+    "name": "_clean_local_datetime",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 1000,
+    "name": "clean_meeting_at",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 1004,
+    "name": "clean_meeting_end",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 1008,
+    "name": "clean",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 1054,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\forms.py",
+    "line": 1060,
+    "name": "clean_url",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\create_search_paths.py",
+    "line": 14,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\evaluate_job.py",
+    "line": 11,
+    "name": "add_arguments",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\evaluate_job.py",
+    "line": 15,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\import_skills.py",
+    "line": 9,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\print_candidate_background.py",
+    "line": 10,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\seed_project_checklist.py",
+    "line": 11,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\test_gmail.py",
+    "line": 11,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\management\\commands\\test_openai_api.py",
+    "line": 11,
+    "name": "handle",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\middleware.py",
+    "line": 26,
+    "name": "__init__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\middleware.py",
+    "line": 30,
+    "name": "__call__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\middleware.py",
+    "line": 34,
+    "name": "process_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 15,
+    "name": "_add_calendar_months",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 27,
+    "name": "_wait_parts",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 60,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 69,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 79,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 94,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 137,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 153,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 197,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 224,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 257,
+    "name": "last_applied",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 271,
+    "name": "last_applied_days",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 277,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 338,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 356,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 399,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 453,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 458,
+    "name": "alpha",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 494,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 523,
+    "name": "update_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 613,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 643,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 696,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 706,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 737,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 776,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 797,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 811,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 845,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 882,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 887,
+    "name": "_connection_records",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 894,
+    "name": "last_invited",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 904,
+    "name": "last_connected",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 914,
+    "name": "last_attended",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 921,
+    "name": "invite_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 928,
+    "name": "connect_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 940,
+    "name": "average_rating",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 952,
+    "name": "average_rating_stars",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 960,
+    "name": "invite_success",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 971,
+    "name": "invite",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1019,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1024,
+    "name": "_connection_records",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1031,
+    "name": "last_invited",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1041,
+    "name": "last_connected",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1051,
+    "name": "last_attended",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1058,
+    "name": "invite_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1065,
+    "name": "connect_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1077,
+    "name": "average_rating",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1089,
+    "name": "average_rating_stars",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1097,
+    "name": "invite_success",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1108,
+    "name": "invite",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1181,
+    "name": "_prepare_meeting_interval",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1243,
+    "name": "save",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1252,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1257,
+    "name": "notes_preview",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1264,
+    "name": "status",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1313,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1332,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1403,
+    "name": "completed_observations",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1412,
+    "name": "observation_count",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1417,
+    "name": "success_count",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1425,
+    "name": "success_probability",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1430,
+    "name": "alpha",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1442,
+    "name": "effective_url",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1451,
+    "name": "hide",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1510,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1543,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1570,
+    "name": "success",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1603,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1666,
+    "name": "stopped",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1670,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1730,
+    "name": "save",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1784,
+    "name": "completed",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1788,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\models.py",
+    "line": 1810,
+    "name": "__str__",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\candidate_background.py",
+    "line": 7,
+    "name": "_date_range",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\candidate_background.py",
+    "line": 14,
+    "name": "_skills_text",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\candidate_background.py",
+    "line": 19,
+    "name": "_append_detail",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\candidate_background.py",
+    "line": 26,
+    "name": "build_candidate_background",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\cover_letter.py",
+    "line": 25,
+    "name": "_job_posting_text",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\cover_letter.py",
+    "line": 40,
+    "name": "_response_refusal",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\cover_letter_pdf.py",
+    "line": 40,
+    "name": "_signature_image",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\cover_letter_pdf.py",
+    "line": 53,
+    "name": "_body_paragraphs",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 18,
+    "name": "get_gmail_service",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 23,
+    "name": "search_emails",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 46,
+    "name": "_decode_body",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 57,
+    "name": "_body_parts",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 78,
+    "name": "_header_map",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 83,
+    "name": "get_email",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 126,
+    "name": "get_or_create_label",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 152,
+    "name": "apply_labels",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 170,
+    "name": "apply_labels_and_archive",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\gmail.py",
+    "line": 191,
+    "name": "remove_labels",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 37,
+    "name": "credential_paths",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 45,
+    "name": "_scope_set",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 52,
+    "name": "_token_scopes",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 63,
+    "name": "_missing_scopes",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 68,
+    "name": "_authorized_scopes",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 76,
+    "name": "_authorize",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_auth.py",
+    "line": 95,
+    "name": "get_google_credentials",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 16,
+    "name": "get_calendar_service",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 21,
+    "name": "_event_result",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 26,
+    "name": "_save_event_id",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 32,
+    "name": "_upsert_event",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 58,
+    "name": "delete_meeting_event",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 78,
+    "name": "sync_meeting_event",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 113,
+    "name": "sync_professional_connect",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\google_calendar.py",
+    "line": 83,
+    "name": "as_calendar_datetime",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 53,
+    "name": "_response_refusal",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 63,
+    "name": "_interview_instructions",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 90,
+    "name": "_generate_text",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 111,
+    "name": "generate_interviewer_response",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 128,
+    "name": "start_interview",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\interview_practice.py",
+    "line": 141,
+    "name": "generate_interview_feedback",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\job_evaluation.py",
+    "line": 126,
+    "name": "_job_posting_text",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\job_evaluation.py",
+    "line": 140,
+    "name": "_response_refusal",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\project_management.py",
+    "line": 30,
+    "name": "review_is_due",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\search_paths.py",
+    "line": 13,
+    "name": "create_company_search_paths",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\search_paths.py",
+    "line": 51,
+    "name": "create_platform_search_paths",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\search_paths.py",
+    "line": 25,
+    "name": "create_path",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 31,
+    "name": "toggl_is_configured",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 36,
+    "name": "default_import_days",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 41,
+    "name": "validate_import_days",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 54,
+    "name": "_parse_timestamp",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 64,
+    "name": "fetch_time_entries",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 100,
+    "name": "fetch_toggl_projects",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 131,
+    "name": "_project_matches_tags",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 141,
+    "name": "refresh_source_project_names",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 160,
+    "name": "import_time_entries",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\services\\toggl.py",
+    "line": 222,
+    "name": "sync_toggl_time_entries",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 118,
+    "name": "make_project",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 449,
+    "name": "_valid_submission",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 512,
+    "name": "test_delivery_failure_does_not_show_success_message",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 1725,
+    "name": "test_toggl_sync_backfills_and_refreshes_activity_names",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2019,
+    "name": "test_single_api_call_then_local_pagination_uses_cache",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2049,
+    "name": "test_refresh_replaces_cached_results_with_one_api_call",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2078,
+    "name": "test_rate_limited_projects_not_found_shows_friendly_message_and_is_not_cached",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2344,
+    "name": "test_evaluates_posting_with_structured_output",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2394,
+    "name": "test_evaluation_request_includes_assumptions_and_genuine_barriers",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2443,
+    "name": "test_evaluation_request_distinguishes_unknowns_from_gaps",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2483,
+    "name": "test_evaluation_request_distinguishes_requirements_from_responsibilities",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2550,
+    "name": "test_rejects_refused_or_unparsed_evaluation",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2574,
+    "name": "test_evaluate_job_command_prints_evaluation_without_saving",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2610,
+    "name": "test_generates_cover_letter_from_application_context",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2649,
+    "name": "test_rejects_refused_or_empty_cover_letters",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 2678,
+    "name": "test_builds_pdf_with_a_sanitized_filename",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 3864,
+    "name": "test_professionals_page_edits_current_professionals_invitation",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 3898,
+    "name": "test_professionals_page_keeps_connection_save_when_google_sync_fails",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4045,
+    "name": "test_professionals_page_deletes_current_professionals_connection",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4069,
+    "name": "test_professionals_page_adds_connection_for_current_professional",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4110,
+    "name": "test_professionals_connection_form_preserves_explicit_meeting_end",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4137,
+    "name": "test_professionals_connection_form_rejects_nonpositive_meeting_interval",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4165,
+    "name": "test_professionals_connection_time_matches_connections_calendar",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 4474,
+    "name": "test_professionals_connection_form_prevents_overlapping_meeting",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5339,
+    "name": "test_job_postings_ai_evaluation_updates_recommendation_and_decision",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5660,
+    "name": "test_application_details_generates_and_saves_cover_letter",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5688,
+    "name": "test_cover_letter_generation_failure_preserves_existing_draft",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5734,
+    "name": "test_cover_letter_download_returns_a_pdf",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5938,
+    "name": "create_observation",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 5945,
+    "name": "create_application",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6097,
+    "name": "test_emails_page_lists_inbox_messages_without_saving_them",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6145,
+    "name": "test_email_options_prioritize_applications_with_matching_sender",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6199,
+    "name": "test_assigning_email_saves_it_labels_it_and_archives_it",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6255,
+    "name": "test_assignment_is_preserved_when_gmail_labeling_and_archiving_fails",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6292,
+    "name": "test_assigning_existing_gmail_message_does_not_create_a_duplicate",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6434,
+    "name": "test_creating_session_saves_snapshot_and_selected_interview_email",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6460,
+    "name": "test_session_rejects_email_from_another_application",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6485,
+    "name": "test_session_rejects_non_interview_email",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6506,
+    "name": "test_context_snapshot_includes_expected_application_data",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6522,
+    "name": "test_context_snapshot_allows_missing_cover_letter_and_interview_email",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6534,
+    "name": "test_start_interview_creates_only_one_opening_question",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6550,
+    "name": "test_message_endpoint_saves_user_and_assistant_messages",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6580,
+    "name": "test_failed_ai_response_can_retry_without_duplicate_user_message",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6615,
+    "name": "test_interviewer_response_uses_only_its_own_session_history",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6645,
+    "name": "test_ending_session_saves_feedback_and_blocks_new_messages",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7039,
+    "name": "test_job_search_ai_evaluation_updates_posting_recommendation",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7595,
+    "name": "test_recruiter_connection_uses_shared_connect_without_professional",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7622,
+    "name": "test_recruiter_connection_conflicts_with_professional_meeting",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7823,
+    "name": "test_calendar_update_rejects_overlapping_meeting_before_google_sync",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7867,
+    "name": "test_connection_event_update_saves_then_syncs_to_google_calendar",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7919,
+    "name": "test_connection_event_update_preserves_save_when_google_sync_fails",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7956,
+    "name": "test_connection_event_update_interprets_naive_datetime_as_mountain_time",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 7988,
+    "name": "test_connection_event_date_update_preserves_mountain_clock_times",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8129,
+    "name": "test_connection_to_review_mode_saves_as_a_meeting",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8198,
+    "name": "test_connection_invite_date_update_requires_csrf_and_updates_invite_date",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8234,
+    "name": "test_connection_event_delete_requires_csrf_and_deletes_connection",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8259,
+    "name": "test_connection_event_update_removes_google_event_when_meeting_is_cleared",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8469,
+    "name": "test_invite_only_connection_does_not_sync_to_google_calendar",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8486,
+    "name": "test_calendar_service_uses_shared_google_credentials",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8510,
+    "name": "test_calendar_only_token_reauthorizes_for_both_services",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8541,
+    "name": "test_search_returns_identifiers_and_next_page_token",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8565,
+    "name": "test_get_email_parses_multipart_bodies_and_headers",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8612,
+    "name": "test_label_helpers_preserve_unrelated_labels",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 8631,
+    "name": "test_apply_labels_and_archive_removes_only_inbox",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 9140,
+    "name": "test_selected_skill_platform_skill_formset_highlights_rows_by_updated_date",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 9213,
+    "name": "test_selected_feature_platform_features_only_mark_unavailable_rows_red_when_stale_or_null",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 9804,
+    "name": "test_features_page_marks_row_red_when_due_date_is_today",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 1374,
+    "name": "create_entry",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 1453,
+    "name": "create_entry",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 1547,
+    "name": "formset_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 1631,
+    "name": "create_entry",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\tests.py",
+    "line": 6072,
+    "name": "success_count",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 183,
+    "name": "_normalized_email_address",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 188,
+    "name": "_email_received_at",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 203,
+    "name": "_applications_for_sender",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 217,
+    "name": "_sync_connection_after_save",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 233,
+    "name": "_delete_connection_with_google_event",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 245,
+    "name": "_calendar_datetime_value",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 252,
+    "name": "_meeting_conflict_message",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 265,
+    "name": "_join_copy_parts",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 270,
+    "name": "_format_month_year",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 277,
+    "name": "_format_date_range",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 289,
+    "name": "_build_date_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 307,
+    "name": "_format_location_from_company",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 312,
+    "name": "_format_location_from_address",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 324,
+    "name": "_build_address_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 360,
+    "name": "_build_company_address_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 365,
+    "name": "_format_pay_amount",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 372,
+    "name": "_build_role_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 475,
+    "name": "_build_residency_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 528,
+    "name": "_build_project_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 582,
+    "name": "_build_course_copy_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 615,
+    "name": "home_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 630,
+    "name": "_contact_rate_limit_key",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 637,
+    "name": "_contact_submission_is_rate_limited",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 652,
+    "name": "contact_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 708,
+    "name": "_create_platform_skills_for_platform",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 722,
+    "name": "_create_platform_features_for_platform",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 736,
+    "name": "_create_platform_skills_for_skill",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 750,
+    "name": "skill_formset_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1085,
+    "name": "_search_paths_with_success_probability",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1145,
+    "name": "_wait_months_display",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1156,
+    "name": "platform_formset_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1246,
+    "name": "professional_formset_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1717,
+    "name": "companies_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1835,
+    "name": "search_terms_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 1945,
+    "name": "job_postings_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2032,
+    "name": "emails_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2156,
+    "name": "email_application_options_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2207,
+    "name": "job_applications_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2266,
+    "name": "application_details_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2406,
+    "name": "_interview_message_payload",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2417,
+    "name": "interview_practice_session_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2438,
+    "name": "interview_practice_opening_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2451,
+    "name": "interview_practice_message_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2518,
+    "name": "end_interview_practice_session_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2538,
+    "name": "retry_interview_practice_feedback_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2556,
+    "name": "generate_application_cover_letter_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2576,
+    "name": "download_application_cover_letter_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2604,
+    "name": "update_job_posting_apply_to_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 2622,
+    "name": "job_search_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3059,
+    "name": "_feature_wait_parts",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3072,
+    "name": "_add_calendar_months",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3084,
+    "name": "_one_year_ago",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3089,
+    "name": "_feature_due_date",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3099,
+    "name": "_resolve_feature_link_url",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3106,
+    "name": "_ordered_feature_queryset",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3132,
+    "name": "features_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3309,
+    "name": "_normalize_search_query",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3314,
+    "name": "_build_search_cache_key",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3321,
+    "name": "_build_search_redirect_url",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3329,
+    "name": "_timestamp_to_datetime",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3336,
+    "name": "_get_cached_projects_for_query",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3344,
+    "name": "_get_project_from_cached_results",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3369,
+    "name": "_save_freelancer_project",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3425,
+    "name": "_fetch_all_projects_from_api",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3460,
+    "name": "_fetch_all_projects",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3507,
+    "name": "search_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3578,
+    "name": "save_freelancer_project_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3626,
+    "name": "resume_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3686,
+    "name": "references_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3709,
+    "name": "experience_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3797,
+    "name": "save_experience_role_section_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3825,
+    "name": "save_experience_role_tasks_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3861,
+    "name": "residencies_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3887,
+    "name": "projects_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3960,
+    "name": "_project_management_redirect",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3971,
+    "name": "_project_management_access_denied",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3977,
+    "name": "_format_toggl_duration",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 3991,
+    "name": "project_management_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4387,
+    "name": "sync_toggl_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4414,
+    "name": "save_project_section_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4442,
+    "name": "save_project_tasks_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4478,
+    "name": "save_project_order_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4506,
+    "name": "courses_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4642,
+    "name": "save_education_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4661,
+    "name": "save_course_section_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4688,
+    "name": "connections_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4694,
+    "name": "directions_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4740,
+    "name": "connection_events_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4801,
+    "name": "connection_weekly_total_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4830,
+    "name": "update_connection_meeting_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4977,
+    "name": "delete_connection_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 4998,
+    "name": "connection_directions_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 5029,
+    "name": "update_direction_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 5057,
+    "name": "delete_direction_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 5068,
+    "name": "recruiter_formset_view",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  },
+  {
+    "file": "mysite\\app\\views.py",
+    "line": 892,
+    "name": "_build_redirect_url",
+    "reason": "Runtime type depends on Django request/form data, ORM results, external API payloads, or caller-provided callbacks."
+  }
+]

@@ -1,4 +1,5 @@
 """Shared OAuth credential handling for Google APIs used by the Career app."""
+from typing import Any
 
 import json
 from json import JSONDecodeError
@@ -33,20 +34,23 @@ class GoogleInsufficientScopesError(GoogleAuthError):
     """The authorized Google token does not grant all required scopes."""
 
 
-def credential_paths():
+def credential_paths() -> Any:
+    """Executes this callable."""
     return (
         Path(settings.GOOGLE_CREDENTIALS_PATH),
         Path(settings.GOOGLE_TOKEN_PATH),
     )
 
 
-def _scope_set(scopes):
+def _scope_set(scopes: Any) -> Any:
+    """Executes this callable."""
     if isinstance(scopes, str):
         return set(scopes.split())
     return set(scopes or [])
 
 
-def _token_scopes(token_path):
+def _token_scopes(token_path: Any) -> Any:
+    """Executes this callable."""
     try:
         token_data = json.loads(token_path.read_text(encoding="utf-8"))
     except (OSError, JSONDecodeError) as error:
@@ -56,18 +60,21 @@ def _token_scopes(token_path):
     return _scope_set(token_data.get("scopes"))
 
 
-def _missing_scopes(scopes):
+def _missing_scopes(scopes: Any) -> Any:
+    """Executes this callable."""
     return set(SCOPES) - _scope_set(scopes)
 
 
-def _authorized_scopes(credentials):
+def _authorized_scopes(credentials: Any) -> Any:
+    """Executes this callable."""
     return _scope_set(
         getattr(credentials, "granted_scopes", None)
         or getattr(credentials, "scopes", None)
     )
 
 
-def _authorize(credentials_path):
+def _authorize(credentials_path: Any) -> Any:
+    """Executes this callable."""
     if not credentials_path.exists():
         raise GoogleCredentialsNotFoundError(
             f"Google OAuth client credentials were not found at {credentials_path}."
@@ -85,7 +92,7 @@ def _authorize(credentials_path):
     return credentials
 
 
-def get_google_credentials():
+def get_google_credentials() -> Any:
     """Return credentials authorized for both Calendar and Gmail.
 
     A saved Calendar-only token is deliberately reauthorized rather than

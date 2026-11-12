@@ -1,3 +1,4 @@
+from typing import Any
 from django.core.management.base import BaseCommand, CommandError
 
 from app.services.gmail import GmailError, get_email, search_emails
@@ -7,7 +8,8 @@ from app.services.google_auth import GoogleAuthError
 class Command(BaseCommand):
     help = "Authenticate with Gmail and display a small sample of recent message metadata."
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Runs the management command."""
         try:
             result = search_emails(max_results=5)
         except (GmailError, GoogleAuthError) as error:

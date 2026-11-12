@@ -1,3 +1,4 @@
+from typing import Any
 from django.core.management.base import BaseCommand
 
 from app.models import Company, Platform, SearchTerm
@@ -10,7 +11,8 @@ from app.services.search_paths import (
 class Command(BaseCommand):
     help = "Create missing valid SearchPath records for enabled companies and platforms."
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Runs the management command."""
         created_count = 0
         existing_count = 0
         active_search_terms = list(SearchTerm.objects.filter(active=True))

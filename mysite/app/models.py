@@ -1,3 +1,4 @@
+from typing import Any
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -11,7 +12,8 @@ from django.db.models import Max, Q, Sum
 MOUNTAIN_TIME_ZONE = ZoneInfo("America/Denver")
 
 
-def _add_calendar_months(date_value, months):
+def _add_calendar_months(date_value: Any, months: Any) -> Any:
+    """Executes this callable."""
     if not months:
         return date_value
 
@@ -22,7 +24,8 @@ def _add_calendar_months(date_value, months):
     return date_value.replace(year=year, month=month, day=day)
 
 
-def _wait_parts(wait_value):
+def _wait_parts(wait_value: Any) -> Any:
+    """Executes this callable."""
     total_days = wait_value.days
     months = total_days // 30
     remaining_days = total_days % 30
@@ -54,7 +57,8 @@ class Skill(models.Model):
 
     updated = models.DateField(blank=True, null=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.name}"
 
 
@@ -62,7 +66,8 @@ class Country(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=3, unique=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -71,7 +76,8 @@ class State(models.Model):
     abbreviation = models.CharField(max_length=2, unique=True)
     country = models.ForeignKey("Country", on_delete=models.PROTECT)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.abbreviation
 
 
@@ -85,7 +91,8 @@ class County(models.Model):
         on_delete=models.SET_NULL,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         if self.state:
             return f"{self.name} County, {self.state.abbreviation}"
         return self.name
@@ -127,7 +134,8 @@ class City(models.Model):
 
     website = models.URLField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.name}, {self.state.abbreviation}"
 
 
@@ -142,7 +150,8 @@ class School(models.Model):
 
     website = models.URLField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -185,7 +194,8 @@ class Education(models.Model):
 
     description = models.TextField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.degree} in {self.field_of_study} @ {self.school}"
 
 
@@ -211,7 +221,8 @@ class Address(models.Model):
 
     description = models.TextField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.street_1}, {self.city}"
 
 
@@ -243,7 +254,8 @@ class Company(models.Model):
     supports_job_search_terms = models.BooleanField(default=True)
 
     @cached_property
-    def last_applied(self):
+    def last_applied(self) -> Any:
+        """Executes this callable."""
         try:
             last_submitted = self.last_applied_submitted
         except AttributeError:
@@ -256,12 +268,14 @@ class Company(models.Model):
         return timezone.now() - last_submitted
 
     @property
-    def last_applied_days(self):
+    def last_applied_days(self) -> Any:
+        """Executes this callable."""
         if self.last_applied is None:
             return None
         return self.last_applied.days
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -321,7 +335,8 @@ class Role(models.Model):
 
     live_url = models.URLField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.title
 
 
@@ -338,7 +353,8 @@ class FreelancerSkill(models.Model):
     category_id = models.IntegerField(null=True, blank=True)
     category_name = models.CharField(max_length=100, null=True, blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -380,7 +396,8 @@ class FreelancerProject(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.title
 
 
@@ -433,11 +450,13 @@ class Project(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.title
 
     @property
-    def alpha(self):
+    def alpha(self) -> Any:
+        """Executes this callable."""
         if not self.allocation_weight:
             return None
 
@@ -472,7 +491,8 @@ class ChecklistItem(models.Model):
     guidance = models.TextField(blank=True)
     review_interval_days = models.PositiveIntegerField(null=True, blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -500,7 +520,8 @@ class ProjectChecklist(models.Model):
         ]
 
     @property
-    def update_due(self):
+    def update_due(self) -> Any:
+        """Executes this callable."""
         if (
             self.updated_at is None
             or self.checklist_item.review_interval_days is None
@@ -589,7 +610,8 @@ class Course(models.Model):
 
     sort_order = models.PositiveIntegerField(default=0)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.title
 
 
@@ -618,7 +640,8 @@ class Supervisor(models.Model):
 
     notes = models.TextField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -670,7 +693,8 @@ class Residency(models.Model):
 
     notes = models.TextField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.address} ({self.start_date} - {self.end_date or 'Present'})"
 
 
@@ -679,7 +703,8 @@ class ProfileSetting(models.Model):
     value = models.TextField(blank=True)
     notes = models.TextField(blank=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.key
 
 
@@ -709,7 +734,8 @@ class Platform(models.Model):
 
     job_search_enabled = models.BooleanField(default=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -747,7 +773,8 @@ class PlatformSkill(models.Model):
             )
         ]
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.platform} - {self.skill}"
 
 
@@ -767,7 +794,8 @@ class Feature(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
 
@@ -780,7 +808,8 @@ class FeatureLink(models.Model):
 
     url = models.CharField(max_length=500)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.url
 
 
@@ -813,7 +842,8 @@ class PlatformFeature(models.Model):
             )
         ]
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.platform} - {self.feature}"
 
 
@@ -849,17 +879,20 @@ class Professional(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
     @cached_property
-    def _connection_records(self):
+    def _connection_records(self) -> Any:
+        """Executes this callable."""
         if self.pk is None:
             return []
         return list(self.connects.all())
 
     @cached_property
-    def last_invited(self):
+    def last_invited(self) -> Any:
+        """Executes this callable."""
         invite_dates = (
             connection.invite_date
             for connection in self._connection_records
@@ -868,7 +901,8 @@ class Professional(models.Model):
         return max(invite_dates, default=None)
 
     @cached_property
-    def last_connected(self):
+    def last_connected(self) -> Any:
+        """Executes this callable."""
         meeting_times = (
             connection.meeting_at
             for connection in self._connection_records
@@ -877,19 +911,22 @@ class Professional(models.Model):
         return max(meeting_times, default=None)
 
     @cached_property
-    def last_attended(self):
+    def last_attended(self) -> Any:
+        """Executes this callable."""
         if self.last_connected is None:
             return None
         return timezone.localtime(self.last_connected).date()
 
     @cached_property
-    def invite_due(self):
+    def invite_due(self) -> Any:
+        """Executes this callable."""
         if self.last_invited is None:
             return None
         return _add_calendar_months(self.last_invited, 1)
 
     @cached_property
-    def connect_due(self):
+    def connect_due(self) -> Any:
+        """Executes this callable."""
         if self.last_connected is None or self.wait is None:
             return None
         months, weeks, days = _wait_parts(self.wait)
@@ -900,7 +937,8 @@ class Professional(models.Model):
         return due_date + timedelta(weeks=weeks, days=days)
 
     @cached_property
-    def average_rating(self):
+    def average_rating(self) -> Any:
+        """Executes this callable."""
         ratings = [
             connection.rating
             for connection in self._connection_records
@@ -911,14 +949,16 @@ class Professional(models.Model):
         return sum(ratings) / len(ratings)
 
     @cached_property
-    def average_rating_stars(self):
+    def average_rating_stars(self) -> Any:
+        """Executes this callable."""
         if self.average_rating is None:
             return ""
         filled_stars = min(5, int(self.average_rating + 0.5))
         return f"{'★' * filled_stars}{'☆' * (5 - filled_stars)}"
 
     @cached_property
-    def invite_success(self):
+    def invite_success(self) -> Any:
+        """Executes this callable."""
         if not self._connection_records:
             return None
         attended_connections = sum(
@@ -928,7 +968,8 @@ class Professional(models.Model):
         return (attended_connections / len(self._connection_records)) * 100
 
     @property
-    def invite(self):
+    def invite(self) -> Any:
+        """Executes this callable."""
         current_date = timezone.localdate()
         if self.wait is None:
             return False
@@ -975,17 +1016,20 @@ class Recruiter(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.name
 
     @cached_property
-    def _connection_records(self):
+    def _connection_records(self) -> Any:
+        """Executes this callable."""
         if self.pk is None:
             return []
         return list(self.connects.all())
 
     @cached_property
-    def last_invited(self):
+    def last_invited(self) -> Any:
+        """Executes this callable."""
         invite_dates = (
             connection.invite_date
             for connection in self._connection_records
@@ -994,7 +1038,8 @@ class Recruiter(models.Model):
         return max(invite_dates, default=None)
 
     @cached_property
-    def last_connected(self):
+    def last_connected(self) -> Any:
+        """Executes this callable."""
         meeting_times = (
             connection.meeting_at
             for connection in self._connection_records
@@ -1003,19 +1048,22 @@ class Recruiter(models.Model):
         return max(meeting_times, default=None)
 
     @cached_property
-    def last_attended(self):
+    def last_attended(self) -> Any:
+        """Executes this callable."""
         if self.last_connected is None:
             return None
         return timezone.localtime(self.last_connected).date()
 
     @cached_property
-    def invite_due(self):
+    def invite_due(self) -> Any:
+        """Executes this callable."""
         if self.last_invited is None:
             return None
         return _add_calendar_months(self.last_invited, 1)
 
     @cached_property
-    def connect_due(self):
+    def connect_due(self) -> Any:
+        """Executes this callable."""
         if self.last_connected is None or self.wait is None:
             return None
         months, weeks, days = _wait_parts(self.wait)
@@ -1026,7 +1074,8 @@ class Recruiter(models.Model):
         return due_date + timedelta(weeks=weeks, days=days)
 
     @cached_property
-    def average_rating(self):
+    def average_rating(self) -> Any:
+        """Executes this callable."""
         ratings = [
             connection.rating
             for connection in self._connection_records
@@ -1037,14 +1086,16 @@ class Recruiter(models.Model):
         return sum(ratings) / len(ratings)
 
     @cached_property
-    def average_rating_stars(self):
+    def average_rating_stars(self) -> Any:
+        """Executes this callable."""
         if self.average_rating is None:
             return ""
         filled_stars = min(5, int(self.average_rating + 0.5))
         return f"{'★' * filled_stars}{'☆' * (5 - filled_stars)}"
 
     @cached_property
-    def invite_success(self):
+    def invite_success(self) -> Any:
+        """Executes this callable."""
         if not self._connection_records:
             return None
         attended_connections = sum(
@@ -1054,7 +1105,8 @@ class Recruiter(models.Model):
         return (attended_connections / len(self._connection_records)) * 100
 
     @property
-    def invite(self):
+    def invite(self) -> Any:
+        """Executes this callable."""
         current_date = timezone.localdate()
         if self.wait is None:
             return False
@@ -1126,7 +1178,8 @@ class Connect(models.Model):
         blank=True,
     )
 
-    def _prepare_meeting_interval(self):
+    def _prepare_meeting_interval(self) -> Any:
+        """Executes this callable."""
         changed_fields = set()
         for field_name in ("meeting_at", "meeting_end"):
             value = getattr(self, field_name)
@@ -1140,7 +1193,8 @@ class Connect(models.Model):
 
         return changed_fields
 
-    def clean(self):
+    def clean(self) -> None:
+        """Validates the model state."""
         self._prepare_meeting_interval()
 
         if self.meeting_at is None or self.meeting_end is None:
@@ -1186,7 +1240,8 @@ class Connect(models.Model):
             }
         )
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Saves the instance."""
         changed_fields = self._prepare_meeting_interval()
         if kwargs.get("update_fields") is not None and changed_fields:
             kwargs["update_fields"] = set(kwargs["update_fields"]) | changed_fields
@@ -1194,17 +1249,20 @@ class Connect(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.description or f"Connection {self.pk}"
 
     @property
-    def notes_preview(self):
+    def notes_preview(self) -> Any:
+        """Executes this callable."""
         if len(self.notes) <= 10:
             return self.notes
         return f"{self.notes[:10]}..."
 
     @property
-    def status(self):
+    def status(self) -> Any:
+        """Executes this callable."""
         now = timezone.now()
 
         # Meeting is scheduled for the future.
@@ -1252,7 +1310,8 @@ class Direction(models.Model):
 
     resolved = models.BooleanField(default=False)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.description
 
 
@@ -1270,7 +1329,8 @@ class SearchTerm(models.Model):
     term = models.CharField(max_length=200, unique=True)
     active = models.BooleanField(default=True)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return self.term
 
 
@@ -1340,7 +1400,8 @@ class SearchPath(models.Model):
         ]
 
     @property
-    def completed_observations(self):
+    def completed_observations(self) -> Any:
+        """Executes this callable."""
         return self.observations.filter(
             complete=True,
         ).exclude(
@@ -1348,32 +1409,38 @@ class SearchPath(models.Model):
         )
 
     @property
-    def observation_count(self):
+    def observation_count(self) -> Any:
+        """Executes this callable."""
         return self.completed_observations.count()
 
     @property
-    def success_count(self):
+    def success_count(self) -> Any:
+        """Executes this callable."""
         return sum(
             observation.success is True
             for observation in self.completed_observations
         )
 
     @property
-    def success_probability(self):
+    def success_probability(self) -> Any:
+        """Executes this callable."""
         return (self.success_count + 1) / (self.observation_count + 2)
 
     @property
-    def alpha(self):
+    def alpha(self) -> Any:
+        """Executes this callable."""
         return self.observation_count / self.success_probability
 
     @property
-    def source_type(self):
+    def source_type(self) -> str:
+        """Executes this callable."""
         if self.platform_id is not None:
             return "platform"
         return "company"
 
     @property
-    def effective_url(self):
+    def effective_url(self) -> Any:
+        """Executes this callable."""
         if self.url:
             return self.url
         if self.platform_id is not None:
@@ -1381,8 +1448,9 @@ class SearchPath(models.Model):
         return self.company.website
 
     @property
-    def hide(self):
+    def hide(self) -> Any:
         # Inactive SearchPaths are always hidden.
+        """Executes this callable."""
         if not self.active:
             return True
 
@@ -1439,7 +1507,8 @@ class SearchPath(models.Model):
 
         return self.source_type == last_observation.search_path.source_type
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         source = self.platform or self.company
         return f'{source} — {self.search_term}'
 
@@ -1471,7 +1540,8 @@ class JobPosting(models.Model):
 
     expired = models.BooleanField(default=False)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.title} — {self.company_name}"
 
 
@@ -1497,7 +1567,8 @@ class SearchObservation(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
     @property
-    def success(self):
+    def success(self) -> Any:
+        """Executes this callable."""
         if not self.complete:
             return None
 
@@ -1529,7 +1600,8 @@ class SearchObservation(models.Model):
 
         return True
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.search_path} — {self.created:%Y-%m-%d}"
 
 
@@ -1591,10 +1663,12 @@ class Application(models.Model):
     )
 
     @property
-    def stopped(self):
+    def stopped(self) -> Any:
+        """Executes this callable."""
         return bool(self.stop_reason)
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"Application — {self.job_posting}"
 
 
@@ -1653,7 +1727,8 @@ class ApplicationEmail(models.Model):
 
     body = models.TextField(blank=True)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Saves the instance."""
         if self.email_type == self.EmailType.MY_RESPONSE:
             self.direction = self.Direction.OUTGOING
             update_fields = kwargs.get("update_fields")
@@ -1691,7 +1766,8 @@ class InterviewPracticeSession(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
     feedback = models.TextField(blank=True)
 
-    def clean(self):
+    def clean(self) -> None:
+        """Validates the model state."""
         super().clean()
         if self.interview_email_id is None:
             return
@@ -1705,10 +1781,12 @@ class InterviewPracticeSession(models.Model):
             )
 
     @property
-    def completed(self):
+    def completed(self) -> Any:
+        """Executes this callable."""
         return self.ended_at is not None
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.application} — {self.get_interview_type_display()}"
 
 
@@ -1729,5 +1807,6 @@ class InterviewPracticeMessage(models.Model):
     class Meta:
         ordering = ["created", "pk"]
 
-    def __str__(self):
+    def __str__(self) -> Any:
+        """Returns the display representation."""
         return f"{self.session} — {self.get_role_display()}"

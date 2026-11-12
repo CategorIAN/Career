@@ -1,3 +1,4 @@
+from typing import Any
 from html import escape
 from io import BytesIO
 from pathlib import Path
@@ -22,6 +23,7 @@ class CoverLetterPDFError(Exception):
 
 
 def cover_letter_filename(application: Application) -> str:
+    """Executes this callable."""
     company_name = (
         application.company.name
         if application.company_id is not None
@@ -35,7 +37,8 @@ def cover_letter_filename(application: Application) -> str:
     return f"{document_date} {posting_name} @ {safe_company_name} Cover Letter.pdf"
 
 
-def _signature_image():
+def _signature_image() -> Any:
+    """Executes this callable."""
     if not SIGNATURE_IMAGE_PATH.is_file():
         raise CoverLetterPDFError(
             f"Signature image is missing: {SIGNATURE_IMAGE_PATH}"
@@ -47,7 +50,8 @@ def _signature_image():
     return signature
 
 
-def _body_paragraphs(cover_letter, style):
+def _body_paragraphs(cover_letter: Any, style: Any) -> Any:
+    """Executes this callable."""
     paragraphs = []
     for paragraph in re.split(r"\n\s*\n", cover_letter.strip()):
         lines = [escape(line) for line in paragraph.splitlines()]

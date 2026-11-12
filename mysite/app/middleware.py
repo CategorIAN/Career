@@ -1,3 +1,4 @@
+from typing import Any
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -22,13 +23,16 @@ PUBLIC_AUTH_VIEW_NAMES = frozenset({"admin:login"})
 class CareerAccessMiddleware:
     """Restrict Career management routes to the configured administrator."""
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: Any) -> None:
+        """Initializes the instance."""
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: Any) -> Any:
+        """Executes this callable."""
         return self.get_response(request)
 
-    def process_view(self, request, view_func, view_args, view_kwargs):
+    def process_view(self, request: Any, view_func: Any, view_args: Any, view_kwargs: Any) -> Any:
+        """Applies request-level access control."""
         resolver_match = request.resolver_match
         if resolver_match.namespace == "admin":
             if resolver_match.view_name in PUBLIC_AUTH_VIEW_NAMES:

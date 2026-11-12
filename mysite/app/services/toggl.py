@@ -1,3 +1,4 @@
+from typing import Any
 import base64
 import json
 from dataclasses import dataclass
@@ -27,15 +28,18 @@ class TogglSyncResult:
     reconciled_deleted: int = 0
 
 
-def toggl_is_configured():
+def toggl_is_configured() -> Any:
+    """Executes this callable."""
     return bool(getattr(settings, "TOGGL_API_TOKEN", ""))
 
 
-def default_import_days():
+def default_import_days() -> Any:
+    """Executes this callable."""
     return max(1, int(getattr(settings, "TOGGL_IMPORT_DAYS", 365)))
 
 
-def validate_import_days(days):
+def validate_import_days(days: Any) -> Any:
+    """Executes this callable."""
     if isinstance(days, bool) or not isinstance(days, int) or days <= 0:
         raise TogglSyncError("Days back must be a positive whole number.")
 
@@ -47,7 +51,8 @@ def validate_import_days(days):
     return days
 
 
-def _parse_timestamp(value):
+def _parse_timestamp(value: Any) -> Any:
+    """Executes this callable."""
     if not value:
         return None
     parsed = parse_datetime(value)
@@ -56,7 +61,7 @@ def _parse_timestamp(value):
     return parsed if timezone.is_aware(parsed) else timezone.make_aware(parsed)
 
 
-def fetch_time_entries(start, end):
+def fetch_time_entries(start: Any, end: Any) -> Any:
     """Read Toggl v9 entries for the configured bounded import window."""
     token = getattr(settings, "TOGGL_API_TOKEN", "")
     if not token:
@@ -92,7 +97,7 @@ def fetch_time_entries(start, end):
     return entries
 
 
-def fetch_toggl_projects():
+def fetch_toggl_projects() -> Any:
     """Return the current user's Toggl project names keyed by project ID."""
     token = getattr(settings, "TOGGL_API_TOKEN", "")
     if not token:
@@ -123,7 +128,8 @@ def fetch_toggl_projects():
     }
 
 
-def _project_matches_tags(tags, projects):
+def _project_matches_tags(tags: Any, projects: Any) -> Any:
+    """Executes this callable."""
     normalized_tags = {str(tag).casefold() for tag in tags}
     return [
         project
@@ -132,7 +138,7 @@ def _project_matches_tags(tags, projects):
     ]
 
 
-def refresh_source_project_names(source_project_names):
+def refresh_source_project_names(source_project_names: Any) -> Any:
     """Refresh stored Toggl activity names from a non-empty ID-to-name mapping."""
     if not source_project_names:
         return 0
@@ -151,7 +157,7 @@ def refresh_source_project_names(source_project_names):
     return len(entries_to_update)
 
 
-def import_time_entries(entries, *, start, end, source_project_names=None):
+def import_time_entries(entries: Any, *, start: Any, end: Any, source_project_names: Any=None) -> Any:
     """Upsert a full bounded Toggl window and reconcile removed/retagged entries."""
     projects = list(Project.objects.exclude(toggl_tag_name=""))
     source_project_names = source_project_names or {}
@@ -213,7 +219,8 @@ def import_time_entries(entries, *, start, end, source_project_names=None):
     return TogglSyncResult(created, updated, ambiguous, running, reconciled_deleted)
 
 
-def sync_toggl_time_entries(*, days_back=None):
+def sync_toggl_time_entries(*, days_back: Any=None) -> Any:
+    """Executes this callable."""
     days = default_import_days() if days_back is None else validate_import_days(days_back)
     end = timezone.now()
     start = end - timedelta(days=days)
