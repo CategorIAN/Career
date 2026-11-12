@@ -907,6 +907,43 @@ class ProjectDisplayModeTests(TestCase):
             self.assertNotContains(response, "Application Tools")
             self.assertNotContains(response, "Save Project Details")
 
+    def test_public_project_er_diagram_is_linked_and_available_to_visitors(self) -> None:
+        """Verifies that public diagrams are linked and publicly rendered."""
+        self.public_project.mermaid_er_diagram = "erDiagram\n    PROJECT {\n        bigint id PK\n    }"
+        self.public_project.save(update_fields=["mermaid_er_diagram"])
+
+        projects_response = self.client.get(reverse("projects"))
+        diagram_url = reverse("project_er_diagram", args=[self.public_project.pk])
+        diagram_response = self.client.get(diagram_url)
+
+        self.assertContains(projects_response, f'href="{diagram_url}"', html=False)
+        self.assertContains(projects_response, "E/R Diagram")
+        self.assertEqual(diagram_response.status_code, 200)
+        self.assertContains(diagram_response, self.public_project.title)
+        self.assertContains(diagram_response, "Back to Projects")
+        self.assertContains(diagram_response, "erDiagram")
+        self.assertContains(diagram_response, 'id="er-diagram-zoom-in"', html=False)
+        self.assertContains(diagram_response, 'id="er-diagram-zoom-out"', html=False)
+        self.assertContains(diagram_response, 'id="er-diagram-reset-zoom"', html=False)
+        self.assertContains(diagram_response, 'id="er-diagram-zoom-level"', html=False)
+        self.assertContains(diagram_response, "setPointerCapture", html=False)
+        self.assertContains(diagram_response, "is-panning", html=False)
+
+    def test_public_project_er_diagram_returns_404_when_unavailable(self) -> None:
+        """Verifies that private or missing diagrams remain unavailable publicly."""
+        self.private_project.mermaid_er_diagram = "erDiagram\n    PRIVATE {\n        bigint id PK\n    }"
+        self.private_project.save(update_fields=["mermaid_er_diagram"])
+
+        private_response = self.client.get(
+            reverse("project_er_diagram", args=[self.private_project.pk])
+        )
+        missing_response = self.client.get(
+            reverse("project_er_diagram", args=[self.public_project.pk])
+        )
+
+        self.assertEqual(private_response.status_code, 404)
+        self.assertEqual(missing_response.status_code, 404)
+
     def test_owner_can_save_project_sections_and_reordered_tasks(self) -> None:
         """Verifies the expected behavior."""
         self.client.force_login(self.administrator)

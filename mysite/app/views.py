@@ -3957,6 +3957,17 @@ def projects_view(request: Any) -> Any:
     )
 
 
+@xframe_options_sameorigin
+def project_er_diagram_view(request: Any, project_id: int) -> Any:
+    """Renders a project's Mermaid E/R diagram when it is available."""
+    projects = Project.objects.filter(mermaid_er_diagram__gt="")
+    if not is_career_administrator(request.user):
+        projects = projects.filter(is_public=True)
+
+    project = get_object_or_404(projects, pk=project_id)
+    return render(request, "app/project_er_diagram.html", {"project": project})
+
+
 def _project_management_redirect(include_inactive: Any, selected_project_id: Any="") -> Any:
     """Executes this callable."""
     query_params = {}

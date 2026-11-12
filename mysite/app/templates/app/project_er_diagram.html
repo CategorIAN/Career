@@ -1,0 +1,178 @@
+{% extends "app/base.html" %}
+
+{% block title %}{{ project.title }} E/R Diagram{% endblock %}
+
+{% block content %}
+<style>
+    .er-diagram-page {
+        max-width: 100%;
+    }
+
+    .er-diagram-actions {
+        margin-bottom: 1rem;
+    }
+
+    .er-diagram-zoom-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .er-diagram-zoom-level {
+        min-width: 4rem;
+        font-weight: 600;
+    }
+
+    .er-diagram-scroll {
+        overflow: auto;
+        max-height: 75vh;
+        padding: 1rem;
+        border: 1px solid #c9c9c9;
+        background: #fff;
+        cursor: grab;
+    }
+
+    .er-diagram-scroll.is-panning {
+        cursor: grabbing;
+        user-select: none;
+    }
+
+    .er-diagram-canvas {
+        position: relative;
+        min-width: 72rem;
+    }
+
+    .er-diagram-canvas svg {
+        display: block;
+        max-width: none;
+        transform-origin: top left;
+    }
+</style>
+
+<section class="utility-page er-diagram-page">
+    <h1>{{ project.title }}</h1>
+    <p class="er-diagram-actions"><a class="copy-button" href="{% url 'projects' %}">Back to Projects</a></p>
+    <div class="er-diagram-zoom-controls" role="group" aria-label="Diagram zoom controls">
+        <button id="er-diagram-zoom-out" class="copy-button" type="button" aria-label="Zoom out">Zoom out (−)</button>
+        <button id="er-diagram-zoom-in" class="copy-button" type="button" aria-label="Zoom in">Zoom in (+)</button>
+        <button id="er-diagram-reset-zoom" class="copy-button" type="button">Reset zoom</button>
+        <output id="er-diagram-zoom-level" class="er-diagram-zoom-level" aria-live="polite">100%</output>
+    </div>
+    <div id="er-diagram-scroll" class="er-diagram-scroll" tabindex="0" aria-label="{{ project.title }} entity relationship diagram">
+        <div id="er-diagram-canvas" class="er-diagram-canvas">
+            <div id="er-diagram-mermaid" class="mermaid">{{ project.mermaid_er_diagram }}</div>
+        </div>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+    (() => {
+        const minimumZoom = 0.5;
+        const maximumZoom = 3;
+        const zoomStep = 0.1;
+
+        const scrollContainer = document.getElementById("er-diagram-scroll");
+        const canvas = document.getElementById("er-diagram-canvas");
+        const diagram = document.getElementById("er-diagram-mermaid");
+        const zoomInButton = document.getElementById("er-diagram-zoom-in");
+        const zoomOutButton = document.getElementById("er-diagram-zoom-out");
+        const resetButton = document.getElementById("er-diagram-reset-zoom");
+        const zoomLevel = document.getElementById("er-diagram-zoom-level");
+        let zoom = 1;
+        let baseWidth = 0;
+        let baseHeight = 0;
+        let panPointerId = null;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panStartScrollLeft = 0;
+        let panStartScrollTop = 0;
+
+        function stopPanning() {
+            if (panPointerId === null) {
+                return;
+            }
+            if (scrollContainer.hasPointerCapture(panPointerId)) {
+                scrollContainer.releasePointerCapture(panPointerId);
+            }
+            panPointerId = null;
+            scrollContainer.classList.remove("is-panning");
+        }
+
+        function startPanning(event) {
+            if (event.pointerType !== "mouse" || event.button !== 0) {
+                return;
+            }
+            event.preventDefault();
+            panPointerId = event.pointerId;
+            panStartX = event.clientX;
+            panStartY = event.clientY;
+            panStartScrollLeft = scrollContainer.scrollLeft;
+            panStartScrollTop = scrollContainer.scrollTop;
+            scrollContainer.setPointerCapture(panPointerId);
+            scrollContainer.classList.add("is-panning");
+        }
+
+        function panDiagram(event) {
+            if (event.pointerId !== panPointerId) {
+                return;
+            }
+            scrollContainer.scrollLeft = panStartScrollLeft - (event.clientX - panStartX);
+            scrollContainer.scrollTop = panStartScrollTop - (event.clientY - panStartY);
+        }
+
+        function updateControlState() {
+            zoomLevel.value = `${Math.round(zoom * 100)}%`;
+            zoomLevel.textContent = zoomLevel.value;
+            zoomInButton.disabled = zoom >= maximumZoom;
+            zoomOutButton.disabled = zoom <= minimumZoom;
+        }
+
+        function applyZoom(nextZoom, resetPosition = false) {
+            const centerX = (scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2)) / zoom;
+            const centerY = (scrollContainer.scrollTop + (scrollContainer.clientHeight / 2)) / zoom;
+
+            zoom = Math.min(maximumZoom, Math.max(minimumZoom, nextZoom));
+            const svg = diagram.querySelector("svg");
+            svg.style.transform = `scale(${zoom})`;
+            canvas.style.width = `${baseWidth * zoom}px`;
+            canvas.style.height = `${baseHeight * zoom}px`;
+            updateControlState();
+
+            window.requestAnimationFrame(() => {
+                if (resetPosition) {
+                    scrollContainer.scrollLeft = 0;
+                    scrollContainer.scrollTop = 0;
+                    return;
+                }
+                scrollContainer.scrollLeft = Math.max(0, (centerX * zoom) - (scrollContainer.clientWidth / 2));
+                scrollContainer.scrollTop = Math.max(0, (centerY * zoom) - (scrollContainer.clientHeight / 2));
+            });
+        }
+
+        function initializeZoom() {
+            const svg = diagram.querySelector("svg");
+            const viewBox = svg.viewBox.baseVal;
+            baseWidth = viewBox.width || svg.getBoundingClientRect().width;
+            baseHeight = viewBox.height || svg.getBoundingClientRect().height;
+            svg.style.width = `${baseWidth}px`;
+            svg.style.height = `${baseHeight}px`;
+            applyZoom(1, true);
+
+            zoomInButton.addEventListener("click", () => applyZoom(Number((zoom + zoomStep).toFixed(2))));
+            zoomOutButton.addEventListener("click", () => applyZoom(Number((zoom - zoomStep).toFixed(2))));
+            resetButton.addEventListener("click", () => applyZoom(1, true));
+            scrollContainer.addEventListener("pointerdown", startPanning);
+            scrollContainer.addEventListener("pointermove", panDiagram);
+            scrollContainer.addEventListener("pointerup", stopPanning);
+            scrollContainer.addEventListener("pointercancel", stopPanning);
+            scrollContainer.addEventListener("lostpointercapture", stopPanning);
+        }
+
+        mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+        mermaid.run({ nodes: [diagram] }).then(initializeZoom);
+    })();
+</script>
+{% endblock %}

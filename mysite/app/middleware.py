@@ -13,6 +13,7 @@ PUBLIC_PORTFOLIO_VIEW_NAMES = frozenset(
         "resume",
         "experience",
         "projects",
+        "project_er_diagram",
         "courses",
         "contact",
     }

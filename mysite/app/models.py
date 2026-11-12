@@ -429,6 +429,8 @@ class Project(models.Model):
 
     live_url = models.URLField(blank=True)
 
+    mermaid_er_diagram = models.TextField(blank=True)
+
     sort_order = models.PositiveIntegerField(default=0)
 
     allocation_weight = models.PositiveIntegerField(default=1)

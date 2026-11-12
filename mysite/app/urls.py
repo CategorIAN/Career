@@ -126,6 +126,11 @@ urlpatterns = [
         name="save_project_tasks",
     ),
     path(
+        "projects/<int:project_id>/er-diagram/",
+        views.project_er_diagram_view,
+        name="project_er_diagram",
+    ),
+    path(
         "projects/<int:project_id>/<str:section>/save/",
         views.save_project_section_view,
         name="save_project_section",
