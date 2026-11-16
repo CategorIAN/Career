@@ -18,6 +18,7 @@ from django.db.models import (
     OuterRef,
     Prefetch,
     Q,
+    Subquery,
     Sum,
     Value,
     When,
@@ -2663,15 +2664,28 @@ def job_search_view(request: Any) -> Any:
             )
         )
     )
+    latest_completed_observation = (
+        SearchObservation.objects.filter(
+            search_path_id=OuterRef("pk"),
+            complete=True,
+        )
+        .order_by("-created")
+    )
     search_paths_queryset = (
-        SearchPath.objects.filter(active=True)
+        SearchPath.objects
         .select_related("company", "platform", "search_term")
         .annotate(
-            page_has_recent_company_application=Exists(
+            hide_has_recent_company_application=Exists(
                 Application.objects.filter(
                     company_id=OuterRef("company_id"),
                     submitted__gte=recent_application_cutoff,
                 )
+            ),
+            hide_latest_completed_observation_created=Subquery(
+                latest_completed_observation.values("created")[:1],
+            ),
+            hide_latest_completed_observation_job_posting_id=Subquery(
+                latest_completed_observation.values("job_posting_id")[:1],
             ),
             pending=Exists(
                 SearchObservation.objects.filter(
@@ -2691,7 +2705,29 @@ def job_search_view(request: Any) -> Any:
     )
 
     all_search_paths = list(search_paths_queryset)
+    last_observation_source_type = None
+    if last_observation_source is not None:
+        last_platform_id, last_company_id = last_observation_source
+        if last_platform_id is not None:
+            last_observation_source_type = "platform"
+        elif last_company_id is not None:
+            last_observation_source_type = "company"
+
     for search_path in all_search_paths:
+        # SearchPath.hide remains the single visibility policy while these
+        # attributes provide its related-record data without per-row queries.
+        search_path._hide_latest_completed_observation_created = (
+            search_path.hide_latest_completed_observation_created
+        )
+        search_path._hide_latest_completed_observation_job_posting_id = (
+            search_path.hide_latest_completed_observation_job_posting_id
+        )
+        search_path._hide_has_recent_company_application = (
+            search_path.hide_has_recent_company_application
+        )
+        search_path._hide_last_observation_source_type = (
+            last_observation_source_type
+        )
         search_path.page_success_probability = (
             search_path.page_success_count + 1
         ) / (search_path.page_observation_count + 2)
@@ -2705,34 +2741,16 @@ def job_search_view(request: Any) -> Any:
             str(search_path).casefold(),
         )
     )
-    search_path_options = all_search_paths
+    visible_search_paths = [
+        search_path for search_path in all_search_paths if not search_path.hide
+    ]
+    search_path_options = visible_search_paths
     if search_text:
         normalized_search_text = search_text.casefold()
         visible_search_paths = [
-            search_path
-            for search_path in all_search_paths
+            search_path for search_path in visible_search_paths
             if normalized_search_text in str(search_path).casefold()
         ]
-    else:
-        visible_search_paths = [
-            search_path
-            for search_path in all_search_paths
-            if not search_path.page_has_recent_company_application
-        ]
-        if last_observation_source is not None:
-            last_platform_id, last_company_id = last_observation_source
-            if last_platform_id is not None:
-                visible_search_paths = [
-                    search_path
-                    for search_path in visible_search_paths
-                    if search_path.platform_id is None
-                ]
-            elif last_company_id is not None:
-                visible_search_paths = [
-                    search_path
-                    for search_path in visible_search_paths
-                    if search_path.company_id is None
-                ]
 
     paginator = Paginator(visible_search_paths, 1)
     page_obj = paginator.get_page(page_number)

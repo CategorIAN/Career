@@ -1471,18 +1471,36 @@ class SearchPath(models.Model):
             ):
                 return True
 
-        latest_completed_observation = (
-            self.observations
-            .filter(complete=True)
-            .order_by("-created")
-            .first()
+        latest_completed_observation_created = getattr(
+            self,
+            "_hide_latest_completed_observation_created",
+            None,
         )
+        latest_completed_observation_job_posting_id = getattr(
+            self,
+            "_hide_latest_completed_observation_job_posting_id",
+            None,
+        )
+        if not hasattr(self, "_hide_latest_completed_observation_created"):
+            latest_completed_observation = (
+                self.observations
+                .filter(complete=True)
+                .order_by("-created")
+                .first()
+            )
+            if latest_completed_observation is not None:
+                latest_completed_observation_created = (
+                    latest_completed_observation.created
+                )
+                latest_completed_observation_job_posting_id = (
+                    latest_completed_observation.job_posting_id
+                )
         recent_observation_cutoff = timezone.now() - timedelta(days=1)
 
         if (
-                latest_completed_observation is not None
-                and latest_completed_observation.created > recent_observation_cutoff
-                and latest_completed_observation.job_posting_id is None
+                latest_completed_observation_created is not None
+                and latest_completed_observation_created > recent_observation_cutoff
+                and latest_completed_observation_job_posting_id is None
         ):
             return True
 
@@ -1491,23 +1509,37 @@ class SearchPath(models.Model):
         if self.company_id is not None:
             cutoff = timezone.now() - timedelta(days=30)
 
-            if self.company.applications.filter(
+            has_recent_company_application = getattr(
+                self,
+                "_hide_has_recent_company_application",
+                None,
+            )
+            if not hasattr(self, "_hide_has_recent_company_application"):
+                has_recent_company_application = self.company.applications.filter(
                     submitted__gte=cutoff
-            ).exists():
+                ).exists()
+            if has_recent_company_application:
                 return True
 
-        last_observation = (
-            SearchObservation.objects
-            .filter(complete=True)
-            .order_by("-created")
-            .first()
+        last_observation_source_type = getattr(
+            self,
+            "_hide_last_observation_source_type",
+            None,
         )
+        if not hasattr(self, "_hide_last_observation_source_type"):
+            last_observation = (
+                SearchObservation.objects
+                .filter(complete=True)
+                .order_by("-created")
+                .first()
+            )
 
-        # Nothing has been searched yet.
-        if last_observation is None:
-            return False
+            # Nothing has been searched yet.
+            if last_observation is None:
+                return False
+            last_observation_source_type = last_observation.search_path.source_type
 
-        return self.source_type == last_observation.search_path.source_type
+        return self.source_type == last_observation_source_type
 
     def __str__(self) -> Any:
         """Returns the display representation."""

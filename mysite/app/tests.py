@@ -6882,8 +6882,8 @@ class JobSearchPageTests(TestCase):
         )
         self.client.force_login(self.administrator)
 
-    def test_job_search_hides_recently_applied_company_paths_without_a_search(self) -> None:
-        """Verifies the expected behavior."""
+    def test_job_search_hides_recently_applied_company_paths_in_manual_searches(self) -> None:
+        """Verifies paths hidden by recent applications cannot be manually searched."""
         company = Company.objects.create(name="Recently Applied Co")
         search_path = SearchPath.objects.create(company=company)
         job_posting = JobPosting.objects.create(
@@ -6905,10 +6905,7 @@ class JobSearchPageTests(TestCase):
             {"search": str(search_path)},
         )
 
-        self.assertEqual(
-            list(search_response.context["page_obj"].object_list),
-            [search_path],
-        )
+        self.assertEqual(list(search_response.context["page_obj"].object_list), [])
 
     def test_job_search_shows_pending_observations_for_current_search_path(self) -> None:
         """Verifies the expected behavior."""
@@ -7418,7 +7415,9 @@ class JobSearchPageTests(TestCase):
             [SearchPath(platform=platform) for platform in platforms]
         )
 
-        with self.assertNumQueries(3):
+        # The authenticated request has two session/user queries and three
+        # page queries; adding paths must not increase that fixed total.
+        with self.assertNumQueries(5):
             response = self.client.get(reverse("job_search"))
 
         self.assertEqual(response.status_code, 200)
@@ -7477,44 +7476,55 @@ class JobSearchPageTests(TestCase):
         self.assertContains(second_page, str(high_path))
         self.assertContains(second_page, "Job Search 2 of 2")
 
-    def test_job_search_can_select_hidden_path_from_search_options(self) -> None:
-        """Verifies the expected behavior."""
-        platform_path = SearchPath.objects.create(
-            platform=Platform.objects.create(name="Visible Platform")
+    def test_job_search_manual_search_respects_search_path_hide(self) -> None:
+        """Verifies manual searches and options exclude paths hidden by their source."""
+        company = Company.objects.create(
+            name="Candid Health",
+            supports_job_search_terms=True,
         )
+        search_term = SearchTerm.objects.create(term="Python Developer")
         hidden_path = SearchPath.objects.create(
-            company=Company.objects.create(name="Hidden Company")
+            company=company,
+            search_term=search_term,
         )
-        latest_observation = SearchObservation.objects.create(
-            search_path=hidden_path,
-            complete=True,
-        )
-        SearchObservation.objects.filter(pk=latest_observation.pk).update(
-            created=timezone.now() + timedelta(days=1)
-        )
+        company_only_path = SearchPath.objects.create(company=company)
+
+        company.supports_job_search_terms = False
+        company.save(update_fields=["supports_job_search_terms"])
+        hidden_path.refresh_from_db()
+        company_only_path.refresh_from_db()
+
+        self.assertTrue(hidden_path.hide)
+        self.assertFalse(company_only_path.hide)
 
         default_response = self.client.get(reverse("job_search"))
         search_response = self.client.get(
             reverse("job_search"),
-            {"search": "hidden company"},
+            {"search": str(hidden_path)},
+        )
+        company_only_response = self.client.get(
+            reverse("job_search"),
+            {"search": str(company_only_path)},
         )
 
-        self.assertContains(
+        self.assertNotContains(
             default_response,
             f'<option value="{hidden_path}"></option>',
             html=False,
         )
+        self.assertContains(
+            default_response,
+            f'<option value="{company_only_path}"></option>',
+            html=False,
+        )
         self.assertEqual(
             default_response.context["formset"].forms[0].instance.pk,
-            platform_path.pk,
+            company_only_path.pk,
         )
+        self.assertEqual(search_response.context["formset"].forms, [])
         self.assertEqual(
-            search_response.context["formset"].forms[0].instance.pk,
-            hidden_path.pk,
-        )
-        self.assertNotEqual(
-            search_response.context["formset"].forms[0].instance.pk,
-            platform_path.pk,
+            company_only_response.context["formset"].forms[0].instance.pk,
+            company_only_path.pk,
         )
 
     def test_job_search_saves_the_current_search_path_formset(self) -> None:
