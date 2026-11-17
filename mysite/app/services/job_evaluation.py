@@ -45,10 +45,12 @@ Candidate assumptions:
   posting mentions unusually long hours, extensive travel, or an unusual
   schedule, identify it as a consideration, not as evidence the candidate is
   unwilling or unable to meet it.
-- The candidate is interested in software engineering, data engineering, and
-  related technical work. Evaluate actual responsibilities, not just title;
-  related programming, backend, API, ETL, and data-systems roles can be good
-  fits when responsibilities align.
+- The candidate is interested in software engineering, data engineering,
+  operations research analyst roles, and related technical work. Evaluate
+  actual responsibilities. Programming, backend, API, ETL, and data-systems
+  roles can be good fits, as can roles focused on mathematical modeling,
+  optimization, scheduling, resource allocation, simulation, or decision
+  support.
 
 Interpret the posting accurately:
 - Separate explicit hiring requirements, stated job responsibilities, inferred
@@ -108,6 +110,13 @@ Assess qualifications carefully:
   by the candidate background, identify it as unknown; do not assume the
   candidate meets or fails it. Do not introduce generic or hypothetical
   eligibility concerns.
+- For operations research roles, consider relevant mathematics and data
+  science education, coursework, and optimization projects documented in the
+  supplied background. Evaluate how the methods and scope of that work relate
+  to the posting. For example, implementing network-flow or combinatorial
+  optimization algorithms demonstrates relevant technical experience for
+  scheduling or resource-allocation work. Credit professional experience and
+  specific solver tools only when the supplied background supports them.
 
 Recommend applying when there is reasonable alignment and a plausible path to
 performing the role, even with imperfect qualifications. Recommend against
