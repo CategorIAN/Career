@@ -859,6 +859,22 @@ class FeatureCreateForm(FeatureForm):
         )
 
 
+class FeatureNotesForm(forms.ModelForm):
+    """Edits the notes for a single Feature."""
+
+    class Meta:
+        model = Feature
+        fields = ["notes"]
+        widgets = {
+            "notes": forms.Textarea(
+                attrs={
+                    "rows": 6,
+                    "style": "width: min(48rem, 100%);",
+                },
+            ),
+        }
+
+
 FeatureFormSet = modelformset_factory(
     Feature,
     form=FeatureForm,

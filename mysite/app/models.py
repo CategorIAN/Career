@@ -796,6 +796,11 @@ class Feature(models.Model):
         blank=True,
     )
 
+    notes = models.TextField(
+        blank=True,
+        default="",
+    )
+
     def __str__(self) -> Any:
         """Returns the display representation."""
         return self.name

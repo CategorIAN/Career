@@ -59,6 +59,45 @@
             margin: 0;
             color: #9b1c1c;
         }
+
+        .skill-assignment-table tr[draggable="true"] {
+            cursor: grab;
+        }
+
+        .skill-assignment-table tr[draggable="true"]:active {
+            cursor: grabbing;
+        }
+
+        .skill-assignment-dropzone.drag-over {
+            outline: 2px dashed #2f6f3e;
+            outline-offset: -2px;
+            background: #e7f4ea;
+        }
+
+        .skill-platform-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1001;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .skill-platform-modal[hidden] {
+            display: none;
+        }
+
+        .skill-platform-modal-content {
+            position: relative;
+            width: min(72rem, 100%);
+            max-height: calc(100vh - 2rem);
+            overflow: auto;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+        }
     </style>
     <div class="skill-page-header">
         <h1>Skills</h1>
@@ -185,27 +224,25 @@
         <h2 style="margin: 0;">Roles</h2>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <button type="button" class="roles-toggle-button" data-target="roles-section-body">Show</button>
-            <button type="submit" name="swap_roles" value="1">Swap</button>
+            <button type="submit" name="save_roles" value="1">Save Roles</button>
         </div>
     </div>
     <div id="roles-section-body" class="hidden" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
         <div style="flex: 1; padding-right: 0.5rem;">
-            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                 <thead>
                     <tr>
                         <th>Roles Without Skill</th>
-                        <th>Swap</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="roles">
                     {% for role in roles_without_skill %}
-                        <tr>
+                        <tr draggable="true" data-assignment-item data-item-id="{{ role.pk }}">
                             <td>{{ role.title }}</td>
-                            <td><input type="checkbox" name="role_without_skill_{{ role.pk }}"></td>
                         </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="2"></td>
+                        <tr data-assignment-empty>
+                            <td></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -213,22 +250,20 @@
         </div>
         <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
         <div style="flex: 1; padding-left: 0.5rem;">
-            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                 <thead>
                     <tr>
                         <th>Roles With Skill</th>
-                        <th>Swap</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="roles" data-input-name="roles_with_skill">
                     {% for role in roles_with_skill %}
-                        <tr>
-                            <td>{{ role.title }}</td>
-                            <td><input type="checkbox" name="role_with_skill_{{ role.pk }}"></td>
+                        <tr draggable="true" data-assignment-item data-item-id="{{ role.pk }}">
+                            <td>{{ role.title }}<input type="hidden" name="roles_with_skill" value="{{ role.pk }}" data-assignment-input></td>
                         </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="2"></td>
+                        <tr data-assignment-empty>
+                            <td></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -245,27 +280,25 @@
         <h2 style="margin: 0;">Projects</h2>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <button type="button" class="roles-toggle-button" data-target="projects-section-body">Show</button>
-            <button type="submit" name="swap_projects" value="1">Swap</button>
+            <button type="submit" name="save_projects" value="1">Save Projects</button>
         </div>
     </div>
     <div id="projects-section-body" class="hidden" style="display: flex; gap: 1rem; align-items: flex-start; margin-top: 1rem; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
         <div style="flex: 1; padding-right: 0.5rem;">
-            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                 <thead>
                     <tr>
                         <th>Projects Without Skill</th>
-                        <th>Swap</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="projects">
                     {% for project in projects_without_skill %}
-                        <tr>
+                        <tr draggable="true" data-assignment-item data-item-id="{{ project.pk }}">
                             <td>{{ project.title }}</td>
-                            <td><input type="checkbox" name="project_without_skill_{{ project.pk }}"></td>
                         </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="2"></td>
+                        <tr data-assignment-empty>
+                            <td></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -273,22 +306,20 @@
         </div>
         <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
         <div style="flex: 1; padding-left: 0.5rem;">
-            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                 <thead>
                     <tr>
                         <th>Projects With Skill</th>
-                        <th>Swap</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="projects" data-input-name="projects_with_skill">
                     {% for project in projects_with_skill %}
-                        <tr>
-                            <td>{{ project.title }}</td>
-                            <td><input type="checkbox" name="project_with_skill_{{ project.pk }}"></td>
+                        <tr draggable="true" data-assignment-item data-item-id="{{ project.pk }}">
+                            <td>{{ project.title }}<input type="hidden" name="projects_with_skill" value="{{ project.pk }}" data-assignment-input></td>
                         </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="2"></td>
+                        <tr data-assignment-empty>
+                            <td></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -312,28 +343,26 @@
                     <h3 style="margin: 0;">{{ group.education.school.name }} | {{ group.education.degree }}{% if group.education.field_of_study %} | {{ group.education.field_of_study }}{% endif %}</h3>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <button type="button" class="roles-toggle-button" data-target="course-education-{{ group.education.pk }}">Show</button>
-                        <button type="submit" name="swap_courses" value="{{ group.education.pk }}">Swap</button>
+                        <button type="submit" name="save_courses" value="{{ group.education.pk }}">Save Courses</button>
                     </div>
                 </div>
                 <div id="course-education-{{ group.education.pk }}" class="hidden" style="border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
                     <div style="display: flex; gap: 1rem; align-items: flex-start;">
                         <div style="flex: 1; padding-right: 0.5rem;">
-                            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                                 <thead>
                                     <tr>
                                         <th>Courses Without Skill</th>
-                                        <th>Swap</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="courses-{{ group.education.pk }}">
                                     {% for course in group.courses_without_skill %}
-                                        <tr>
+                                        <tr draggable="true" data-assignment-item data-item-id="{{ course.pk }}">
                                             <td>{{ course.title }}</td>
-                                            <td><input type="checkbox" name="course_without_skill_{{ course.pk }}"></td>
                                         </tr>
                                     {% empty %}
-                                        <tr>
-                                            <td colspan="2"></td>
+                                        <tr data-assignment-empty>
+                                            <td></td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -341,22 +370,20 @@
                         </div>
                         <div style="width: 1px; align-self: stretch; background: #8c8c8c;"></div>
                         <div style="flex: 1; padding-left: 0.5rem;">
-                            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
+                            <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
                                 <thead>
                                     <tr>
                                         <th>Courses With Skill</th>
-                                        <th>Swap</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="courses-{{ group.education.pk }}" data-input-name="courses_with_skill">
                                     {% for course in group.courses_with_skill %}
-                                        <tr>
-                                            <td>{{ course.title }}</td>
-                                            <td><input type="checkbox" name="course_with_skill_{{ course.pk }}"></td>
+                                        <tr draggable="true" data-assignment-item data-item-id="{{ course.pk }}">
+                                            <td>{{ course.title }}<input type="hidden" name="courses_with_skill" value="{{ course.pk }}" data-assignment-input></td>
                                         </tr>
                                     {% empty %}
-                                        <tr>
-                                            <td colspan="2"></td>
+                                        <tr data-assignment-empty>
+                                            <td></td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -371,156 +398,9 @@
 <div style="margin-top: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <h2 style="margin: 0;">Platforms</h2>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" class="roles-toggle-button" data-target="platforms-section-body">Show</button>
-            <button type="submit" form="platform-skills-form" name="save_platform_skills" value="1">Save</button>
-        </div>
+        <button type="button" class="roles-toggle-button" data-target="platforms-section-body">Show</button>
     </div>
     <div id="platforms-section-body" class="hidden">
-    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
-            <h3 style="margin: 0 0 1rem 0;">Available / Not Listed</h3>
-            {% if formset.forms %}
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                    {% for platform_skill in platforms_not_listed %}
-                        <a
-                            href="{% url 'skills' %}?{% if selected_skill %}skill_id={{ selected_skill.pk }}&{% elif page_obj %}page={{ page_obj.number }}&{% endif %}platform_id={{ platform_skill.platform.pk }}"
-                            class="platform-link-button"
-                            data-platform-url="{{ platform_skill.platform.url }}"
-                            style="{% if selected_platform and selected_platform.pk == platform_skill.platform.pk %}background: #d9ead3;{% else %}background: #f2f2f2;{% endif %} border: 1px solid #7d7d7d; padding: 0.35rem 0.75rem; cursor: pointer; text-decoration: none; color: #222;"
-                        >{{ platform_skill.platform.name }}</a>
-                    {% empty %}
-                        <div>No platforms.</div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div>Select a skill.</div>
-            {% endif %}
-        </div>
-        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
-            <h3 style="margin: 0 0 1rem 0;">Available / Listed</h3>
-            {% if formset.forms %}
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                    {% for platform_skill in platforms_listed %}
-                        <a
-                            href="{% url 'skills' %}?{% if selected_skill %}skill_id={{ selected_skill.pk }}&{% elif page_obj %}page={{ page_obj.number }}&{% endif %}platform_id={{ platform_skill.platform.pk }}"
-                            class="platform-link-button"
-                            data-platform-url="{{ platform_skill.platform.url }}"
-                            style="{% if selected_platform and selected_platform.pk == platform_skill.platform.pk %}background: #d9ead3;{% else %}background: #f2f2f2;{% endif %} border: 1px solid #7d7d7d; padding: 0.35rem 0.75rem; cursor: pointer; text-decoration: none; color: #222;"
-                        >{{ platform_skill.platform.name }}</a>
-                    {% empty %}
-                        <div>No platforms.</div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div>Select a skill.</div>
-            {% endif %}
-        </div>
-    </div>
-    <form id="platform-skills-form" method="post" style="display: flex; gap: 1rem; margin-top: 1rem;">
-        {% csrf_token %}
-        <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
-        <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
-        <input type="hidden" name="platform_id" value="{{ selected_platform_id }}">
-        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
-            <h3 style="margin: 0 0 1rem 0;">Skills Not Listed</h3>
-            {% if formset.forms and selected_platform %}
-                <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Available</th>
-                            <th>Swap</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for platform_skill in skills_not_listed %}
-                        <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
-                            <td>
-                                {% if selected_platform %}
-                                    <a
-                                        href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ selected_platform.pk }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a>
-                                {% else %}
-                                    {{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})
-                                {% endif %}
-                            </td>
-                            <td>
-                                <select name="platform_skill_available_{{ platform_skill.pk }}">
-                                    <option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option>
-                                    <option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option>
-                                    <option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option>
-                                </select>
-                            </td>
-                            <td>
-                                <input type="checkbox" name="platform_skill_not_listed_{{ platform_skill.pk }}">
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="3">No skills.</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% elif formset.forms %}
-                <div>Select a platform.</div>
-            {% else %}
-                <div>Select a skill.</div>
-            {% endif %}
-        </div>
-        <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
-            <h3 style="margin: 0 0 1rem 0;">Skills Listed</h3>
-            {% if formset.forms and selected_platform %}
-                <table border="1" cellpadding="8" cellspacing="0" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Available</th>
-                            <th>Swap</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for platform_skill in skills_listed %}
-                        <tr{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
-                            <td>
-                                {% if selected_platform %}
-                                    <a
-                                        href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ selected_platform.pk }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a>
-                                {% else %}
-                                    {{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})
-                                {% endif %}
-                            </td>
-                            <td>
-                                <select name="platform_skill_available_{{ platform_skill.pk }}">
-                                    <option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option>
-                                    <option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option>
-                                    <option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option>
-                                </select>
-                            </td>
-                            <td>
-                                <input type="checkbox" name="platform_skill_listed_{{ platform_skill.pk }}">
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="3">No skills.</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% elif formset.forms %}
-                <div>Select a platform.</div>
-            {% else %}
-                <div>Select a skill.</div>
-            {% endif %}
-        </div>
-    </form>
     <form method="post" style="margin-top: 1rem;">
         {% csrf_token %}
         {{ selected_skill_platform_skill_formset.management_form }}
@@ -540,6 +420,7 @@
                             <th>Available</th>
                             <th>Listed</th>
                             <th>Updated</th>
+                            <th>Skills</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -567,10 +448,13 @@
                                     {{ platform_skill_form.updated.errors }}
                                     {{ platform_skill_form.updated }}
                                 </td>
+                                <td>
+                                    <button type="button" class="open-platform-skill-modal" data-target="platform-skill-modal-{{ platform_skill_form.instance.platform.pk }}">Skills</button>
+                                </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4">No platform skills.</td>
+                                <td colspan="5">No platform skills.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -580,6 +464,53 @@
             {% endif %}
         </div>
     </form>
+    {% for group in platform_skill_groups %}
+        <div id="platform-skill-modal-{{ group.platform.pk }}" class="skill-platform-modal" role="dialog" aria-modal="true" aria-labelledby="platform-skill-modal-title-{{ group.platform.pk }}" hidden>
+            <div class="skill-platform-modal-content">
+                <button type="button" class="close-platform-skill-modal skill-add-modal-close" aria-label="Close">&times;</button>
+                <h2 id="platform-skill-modal-title-{{ group.platform.pk }}">{{ group.platform.name }} Skills</h2>
+                <form method="post" style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{% if page_obj %}{{ page_obj.number }}{% else %}1{% endif %}">
+                    <input type="hidden" name="skill_id" value="{{ selected_skill_id }}">
+                    <input type="hidden" name="platform_id" value="{{ group.platform.pk }}">
+                    <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+                        <h3 style="margin: 0 0 1rem 0;">Skills Not Listed</h3>
+                        <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
+                            <thead><tr><th>Name</th><th>Available</th></tr></thead>
+                            <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="platform-skills-{{ group.platform.pk }}">
+                                {% for platform_skill in group.skills_not_listed %}
+                                    <tr draggable="true" data-assignment-item data-item-id="{{ platform_skill.pk }}"{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
+                                        <td><a href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ group.platform.pk }}" target="_blank" rel="noopener noreferrer">{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a></td>
+                                        <td><select name="platform_skill_available_{{ platform_skill.pk }}"><option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option><option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option><option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option></select></td>
+                                    </tr>
+                                {% empty %}
+                                    <tr data-assignment-empty><td colspan="2">No skills.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="flex: 1; border: 1px solid #8c8c8c; padding: 1rem; background: #f7f7f7;">
+                        <h3 style="margin: 0 0 1rem 0;">Skills Listed</h3>
+                        <table border="1" cellpadding="8" cellspacing="0" class="skill-assignment-table" style="width: 100%;">
+                            <thead><tr><th>Name</th><th>Available</th></tr></thead>
+                            <tbody class="skill-assignment-dropzone" data-assignment-list data-assignment-group="platform-skills-{{ group.platform.pk }}" data-input-name="listed_platform_skill_ids">
+                                {% for platform_skill in group.skills_listed %}
+                                    <tr draggable="true" data-assignment-item data-item-id="{{ platform_skill.pk }}"{% if displayed_skill and platform_skill.skill.pk == displayed_skill.pk %} style="background: #d9ead3;"{% endif %}>
+                                        <td><a href="{% url 'skills' %}?skill_id={{ platform_skill.skill.pk }}&platform_id={{ group.platform.pk }}" target="_blank" rel="noopener noreferrer">{{ platform_skill.skill.name }} ({{ platform_skill.skill.rating }})</a><input type="hidden" name="listed_platform_skill_ids" value="{{ platform_skill.pk }}" data-assignment-input></td>
+                                        <td><select name="platform_skill_available_{{ platform_skill.pk }}"><option value="" {% if platform_skill.available == None %}selected{% endif %}>Unknown</option><option value="true" {% if platform_skill.available == True %}selected{% endif %}>Yes</option><option value="false" {% if platform_skill.available == False %}selected{% endif %}>No</option></select></td>
+                                    </tr>
+                                {% empty %}
+                                    <tr data-assignment-empty><td colspan="2">No skills.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="submit" name="save_platform_skills" value="1" style="align-self: flex-start;">Save</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
     </div>
 </div>
 </section>
@@ -627,15 +558,121 @@
         });
     });
 
-    document.querySelectorAll(".platform-link-button").forEach(button => {
-        button.addEventListener("click", () => {
-            const platformUrl = button.dataset.platformUrl;
-            if (!platformUrl) {
-                return;
+    (() => {
+        let draggedItem = null;
+
+        const dropzones = Array.from(
+            document.querySelectorAll("[data-assignment-list]")
+        );
+
+        const syncListInputs = list => {
+            list.querySelectorAll("[data-assignment-input]").forEach(input => {
+                input.remove();
+            });
+
+            if (list.dataset.inputName) {
+                list.querySelectorAll("[data-assignment-item]").forEach(item => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = list.dataset.inputName;
+                    input.value = item.dataset.itemId || "";
+                    input.dataset.assignmentInput = "";
+                    item.cells[0]?.append(input);
+                });
             }
-            window.open(platformUrl, "_blank", "noopener");
+
+            const emptyRow = list.querySelector("[data-assignment-empty]");
+            if (emptyRow) {
+                emptyRow.hidden = Boolean(
+                    list.querySelector("[data-assignment-item]")
+                );
+            }
+        };
+
+        const syncGroup = group => {
+            dropzones
+                .filter(list => list.dataset.assignmentGroup === group)
+                .forEach(syncListInputs);
+        };
+
+        document.querySelectorAll("[data-assignment-item]").forEach(item => {
+            item.addEventListener("dragstart", event => {
+                draggedItem = item;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", item.dataset.itemId || "");
+            });
+
+            item.addEventListener("dragend", () => {
+                dropzones.forEach(list => list.classList.remove("drag-over"));
+                draggedItem = null;
+            });
         });
-    });
+
+        dropzones.forEach(dropzone => {
+            dropzone.addEventListener("dragover", event => {
+                if (
+                    draggedItem
+                    && draggedItem.parentElement?.dataset.assignmentGroup
+                        === dropzone.dataset.assignmentGroup
+                ) {
+                    event.preventDefault();
+                    dropzone.classList.add("drag-over");
+                }
+            });
+
+            dropzone.addEventListener("dragleave", () => {
+                dropzone.classList.remove("drag-over");
+            });
+
+            dropzone.addEventListener("drop", event => {
+                event.preventDefault();
+                dropzone.classList.remove("drag-over");
+                if (
+                    !draggedItem
+                    || draggedItem.parentElement?.dataset.assignmentGroup
+                        !== dropzone.dataset.assignmentGroup
+                ) {
+                    return;
+                }
+
+                dropzone.append(draggedItem);
+                syncGroup(dropzone.dataset.assignmentGroup);
+            });
+        });
+
+        dropzones.forEach(syncListInputs);
+    })();
+
+    (() => {
+        const closeModal = modal => modal.setAttribute("hidden", "");
+
+        document.querySelectorAll(".open-platform-skill-modal").forEach(button => {
+            button.addEventListener("click", () => {
+                const modal = document.getElementById(button.dataset.target);
+                modal?.removeAttribute("hidden");
+            });
+        });
+
+        document.querySelectorAll(".skill-platform-modal").forEach(modal => {
+            modal.querySelector(".close-platform-skill-modal")?.addEventListener(
+                "click",
+                () => closeModal(modal),
+            );
+            modal.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                document.querySelectorAll(".skill-platform-modal:not([hidden])").forEach(
+                    closeModal,
+                );
+            }
+        });
+    })();
 
     (() => {
         const modal = document.getElementById("add-skill-modal");

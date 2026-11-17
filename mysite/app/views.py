@@ -59,6 +59,7 @@ from .forms import (
     FeatureCreateForm,
     FeatureLinkForm,
     FeatureLinkFormSet,
+    FeatureNotesForm,
     JobPostingCreateForm,
     JobPostingForm,
     PlatformCreateForm,
@@ -811,40 +812,7 @@ def skill_formset_view(request: Any) -> Any:
     )
     visible_platform_skill_filter = available_not_listed_filter | listed_filter
 
-    if displayed_skill is not None:
-        platforms_not_listed = (
-            PlatformSkill.objects
-            .select_related("platform", "skill")
-            .filter(skill=displayed_skill)
-            .filter(available_not_listed_filter)
-            .order_by("platform__name", "platform__id")
-        )
-        platforms_listed = (
-            PlatformSkill.objects
-            .select_related("platform", "skill")
-            .filter(skill=displayed_skill)
-            .filter(listed_filter)
-            .order_by("platform__name", "platform__id")
-        )
-    else:
-        platforms_not_listed = PlatformSkill.objects.none()
-        platforms_listed = PlatformSkill.objects.none()
-
     if displayed_skill is not None and selected_platform is not None:
-        skills_not_listed = (
-            PlatformSkill.objects
-            .select_related("platform", "skill")
-            .filter(platform=selected_platform)
-            .filter(available_not_listed_filter)
-            .order_by("-skill__rating", "skill__name", "skill__id")
-        )
-        skills_listed = (
-            PlatformSkill.objects
-            .select_related("platform", "skill")
-            .filter(platform=selected_platform)
-            .filter(listed_filter)
-            .order_by("skill__rating", "skill__name", "skill__id")
-        )
         editable_platform_skills = (
             PlatformSkill.objects
             .select_related("platform", "skill")
@@ -852,8 +820,6 @@ def skill_formset_view(request: Any) -> Any:
             .filter(visible_platform_skill_filter)
         )
     else:
-        skills_not_listed = PlatformSkill.objects.none()
-        skills_listed = PlatformSkill.objects.none()
         editable_platform_skills = PlatformSkill.objects.none()
 
     if displayed_skill is not None:
@@ -869,6 +835,49 @@ def skill_formset_view(request: Any) -> Any:
         )
     else:
         selected_skill_platform_skills = PlatformSkill.objects.none()
+
+    platform_skill_groups = []
+    if displayed_skill is not None:
+        platform_skill_rows = list(selected_skill_platform_skills)
+        platform_ids = [
+            platform_skill.platform_id for platform_skill in platform_skill_rows
+        ]
+        visible_platform_skills = (
+            PlatformSkill.objects.select_related("platform", "skill")
+            .filter(platform_id__in=platform_ids)
+            .filter(visible_platform_skill_filter)
+            .order_by("platform_id", "skill__name", "skill__id")
+        )
+        skills_by_platform_id: dict[int, list[Any]] = {}
+        for platform_skill in visible_platform_skills:
+            skills_by_platform_id.setdefault(platform_skill.platform_id, []).append(
+                platform_skill
+            )
+        for platform_skill in platform_skill_rows:
+            platform_skills = skills_by_platform_id.get(platform_skill.platform_id, [])
+            skills_not_listed = [
+                item
+                for item in platform_skills
+                if item.available is not False and item.listed is not True
+            ]
+            skills_listed = [
+                item
+                for item in platform_skills
+                if item.available is True and item.listed is True
+            ]
+            skills_not_listed.sort(
+                key=lambda item: (-item.skill.rating, item.skill.name, item.skill_id)
+            )
+            skills_listed.sort(
+                key=lambda item: (item.skill.rating, item.skill.name, item.skill_id)
+            )
+            platform_skill_groups.append(
+                {
+                    "platform": platform_skill.platform,
+                    "skills_not_listed": skills_not_listed,
+                    "skills_listed": skills_listed,
+                }
+            )
 
     course_groups = []
     for education in course_educations:
@@ -901,9 +910,9 @@ def skill_formset_view(request: Any) -> Any:
         formset = SkillFormSet(request.POST, queryset=page_queryset)
         add_skill_requested = "add_skill" in request.POST
         delete_skill_id = request.POST.get("delete_skill", "").strip()
-        swap_roles_requested = "swap_roles" in request.POST
-        swap_projects_requested = "swap_projects" in request.POST
-        swap_courses_education_id = request.POST.get("swap_courses", "").strip()
+        save_roles_requested = "save_roles" in request.POST
+        save_projects_requested = "save_projects" in request.POST
+        save_courses_education_id = request.POST.get("save_courses", "").strip()
         save_platform_skills_requested = "save_platform_skills" in request.POST
         save_selected_skill_platform_skills_requested = (
             "save_selected_skill_platform_skills" in request.POST
@@ -932,77 +941,55 @@ def skill_formset_view(request: Any) -> Any:
             if selected_platform is not None:
                 delete_redirect_params["platform_id"] = selected_platform.pk
             return redirect(_build_redirect_url(delete_redirect_params))
-        elif swap_roles_requested:
+        elif save_roles_requested:
             if displayed_skill is not None:
-                add_role_ids = [
-                    int(key.removeprefix("role_without_skill_"))
-                    for key in request.POST
-                    if key.startswith("role_without_skill_")
-                ]
-                remove_role_ids = [
-                    int(key.removeprefix("role_with_skill_"))
-                    for key in request.POST
-                    if key.startswith("role_with_skill_")
-                ]
+                role_ids_with_skill = request.POST.getlist("roles_with_skill")
 
                 with transaction.atomic():
-                    for role in Role.objects.filter(pk__in=add_role_ids):
-                        role.skills.add(displayed_skill)
-                    for role in Role.objects.filter(pk__in=remove_role_ids):
+                    for role in Role.objects.filter(skills=displayed_skill).exclude(
+                        pk__in=role_ids_with_skill
+                    ):
                         role.skills.remove(displayed_skill)
+                    for role in Role.objects.filter(pk__in=role_ids_with_skill):
+                        role.skills.add(displayed_skill)
             return redirect(_build_redirect_url(redirect_params))
-        elif swap_projects_requested:
+        elif save_projects_requested:
             if displayed_skill is not None:
-                add_project_ids = [
-                    int(key.removeprefix("project_without_skill_"))
-                    for key in request.POST
-                    if key.startswith("project_without_skill_")
-                ]
-                remove_project_ids = [
-                    int(key.removeprefix("project_with_skill_"))
-                    for key in request.POST
-                    if key.startswith("project_with_skill_")
-                ]
+                project_ids_with_skill = request.POST.getlist("projects_with_skill")
 
                 with transaction.atomic():
-                    for project in Project.objects.filter(pk__in=add_project_ids):
-                        project.skills.add(displayed_skill)
-                    for project in Project.objects.filter(pk__in=remove_project_ids):
+                    for project in Project.objects.filter(skills=displayed_skill).exclude(
+                        pk__in=project_ids_with_skill
+                    ):
                         project.skills.remove(displayed_skill)
+                    for project in Project.objects.filter(pk__in=project_ids_with_skill):
+                        project.skills.add(displayed_skill)
             return redirect(_build_redirect_url(redirect_params))
-        elif swap_courses_education_id:
+        elif save_courses_education_id:
             if displayed_skill is not None:
-                add_course_ids = [
-                    int(key.removeprefix("course_without_skill_"))
-                    for key in request.POST
-                    if key.startswith("course_without_skill_")
-                ]
-                remove_course_ids = [
-                    int(key.removeprefix("course_with_skill_"))
-                    for key in request.POST
-                    if key.startswith("course_with_skill_")
-                ]
+                course_ids_with_skill = request.POST.getlist("courses_with_skill")
 
                 with transaction.atomic():
                     for course in Course.objects.filter(
-                        pk__in=add_course_ids,
-                        education_id=swap_courses_education_id,
+                        education_id=save_courses_education_id,
+                        skills=displayed_skill,
+                    ).exclude(pk__in=course_ids_with_skill):
+                        course.skills.remove(displayed_skill)
+                    for course in Course.objects.filter(
+                        pk__in=course_ids_with_skill,
+                        education_id=save_courses_education_id,
                     ):
                         course.skills.add(displayed_skill)
-                    for course in Course.objects.filter(
-                        pk__in=remove_course_ids,
-                        education_id=swap_courses_education_id,
-                    ):
-                        course.skills.remove(displayed_skill)
             return redirect(_build_redirect_url(redirect_params))
         elif save_platform_skills_requested:
             if selected_platform is not None:
                 with transaction.atomic():
                     current_date = timezone.now().astimezone(USER_TIMEZONE).date()
+                    listed_platform_skill_ids = request.POST.getlist(
+                        "listed_platform_skill_ids"
+                    )
                     for platform_skill in editable_platform_skills:
                         available_key = f"platform_skill_available_{platform_skill.pk}"
-                        not_listed_swap_key = f"platform_skill_not_listed_{platform_skill.pk}"
-                        listed_swap_key = f"platform_skill_listed_{platform_skill.pk}"
 
                         available_value = request.POST.get(available_key, "")
                         platform_skill.available = {
@@ -1011,15 +998,9 @@ def skill_formset_view(request: Any) -> Any:
                             "": None,
                         }.get(available_value, None)
 
-                        was_swapped = False
-                        if request.POST.get(not_listed_swap_key):
-                            platform_skill.listed = True
-                            was_swapped = True
-                        elif request.POST.get(listed_swap_key):
-                            platform_skill.listed = False
-                            was_swapped = True
-
-                        if was_swapped:
+                        is_listed = str(platform_skill.pk) in listed_platform_skill_ids
+                        if platform_skill.listed != is_listed:
+                            platform_skill.listed = is_listed
                             platform_skill.updated = current_date
 
                         if displayed_skill is not None and platform_skill.skill_id == displayed_skill.pk:
@@ -1073,10 +1054,7 @@ def skill_formset_view(request: Any) -> Any:
             "projects_with_skill": projects_with_skill,
             "projects_without_skill": projects_without_skill,
             "course_groups": course_groups,
-            "platforms_not_listed": platforms_not_listed,
-            "platforms_listed": platforms_listed,
-            "skills_not_listed": skills_not_listed,
-            "skills_listed": skills_listed,
+            "platform_skill_groups": platform_skill_groups,
             "selected_skill_platform_skill_formset": selected_skill_platform_skill_formset,
             "current_date": current_date,
             "one_year_ago_date": _one_year_ago(current_date),
@@ -3182,9 +3160,21 @@ def features_view(request: Any) -> Any:
         if displayed_feature is not None
         else PlatformFeature.objects.none()
     )
+    feature_notes_form = (
+        FeatureNotesForm(instance=displayed_feature, prefix="feature-notes")
+        if displayed_feature is not None
+        else None
+    )
 
     if request.method == "POST":
         add_feature_requested = bool(request.POST.get("add_feature"))
+        save_feature_notes_requested = "save_feature_notes" in request.POST
+        if save_feature_notes_requested and displayed_feature is not None:
+            feature_notes_form = FeatureNotesForm(
+                request.POST,
+                instance=displayed_feature,
+                prefix="feature-notes",
+            )
         new_form = (
             FeatureCreateForm(request.POST, prefix="new")
             if add_feature_requested
@@ -3256,6 +3246,13 @@ def features_view(request: Any) -> Any:
                 feature_link.save()
                 query_string = urlencode(redirect_params)
                 return redirect(f"{request.path}?{query_string}" if query_string else request.path)
+        elif save_feature_notes_requested:
+            if feature_notes_form is not None and feature_notes_form.is_valid():
+                feature_notes_form.save()
+                query_string = urlencode(redirect_params)
+                return redirect(
+                    f"{request.path}?{query_string}" if query_string else request.path
+                )
         elif save_selected_feature_platform_features_requested:
             if displayed_feature is not None and selected_feature_platform_feature_formset.is_valid():
                 selected_feature_platform_feature_formset.save()
@@ -3319,6 +3316,7 @@ def features_view(request: Any) -> Any:
             "selected_feature": selected_feature,
             "selected_feature_id": selected_feature_id,
             "feature_link_formset": feature_link_formset,
+            "feature_notes_form": feature_notes_form,
             "formset": formset,
         },
     )

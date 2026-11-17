@@ -3165,6 +3165,8 @@ class PlatformPageTests(TestCase):
         response = self.client.get(reverse("platforms"))
 
         self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
         self.assertContains(response, "Success Probability")
         self.assertContains(response, "Python")
         self.assertNotContains(response, "Django")
@@ -3174,6 +3176,9 @@ class PlatformPageTests(TestCase):
             f'data-target="edit-platform-search-path-modal-{SearchPath.objects.get(platform=platform).pk}"',
             html=False,
         )
+        search_path = response.context["platform_search_paths"][0]
+        self.assertEqual(search_path.page_observation_count, 0)
+        self.assertEqual(search_path.page_success_count, 0)
 
     def test_platform_search_path_edit_saves_only_the_current_platform_path(self) -> None:
         """Verifies the expected behavior."""
@@ -4772,12 +4777,17 @@ class CompanyPageTests(TestCase):
         content = response.content.decode()
 
         self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
         self.assertContains(response, "Success Probability")
         self.assertContains(
             response,
             f'data-target="edit-company-search-path-modal-{higher_probability_path.pk}"',
             html=False,
         )
+        displayed_path = response.context["company_search_paths"][0]
+        self.assertEqual(displayed_path.page_observation_count, 2)
+        self.assertEqual(displayed_path.page_success_count, 2)
         self.assertNotContains(response, str(other_path))
         self.assertLess(content.index("Python"), content.index("Django"))
 
@@ -4944,6 +4954,8 @@ class SearchTermsPageTests(TestCase):
 
         self.assertEqual(response.context["selected_search_term"], search_term)
         self.assertContains(response, "Job Search Paths")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
         self.assertContains(response, "Success Probability")
         self.assertContains(
             response,
@@ -4955,6 +4967,9 @@ class SearchTermsPageTests(TestCase):
             response.context["search_term_search_paths"],
             [higher_probability_path, lower_probability_path],
         )
+        displayed_path = response.context["search_term_search_paths"][0]
+        self.assertEqual(displayed_path.page_observation_count, 1)
+        self.assertEqual(displayed_path.page_success_count, 1)
 
         save_response = self.client.post(
             reverse("search_terms"),
@@ -8797,11 +8812,14 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(response, "Roles Without Skill")
         self.assertContains(response, "Roles With Skill")
-        self.assertContains(response, "<td>Analyst</td>", html=True)
-        self.assertContains(response, "<td>Engineer</td>", html=True)
-        self.assertContains(response, "<td>Manager</td>", html=True)
-        self.assertContains(response, 'name="role_without_skill_')
-        self.assertContains(response, 'name="role_with_skill_')
+        self.assertContains(response, "Analyst")
+        self.assertContains(response, "Engineer")
+        self.assertContains(response, "Manager")
+        self.assertContains(response, 'data-assignment-group="roles"', html=False)
+        self.assertContains(response, 'name="roles_with_skill"', html=False)
+        self.assertContains(response, 'draggable="true"', html=False)
+        self.assertNotContains(response, 'name="role_without_skill_')
+        self.assertNotContains(response, 'name="role_with_skill_')
         self.assertContains(response, "Projects")
 
     def test_displayed_skill_is_used_for_role_tables_when_no_skill_is_selected(self) -> None:
@@ -8832,8 +8850,8 @@ class SkillPageTests(TestCase):
             [role.pk for role in response.context["roles_with_skill"]],
             [role_with_skill.pk],
         )
-        self.assertContains(response, "<td>Analyst</td>", html=True)
-        self.assertContains(response, "<td>Engineer</td>", html=True)
+        self.assertContains(response, "Analyst")
+        self.assertContains(response, "Engineer")
 
     def test_selected_skill_shows_projects_without_and_with_skill(self) -> None:
         """Verifies the expected behavior."""
@@ -8858,14 +8876,16 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(response, "Projects Without Skill")
         self.assertContains(response, "Projects With Skill")
-        self.assertContains(response, "<td>Alpha Project</td>", html=True)
-        self.assertContains(response, "<td>Beta Project</td>", html=True)
-        self.assertContains(response, "<td>Gamma Project</td>", html=True)
-        self.assertContains(response, 'name="project_without_skill_')
-        self.assertContains(response, 'name="project_with_skill_')
+        self.assertContains(response, "Alpha Project")
+        self.assertContains(response, "Beta Project")
+        self.assertContains(response, "Gamma Project")
+        self.assertContains(response, 'data-assignment-group="projects"', html=False)
+        self.assertContains(response, 'name="projects_with_skill"', html=False)
+        self.assertNotContains(response, 'name="project_without_skill_')
+        self.assertNotContains(response, 'name="project_with_skill_')
 
-    def test_selected_skill_shows_platform_boxes_using_platformskill_filters(self) -> None:
-        """Verifies the expected behavior."""
+    def test_selected_skill_builds_a_platform_modal_for_each_platform_row(self) -> None:
+        """Verifies each platform row has an in-page skills modal."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         platform_not_listed_true_false = Platform.objects.create(name="Alpha Platform")
         platform_not_listed_null_null = Platform.objects.create(name="Beta Platform")
@@ -8908,28 +8928,36 @@ class SkillPageTests(TestCase):
         response = self.client.get(reverse("skills"), {"skill_id": selected_skill.pk})
 
         self.assertEqual(response.status_code, 200)
+        groups_by_platform_id = {
+            group["platform"].pk: group
+            for group in response.context["platform_skill_groups"]
+        }
         self.assertEqual(
-            [item.platform.pk for item in response.context["platforms_not_listed"]],
-            [platform_not_listed_true_false.pk, platform_not_listed_null_null.pk],
+            [item.platform.pk for item in groups_by_platform_id[
+                platform_not_listed_true_false.pk
+            ]["skills_not_listed"]],
+            [platform_not_listed_true_false.pk],
         )
         self.assertEqual(
-            [item.platform.pk for item in response.context["platforms_listed"]],
+            [item.platform.pk for item in groups_by_platform_id[platform_listed.pk][
+                "skills_listed"
+            ]],
             [platform_listed.pk],
         )
         self.assertContains(response, "Platforms")
-        self.assertContains(response, "Available / Not Listed")
-        self.assertContains(response, "Available / Listed")
+        self.assertNotContains(response, "Available / Not Listed")
+        self.assertNotContains(response, "Available / Listed")
         self.assertContains(response, "Alpha Platform")
         self.assertContains(response, "Beta Platform")
         self.assertContains(response, "Gamma Platform")
         self.assertContains(
             response,
-            f'href="{reverse("skills")}?skill_id={selected_skill.pk}&platform_id={platform_listed.pk}"',
+            f'data-target="platform-skill-modal-{platform_listed.pk}"',
             html=False,
         )
 
-    def test_displayed_skill_is_used_for_platform_boxes_when_no_skill_is_selected(self) -> None:
-        """Verifies the expected behavior."""
+    def test_displayed_skill_builds_platform_modals_when_no_skill_is_selected(self) -> None:
+        """Verifies the displayed skill supplies the platform modal rows."""
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
         Skill.objects.create(name="Zulu", type="Language")
         platform_not_listed = Platform.objects.create(name="Alpha Platform")
@@ -8952,18 +8980,14 @@ class SkillPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            [item.platform.pk for item in response.context["platforms_not_listed"]],
-            [platform_not_listed.pk],
-        )
-        self.assertEqual(
-            [item.platform.pk for item in response.context["platforms_listed"]],
-            [platform_listed.pk],
+            [group["platform"].pk for group in response.context["platform_skill_groups"]],
+            [platform_not_listed.pk, platform_listed.pk],
         )
         self.assertContains(response, "Alpha Platform")
         self.assertContains(response, "Beta Platform")
 
-    def test_selected_skill_and_platform_show_bottom_skill_boxes_with_requested_ordering(self) -> None:
-        """Verifies the expected behavior."""
+    def test_platform_skills_modal_shows_requested_skill_ordering(self) -> None:
+        """Verifies the selected platform modal contains the expected lists."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
         platform = Platform.objects.create(name="Target Platform")
         high_rating_not_listed = Skill.objects.create(name="Python", type="Language", rating=5)
@@ -8987,8 +9011,9 @@ class SkillPageTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        group = response.context["platform_skill_groups"][0]
         self.assertEqual(
-            [item.skill.pk for item in response.context["skills_not_listed"]],
+            [item.skill.pk for item in group["skills_not_listed"]],
             [
                 high_rating_not_listed.pk,
                 same_rating_not_listed_a.pk,
@@ -8996,7 +9021,7 @@ class SkillPageTests(TestCase):
             ],
         )
         self.assertEqual(
-            [item.skill.pk for item in response.context["skills_listed"]],
+            [item.skill.pk for item in group["skills_listed"]],
             [
                 listed_low.pk,
                 selected_skill.pk,
@@ -9005,6 +9030,11 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(response, "Skills Not Listed")
         self.assertContains(response, "Skills Listed")
+        self.assertContains(
+            response,
+            f'id="platform-skill-modal-{platform.pk}"',
+            html=False,
+        )
         self.assertNotContains(response, f'name="platform_skill_name_', html=False)
         self.assertContains(response, f"{high_rating_not_listed.name} ({high_rating_not_listed.rating})")
         self.assertContains(response, f"{same_rating_not_listed_a.name} ({same_rating_not_listed_a.rating})")
@@ -9018,17 +9048,20 @@ class SkillPageTests(TestCase):
             html=False,
         )
         self.assertContains(response, 'target="_blank"', html=False)
-        self.assertContains(response, "<th>Swap</th>", html=False)
+        self.assertNotContains(response, "<th>Swap</th>", html=False)
         self.assertContains(
             response,
-            f'name="platform_skill_not_listed_{high_rating_not_listed.platformskill_set.get(platform=platform).pk}"',
+            f'data-assignment-group="platform-skills-{platform.pk}"',
             html=False,
         )
+        self.assertContains(response, 'draggable="true"', html=False)
         self.assertContains(
             response,
-            f'name="platform_skill_listed_{selected_skill.platformskill_set.get(platform=platform).pk}"',
+            f'name="listed_platform_skill_ids" value="{selected_skill.platformskill_set.get(platform=platform).pk}"',
             html=False,
         )
+        self.assertNotContains(response, 'name="platform_skill_not_listed_', html=False)
+        self.assertNotContains(response, 'name="platform_skill_listed_', html=False)
         self.assertNotContains(
             response,
             f'name="platform_skill_rating_{high_rating_not_listed.platformskill_set.get(platform=platform).pk}"',
@@ -9036,11 +9069,11 @@ class SkillPageTests(TestCase):
         )
         self.assertContains(
             response,
-            '<tr style="background: #d9ead3;">',
+            'style="background: #d9ead3;"',
             html=False,
         )
 
-    def test_platforms_section_save_updates_selected_skill_date_and_swaps_listing(self) -> None:
+    def test_platforms_section_save_uses_dragged_destination_list(self) -> None:
         """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology", rating=2)
         platform = Platform.objects.create(name="Target Platform")
@@ -9083,10 +9116,12 @@ class SkillPageTests(TestCase):
                 "platform_id": str(platform.pk),
                 "save_platform_skills": "1",
                 f"platform_skill_available_{editable_platform_skill.pk}": "false",
-                f"platform_skill_not_listed_{editable_platform_skill.pk}": "on",
                 f"platform_skill_available_{listed_platform_skill.pk}": "",
-                f"platform_skill_listed_{listed_platform_skill.pk}": "on",
                 f"platform_skill_available_{untouched_platform_skill.pk}": "true",
+                "listed_platform_skill_ids": [
+                    str(editable_platform_skill.pk),
+                    str(untouched_platform_skill.pk),
+                ],
             },
         )
 
@@ -9101,14 +9136,15 @@ class SkillPageTests(TestCase):
         self.assertEqual(editable_platform_skill.skill.rating, 5)
         self.assertFalse(editable_platform_skill.available)
         self.assertTrue(editable_platform_skill.listed)
-        self.assertEqual(str(editable_platform_skill.updated), "2026-09-04")
+        current_date = timezone.now().astimezone(ZoneInfo("America/Denver")).date()
+        self.assertEqual(editable_platform_skill.updated, current_date)
         self.assertEqual(listed_platform_skill.skill.name, "Bash")
         self.assertEqual(listed_platform_skill.skill.rating, 3)
         self.assertIsNone(listed_platform_skill.available)
         self.assertFalse(listed_platform_skill.listed)
-        self.assertEqual(str(listed_platform_skill.updated), "2026-09-04")
+        self.assertEqual(listed_platform_skill.updated, current_date)
         self.assertTrue(untouched_platform_skill.listed)
-        self.assertEqual(str(untouched_platform_skill.updated), "2026-09-04")
+        self.assertEqual(untouched_platform_skill.updated, current_date)
 
     def test_selected_skill_shows_platform_skill_formset_table_scoped_to_skill(self) -> None:
         """Verifies the expected behavior."""
@@ -9443,15 +9479,17 @@ class SkillPageTests(TestCase):
         self.assertContains(response, "Courses With Skill")
         self.assertContains(response, "School One | Bachelor of Science | Computer Science")
         self.assertContains(response, "School Two | Master of Science | Analytics")
-        self.assertContains(response, f'name="swap_courses" value="{education_one.pk}"', html=False)
-        self.assertContains(response, f'name="swap_courses" value="{education_two.pk}"', html=False)
-        self.assertContains(response, "<td>Algorithms</td>", html=True)
-        self.assertContains(response, "<td>Databases</td>", html=True)
-        self.assertContains(response, "<td>Statistics</td>", html=True)
-        self.assertContains(response, 'name="course_without_skill_')
-        self.assertContains(response, 'name="course_with_skill_')
+        self.assertContains(response, f'name="save_courses" value="{education_one.pk}"', html=False)
+        self.assertContains(response, f'name="save_courses" value="{education_two.pk}"', html=False)
+        self.assertContains(response, "Algorithms")
+        self.assertContains(response, "Databases")
+        self.assertContains(response, "Statistics")
+        self.assertContains(response, 'data-assignment-group="courses-', html=False)
+        self.assertContains(response, 'name="courses_with_skill"', html=False)
+        self.assertNotContains(response, 'name="course_without_skill_')
+        self.assertNotContains(response, 'name="course_with_skill_')
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_roles(self) -> None:
+    def test_saving_roles_uses_the_dragged_destination_list(self) -> None:
         """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         company = Company.objects.create(name="Example Company")
@@ -9480,9 +9518,8 @@ class SkillPageTests(TestCase):
                 "form-0-rating": str(selected_skill.rating),
                 "skill_id": str(selected_skill.pk),
                 "page": "1",
-                "swap_roles": "1",
-                f"role_without_skill_{role_without_skill.pk}": "on",
-                f"role_with_skill_{role_with_skill.pk}": "on",
+                "save_roles": "1",
+                "roles_with_skill": str(role_without_skill.pk),
             },
         )
 
@@ -9490,7 +9527,7 @@ class SkillPageTests(TestCase):
         self.assertTrue(role_without_skill.skills.filter(pk=selected_skill.pk).exists())
         self.assertFalse(role_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
-    def test_swap_button_uses_displayed_skill_when_no_selected_skill_is_provided(self) -> None:
+    def test_saving_roles_uses_displayed_skill_when_no_selected_skill_is_provided(self) -> None:
         """Verifies the expected behavior."""
         displayed_skill = Skill.objects.create(name="Alpha", type="Technology")
         Skill.objects.create(name="Zulu", type="Language")
@@ -9519,9 +9556,8 @@ class SkillPageTests(TestCase):
                 "form-0-type": displayed_skill.type,
                 "form-0-rating": str(displayed_skill.rating),
                 "page": "1",
-                "swap_roles": "1",
-                f"role_without_skill_{role_without_skill.pk}": "on",
-                f"role_with_skill_{role_with_skill.pk}": "on",
+                "save_roles": "1",
+                "roles_with_skill": str(role_without_skill.pk),
             },
         )
 
@@ -9529,7 +9565,7 @@ class SkillPageTests(TestCase):
         self.assertTrue(role_without_skill.skills.filter(pk=displayed_skill.pk).exists())
         self.assertFalse(role_with_skill.skills.filter(pk=displayed_skill.pk).exists())
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_projects(self) -> None:
+    def test_saving_projects_uses_the_dragged_destination_list(self) -> None:
         """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         project_without_skill = Project.objects.create(title="Alpha Project")
@@ -9549,9 +9585,8 @@ class SkillPageTests(TestCase):
                 "form-0-rating": str(selected_skill.rating),
                 "skill_id": str(selected_skill.pk),
                 "page": "1",
-                "swap_projects": "1",
-                f"project_without_skill_{project_without_skill.pk}": "on",
-                f"project_with_skill_{project_with_skill.pk}": "on",
+                "save_projects": "1",
+                "projects_with_skill": str(project_without_skill.pk),
             },
         )
 
@@ -9559,7 +9594,7 @@ class SkillPageTests(TestCase):
         self.assertTrue(project_without_skill.skills.filter(pk=selected_skill.pk).exists())
         self.assertFalse(project_with_skill.skills.filter(pk=selected_skill.pk).exists())
 
-    def test_swap_button_adds_and_removes_selected_skill_for_checked_courses(self) -> None:
+    def test_saving_courses_uses_the_dragged_destination_list(self) -> None:
         """Verifies the expected behavior."""
         selected_skill = Skill.objects.create(name="SQL", type="Technology")
         school = School.objects.create(name="School One")
@@ -9591,9 +9626,8 @@ class SkillPageTests(TestCase):
                 "form-0-rating": str(selected_skill.rating),
                 "skill_id": str(selected_skill.pk),
                 "page": "1",
-                "swap_courses": str(education.pk),
-                f"course_without_skill_{course_without_skill.pk}": "on",
-                f"course_with_skill_{course_with_skill.pk}": "on",
+                "save_courses": str(education.pk),
+                "courses_with_skill": str(course_without_skill.pk),
             },
         )
 
@@ -9883,6 +9917,51 @@ class FeaturePageTests(TestCase):
         self.assertNotContains(response, f'name="delete_feature" value="{first_feature.pk}"', html=False)
         self.assertNotContains(response, "Feature 1 of", html=False)
         self.assertNotContains(response, 'aria-label="Next feature"', html=False)
+
+    def test_selected_feature_displays_and_saves_notes(self) -> None:
+        """Verifies notes are scoped to and editable for the selected feature."""
+        feature = Feature.objects.create(name="Billing", notes="Existing notes")
+
+        response = self.client.get(reverse("features"), {"feature_id": feature.pk})
+
+        self.assertContains(
+            response,
+            '<h2 style="margin: 0;">Notes</h2>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'data-target="feature-notes-section-body">Show</button>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'id="feature-notes-section-body" class="hidden"',
+            html=False,
+        )
+        self.assertContains(response, 'name="feature-notes-notes"', html=False)
+        self.assertContains(response, "Existing notes")
+        self.assertContains(
+            response,
+            'name="save_feature_notes" value="1"',
+            html=False,
+        )
+
+        save_response = self.client.post(
+            reverse("features"),
+            {
+                "feature_id": feature.pk,
+                "feature-notes-notes": "Updated notes",
+                "save_feature_notes": "1",
+            },
+        )
+
+        self.assertRedirects(
+            save_response,
+            f"{reverse('features')}?feature_id={feature.pk}",
+        )
+        feature.refresh_from_db()
+        self.assertEqual(feature.notes, "Updated notes")
 
     def test_selected_feature_shows_links_section_scoped_to_feature(self) -> None:
         """Verifies the expected behavior."""

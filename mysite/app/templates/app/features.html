@@ -164,6 +164,24 @@
 {% if displayed_feature %}
     <div style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">Notes</h2>
+            <button type="button" class="feature-toggle-button" data-target="feature-notes-section-body">Show</button>
+        </div>
+        <div id="feature-notes-section-body" class="hidden">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="page" value="{% if feature_page_obj %}{{ feature_page_obj.number }}{% else %}1{% endif %}">
+                <input type="hidden" name="feature_id" value="{{ selected_feature_id }}">
+                {{ feature_notes_form.notes.errors }}
+                <div>
+                    {{ feature_notes_form.notes }}
+                </div>
+                <button type="submit" name="save_feature_notes" value="1" style="margin-top: 0.75rem;">Save Notes</button>
+            </form>
+        </div>
+    </div>
+    <div style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <h2 style="margin: 0;">Links</h2>
             <button type="button" class="feature-toggle-button" data-target="feature-links-section-body">Show</button>
         </div>

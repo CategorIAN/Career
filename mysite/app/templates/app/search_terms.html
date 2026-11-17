@@ -48,6 +48,8 @@
                     <tr>
                         <th>Name</th>
                         <th>Active</th>
+                        <th>Observation Count</th>
+                        <th>Success Count</th>
                         <th>Success Probability</th>
                         <th>Edit</th>
                     </tr>
@@ -63,13 +65,15 @@
                                 {% endif %}
                             </td>
                             <td>{{ search_path.active|yesno:"Yes,No" }}</td>
+                            <td>{{ search_path.page_observation_count }}</td>
+                            <td>{{ search_path.page_success_count }}</td>
                             <td>{{ search_path.page_success_probability|floatformat:2 }}</td>
                             <td>
                                 <button type="button" class="copy-button open-search-term-search-path-modal" data-target="edit-search-term-search-path-modal-{{ search_path.pk }}">Edit</button>
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="4">No job search paths for this search term.</td></tr>
+                        <tr><td colspan="6">No job search paths for this search term.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
