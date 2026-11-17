@@ -145,6 +145,7 @@ from .services.gmail import (
 from .services.search_paths import (
     create_company_search_paths,
     create_platform_search_paths,
+    create_search_term_search_paths,
 )
 from .services.project_management import review_is_due, seed_default_checklist_items
 from .services.toggl import (
@@ -1840,7 +1841,9 @@ def search_terms_view(request: Any) -> Any:
         ).strip()
         if "add_search_term" in request.POST:
             if new_search_term_form.is_valid():
-                new_search_term_form.save()
+                with transaction.atomic():
+                    search_term = new_search_term_form.save()
+                    create_search_term_search_paths(search_term)
                 return redirect(redirect_url)
             show_add_modal = True
         elif delete_search_term_id:

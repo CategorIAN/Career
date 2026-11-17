@@ -76,3 +76,39 @@ def create_platform_search_paths(
             existing_count += 1
 
     return SearchPathCreationResult(created_count, existing_count)
+
+
+def create_search_term_search_paths(search_term: SearchTerm) -> SearchPathCreationResult:
+    """Create valid platform and company SearchPaths for a saved search term."""
+    created_count = 0
+    existing_count = 0
+
+    eligible_platforms = Platform.objects.filter(job_search_enabled=True)
+    eligible_companies = Company.objects.filter(
+        job_search_enabled=True,
+        supports_job_search_terms=True,
+    )
+
+    for platform in eligible_platforms:
+        _, created = SearchPath.objects.get_or_create(
+            company=None,
+            platform=platform,
+            search_term=search_term,
+        )
+        if created:
+            created_count += 1
+        else:
+            existing_count += 1
+
+    for company in eligible_companies:
+        _, created = SearchPath.objects.get_or_create(
+            company=company,
+            platform=None,
+            search_term=search_term,
+        )
+        if created:
+            created_count += 1
+        else:
+            existing_count += 1
+
+    return SearchPathCreationResult(created_count, existing_count)
