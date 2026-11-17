@@ -6144,6 +6144,14 @@ class ApplicationProgressTests(TestCase):
 
 
 class EmailsPageTests(TestCase):
+    def setUp(self) -> None:
+        """Signs in as the Career administrator for private email workflows."""
+        self.administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(self.administrator)
+
     @patch("app.views.get_email")
     @patch("app.views.search_emails")
     def test_emails_page_lists_inbox_messages_without_saving_them(
@@ -6375,6 +6383,59 @@ class EmailsPageTests(TestCase):
         self.assertEqual(ApplicationEmail.objects.filter(gmail_message_id="message-1").count(), 1)
         assigned_email = ApplicationEmail.objects.get(gmail_message_id="message-1")
         self.assertEqual(assigned_email.application, original_application)
+
+    def test_undoing_an_email_assignment_deletes_only_that_application_email(self) -> None:
+        """Verifies that undo removes the selected local email assignment."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        assigned_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-1",
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        other_assigned_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-2",
+            sender="other@example.com",
+            received_at=datetime(2026, 10, 2, tzinfo=UTC),
+        )
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "undo_email_assignment",
+                "gmail_message_id": assigned_email.gmail_message_id,
+                "page_token": "next-page",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('emails')}?page_token=next-page")
+        self.assertFalse(ApplicationEmail.objects.filter(pk=assigned_email.pk).exists())
+        self.assertTrue(ApplicationEmail.objects.filter(pk=other_assigned_email.pk).exists())
+
+    @patch("app.views.get_email")
+    def test_email_options_include_assigned_application_for_undo_action(
+        self,
+        mock_get_email: Any,
+    ) -> None:
+        """Verifies that assigned messages can be identified by the side panel."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-1",
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+
+        response = self.client.get(reverse("email_application_options", args=["message-1"]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["assigned_application"]["id"], application.pk)
+        mock_get_email.assert_not_called()
 
     def test_application_details_groups_emails_by_thread_and_orders_them(self) -> None:
         """Verifies the expected behavior."""

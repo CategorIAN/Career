@@ -300,7 +300,17 @@
             if (data.assigned_application) {
                 const message = document.createElement("p");
                 message.textContent = `Already assigned to ${data.assigned_application.title} @ ${data.assigned_application.company}.`;
-                panelContent.append(message);
+                const form = document.createElement("form");
+                form.method = "post";
+                addHiddenInput(form, "csrfmiddlewaretoken", csrfToken);
+                addHiddenInput(form, "action", "undo_email_assignment");
+                addHiddenInput(form, "gmail_message_id", messageId);
+                if (pageToken) addHiddenInput(form, "page_token", pageToken);
+                const submit = document.createElement("button");
+                submit.type = "submit";
+                submit.textContent = "Undo Assignment";
+                form.append(submit);
+                panelContent.append(message, form);
                 return;
             }
             const list = document.createElement("div");

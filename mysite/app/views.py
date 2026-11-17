@@ -2011,6 +2011,21 @@ def job_postings_view(request: Any) -> Any:
 def emails_view(request: Any) -> Any:
     """Executes this callable."""
     page_token = request.GET.get("page_token", "").strip() or None
+    if request.method == "POST" and request.POST.get("action") == "undo_email_assignment":
+        page_token = request.POST.get("page_token", "").strip() or page_token
+        message_id = request.POST.get("gmail_message_id", "").strip()
+        redirect_url = reverse("emails")
+        if page_token:
+            redirect_url = f"{redirect_url}?{urlencode({'page_token': page_token})}"
+
+        application_email = ApplicationEmail.objects.filter(gmail_message_id=message_id).first()
+        if application_email is None:
+            messages.error(request, "This email is no longer assigned to an application.")
+        else:
+            application_email.delete()
+            messages.success(request, "Email assignment undone.")
+        return redirect(redirect_url)
+
     if request.method == "POST" and request.POST.get("action") == "assign_email":
         page_token = request.POST.get("page_token", "").strip() or page_token
         message_id = request.POST.get("gmail_message_id", "").strip()
