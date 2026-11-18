@@ -142,6 +142,7 @@ from .services.gmail import (
     get_or_create_label,
     search_emails,
 )
+from .services.application_emails import refresh_application_email_html
 from .services.search_paths import (
     create_company_search_paths,
     create_platform_search_paths,
@@ -201,6 +202,12 @@ def _email_received_at(email: Any) -> Any:
     if timezone.is_naive(received_at):
         return timezone.make_aware(received_at, UTC)
     return received_at
+
+
+def _normalized_gmail_page_token(value: Any) -> str | None:
+    """Return a usable Gmail pagination token or ``None`` for blank placeholders."""
+    token = str(value or "").strip()
+    return token if token and token.lower() != "none" else None
 
 
 def _applications_for_sender(sender_email: Any) -> Any:
@@ -1133,14 +1140,44 @@ def _wait_months_display(wait_value: Any) -> Any:
     return f"{formatted_months} {unit}"
 
 
+def _sort_by_success_probability(sources: Any) -> list[Any]:
+    """Sort SearchPath sources by descending probability and then display name."""
+    return sorted(
+        sources,
+        key=lambda source: (
+            -source.success_probability,
+            str(source).casefold(),
+            source.pk,
+        ),
+    )
+
+
 def platform_formset_view(request: Any) -> Any:
     """Executes this callable."""
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    queryset = Platform.objects.all().order_by("name")
-    paginator = Paginator(queryset, 1)
+    queryset = Platform.objects.all()
+    all_platforms = _sort_by_success_probability(list(queryset))
+    selected_platform_id = request.GET.get("platform_id", "").strip()
+    searched_platform = None
+    if selected_platform_id:
+        searched_platform = next(
+            (
+                platform
+                for platform in all_platforms
+                if str(platform.pk) == selected_platform_id
+            ),
+            None,
+        )
+        if searched_platform is not None:
+            page_number = all_platforms.index(searched_platform) + 1
+    paginator = Paginator(all_platforms, 1)
     page_obj = paginator.get_page(page_number)
-    page_queryset = page_obj.object_list
-    selected_platform = page_queryset.first()
+    selected_platform = next(iter(page_obj.object_list), None)
+    page_queryset = (
+        queryset.filter(pk=selected_platform.pk)
+        if selected_platform is not None
+        else queryset.none()
+    )
     platform_search_paths = _search_paths_with_success_probability(selected_platform)
     show_edit_platform_search_path_id = None
     submitted_platform_search_path_form = None
@@ -1216,6 +1253,8 @@ def platform_formset_view(request: Any) -> Any:
             "formset": formset,
             "page_obj": page_obj,
             "selected_platform": selected_platform,
+            "all_platforms": all_platforms,
+            "searched_platform": searched_platform,
             "platform_search_paths": platform_search_paths,
             "platform_search_path_forms": platform_search_path_forms,
             "show_edit_platform_search_path_id": show_edit_platform_search_path_id,
@@ -1376,6 +1415,11 @@ def professional_formset_view(request: Any) -> Any:
         .values_list("name", flat=True)
         .first()
         if invited_professional_id
+        else None
+    )
+    invited_professional_first_name = (
+        invited_professional_name.split(maxsplit=1)[0]
+        if invited_professional_name
         else None
     )
     submitted_edit_form = None
@@ -1690,6 +1734,7 @@ def professional_formset_view(request: Any) -> Any:
             "show_add_connection_modal": show_add_connection_modal,
             "connection_conflict_message": connection_conflict_message,
             "invited_professional_name": invited_professional_name,
+            "invited_professional_first_name": invited_professional_first_name,
         },
     )
 
@@ -1701,22 +1746,26 @@ def companies_view(request: Any) -> Any:
     submitted_edit_form = None
     submitted_edit_company_id = None
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    companies_queryset = Company.objects.order_by("name", "pk")
+    companies_queryset = Company.objects.all()
+    all_companies = _sort_by_success_probability(list(companies_queryset))
     selected_company_id = request.GET.get("company_id", "").strip()
     searched_company = None
     if selected_company_id:
-        searched_company = companies_queryset.filter(pk=selected_company_id).first()
+        searched_company = next(
+            (
+                company
+                for company in all_companies
+                if str(company.pk) == selected_company_id
+            ),
+            None,
+        )
         if searched_company is not None:
-            page_number = companies_queryset.filter(
-                Q(name__lt=searched_company.name)
-                | Q(name=searched_company.name, pk__lte=searched_company.pk)
-            ).count()
+            page_number = all_companies.index(searched_company) + 1
 
-    paginator = Paginator(companies_queryset, 1)
+    paginator = Paginator(all_companies, 1)
     page_obj = paginator.get_page(page_number)
     companies = list(page_obj.object_list)
     selected_company = companies[0] if companies else None
-    all_companies = list(companies_queryset.only("pk", "name"))
     company_search_paths = _search_paths_with_success_probability(selected_company)
     show_edit_company_search_path_id = None
     submitted_company_search_path_form = None
@@ -1819,8 +1868,22 @@ def search_terms_view(request: Any) -> Any:
     submitted_edit_form = None
     submitted_edit_search_term_id = None
     page_number = request.POST.get("page") or request.GET.get("page") or 1
-    search_terms_queryset = SearchTerm.objects.order_by("term", "pk")
-    paginator = Paginator(search_terms_queryset, 1)
+    search_terms_queryset = SearchTerm.objects.all()
+    all_search_terms = _sort_by_success_probability(list(search_terms_queryset))
+    selected_search_term_id = request.GET.get("search_term_id", "").strip()
+    searched_search_term = None
+    if selected_search_term_id:
+        searched_search_term = next(
+            (
+                search_term
+                for search_term in all_search_terms
+                if str(search_term.pk) == selected_search_term_id
+            ),
+            None,
+        )
+        if searched_search_term is not None:
+            page_number = all_search_terms.index(searched_search_term) + 1
+    paginator = Paginator(all_search_terms, 1)
     page_obj = paginator.get_page(page_number)
     search_terms = list(page_obj.object_list)
     selected_search_term = search_terms[0] if search_terms else None
@@ -1912,6 +1975,8 @@ def search_terms_view(request: Any) -> Any:
             "search_terms": search_terms,
             "page_obj": page_obj,
             "selected_search_term": selected_search_term,
+            "all_search_terms": all_search_terms,
+            "searched_search_term": searched_search_term,
             "search_term_search_paths": search_term_search_paths,
             "search_term_search_path_forms": search_term_search_path_forms,
             "new_search_term_form": new_search_term_form,
@@ -2013,9 +2078,9 @@ def job_postings_view(request: Any) -> Any:
 
 def emails_view(request: Any) -> Any:
     """Executes this callable."""
-    page_token = request.GET.get("page_token", "").strip() or None
+    page_token = _normalized_gmail_page_token(request.GET.get("page_token"))
     if request.method == "POST" and request.POST.get("action") == "undo_email_assignment":
-        page_token = request.POST.get("page_token", "").strip() or page_token
+        page_token = _normalized_gmail_page_token(request.POST.get("page_token")) or page_token
         message_id = request.POST.get("gmail_message_id", "").strip()
         redirect_url = reverse("emails")
         if page_token:
@@ -2030,7 +2095,7 @@ def emails_view(request: Any) -> Any:
         return redirect(redirect_url)
 
     if request.method == "POST" and request.POST.get("action") == "assign_email":
-        page_token = request.POST.get("page_token", "").strip() or page_token
+        page_token = _normalized_gmail_page_token(request.POST.get("page_token")) or page_token
         message_id = request.POST.get("gmail_message_id", "").strip()
         application = get_object_or_404(
             Application.objects.select_related("company", "job_posting"),
@@ -2068,6 +2133,7 @@ def emails_view(request: Any) -> Any:
                 "received_at": _email_received_at(gmail_email),
                 "body": gmail_email.get("plain_text_body")
                 or gmail_email.get("html_body", ""),
+                "html_body": gmail_email.get("html_body", ""),
             },
         )
         if not created:
@@ -2117,7 +2183,9 @@ def emails_view(request: Any) -> Any:
                 gmail_email = get_email(message_id)
             except GmailError:
                 continue
-            body = gmail_email.get("plain_text_body") or gmail_email.get("html_body", "")
+            plain_text_body = gmail_email.get("plain_text_body", "")
+            html_body = gmail_email.get("html_body", "")
+            body = plain_text_body or html_body
             sender_name, sender_email = parseaddr(gmail_email.get("sender", ""))
             inbox_emails.append(
                 {
@@ -2129,6 +2197,7 @@ def emails_view(request: Any) -> Any:
                     "received_at": _email_received_at(gmail_email),
                     "preview": re.sub(r"\s+", " ", body).strip()[:100],
                     "body": body,
+                    "html_body": html_body,
                     "assigned_email": assigned_emails.get(gmail_email["message_id"]),
                 }
             )
@@ -2234,20 +2303,51 @@ def job_applications_view(request: Any) -> Any:
         last_applied_submitted=Max("applications__submitted")
     )
     applications = Application.objects.select_related("job_posting").prefetch_related(
-        Prefetch("company", queryset=companies)
+        Prefetch("company", queryset=companies),
+        Prefetch(
+            "emails",
+            queryset=ApplicationEmail.objects.order_by("-received_at", "-pk"),
+            to_attr="_latest_application_emails",
+        ),
     )
+    applied_applications = applications.filter(
+        submitted__isnull=False,
+        stop_reason="",
+    ).order_by("-submitted", "-pk")
+    to_apply_applications = applications.filter(
+        submitted__isnull=True,
+        stop_reason="",
+    ).order_by("-created", "-pk")
     return render(
         request,
         "app/job_applications.html",
         {
-            "to_apply_applications": applications.filter(
-                submitted__isnull=True,
-                stop_reason="",
-            ).order_by("-created", "-pk"),
-            "applied_applications": applications.filter(
-                submitted__isnull=False,
-                stop_reason="",
-            ).order_by("-submitted", "-pk"),
+            "to_apply_applications": to_apply_applications,
+            "to_apply_application_groups": (
+                (
+                    "To Apply (No Company Saved)",
+                    to_apply_applications.filter(company__isnull=True),
+                ),
+                (
+                    "To Apply (Company Saved)",
+                    to_apply_applications.filter(company__isnull=False),
+                ),
+            ),
+            "applied_applications": applied_applications,
+            "applied_application_groups": (
+                (
+                    "Applied (In Process)",
+                    applied_applications.filter(outcome=Application.Outcome.IN_PROCESS),
+                ),
+                (
+                    "Applied (Accepted)",
+                    applied_applications.filter(outcome=Application.Outcome.ACCEPTED),
+                ),
+                (
+                    "Applied (Rejected)",
+                    applied_applications.filter(outcome=Application.Outcome.REJECTED),
+                ),
+            ),
             "stopped_applications": applications.exclude(
                 stop_reason=""
             ).order_by("-created", "-pk"),
@@ -2340,6 +2440,25 @@ def application_details_view(request: Any) -> Any:
                     reverse("interview_practice_session", args=[interview_session.pk])
                 )
             show_interview_session_modal = True
+        elif "refresh_application_email_html" in request.POST:
+            application_email = application.emails.filter(
+                pk=request.POST.get("application_email_id")
+            ).first()
+            if application_email is None:
+                messages.error(request, "The selected application email was not found.")
+            else:
+                try:
+                    refreshed = refresh_application_email_html(application_email)
+                except (GmailError, GoogleAuthError) as error:
+                    messages.error(request, f"Unable to refresh the email HTML: {error}")
+                else:
+                    if refreshed:
+                        messages.success(request, "Email HTML refreshed.")
+                    else:
+                        messages.warning(request, "Gmail did not provide an HTML version for this email.")
+                return redirect(
+                    f"{reverse('application_details')}?application_id={application.pk}"
+                )
         elif "save_application_email_type" in request.POST:
             application_email = application.emails.filter(
                 pk=request.POST.get("application_email_id")
@@ -2870,11 +2989,26 @@ def job_search_view(request: Any) -> Any:
             SearchObservation.objects.create(search_path_id=current_search_path_id)
             return redirect(redirect_url)
         if complete_search_observation_id and current_search_path_id is not None:
-            SearchObservation.objects.filter(
-                pk=complete_search_observation_id,
-                search_path_id=current_search_path_id,
-                complete=False,
-            ).update(complete=True)
+            with transaction.atomic():
+                observation = (
+                    SearchObservation.objects.select_related("job_posting")
+                    .filter(
+                        pk=complete_search_observation_id,
+                        search_path_id=current_search_path_id,
+                        complete=False,
+                    )
+                    .first()
+                )
+                if observation is not None:
+                    observation.complete = True
+                    observation.save(update_fields=["complete"])
+                    if (
+                        observation.job_posting is not None
+                        and observation.job_posting.apply_to is True
+                    ):
+                        Application.objects.get_or_create(
+                            job_posting=observation.job_posting
+                        )
             return redirect(redirect_url)
         if delete_search_observation_id and current_search_path_id is not None:
             SearchObservation.objects.filter(
@@ -5265,6 +5399,9 @@ def recruiter_formset_view(request: Any) -> Any:
         if invited_recruiter_id
         else None
     )
+    invited_recruiter_first_name = (
+        invited_recruiter_name.split(maxsplit=1)[0] if invited_recruiter_name else None
+    )
     submitted_edit_form = None
     submitted_edit_recruiter_id = None
     submitted_invitation_form = None
@@ -5571,6 +5708,7 @@ def recruiter_formset_view(request: Any) -> Any:
             "show_add_connection_modal": show_add_connection_modal,
             "connection_conflict_message": connection_conflict_message,
             "invited_recruiter_name": invited_recruiter_name,
+            "invited_recruiter_first_name": invited_recruiter_first_name,
         },
     )
 

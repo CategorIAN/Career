@@ -34,6 +34,41 @@ def _wait_parts(wait_value: Any) -> Any:
     return months, weeks, days
 
 
+class SearchObservationStatisticsMixin:
+    """Provide SearchObservation statistics for SearchPath sources."""
+
+    def _observation_queryset(self) -> Any:
+        """Return observations associated with this object's SearchPaths."""
+        return SearchObservation.objects.filter(search_path__in=self.search_paths.all())
+
+    @property
+    def completed_observations(self) -> Any:
+        """Return completed observations excluding expired job postings."""
+        return self._observation_queryset().filter(
+            complete=True,
+        ).exclude(
+            job_posting__expired=True,
+        )
+
+    @property
+    def observation_count(self) -> Any:
+        """Return the number of completed, non-expired observations."""
+        return self.completed_observations.count()
+
+    @property
+    def success_count(self) -> Any:
+        """Return completed observations whose calculated success is true."""
+        return sum(
+            observation.success is True
+            for observation in self.completed_observations
+        )
+
+    @property
+    def success_probability(self) -> Any:
+        """Return the Laplace-smoothed probability of a successful observation."""
+        return (self.success_count + 1) / (self.observation_count + 2)
+
+
 class Skill(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -226,7 +261,7 @@ class Address(models.Model):
         return f"{self.street_1}, {self.city}"
 
 
-class Company(models.Model):
+class Company(SearchObservationStatisticsMixin, models.Model):
     name = models.CharField(max_length=200)
 
     address = models.ForeignKey(
@@ -710,7 +745,7 @@ class ProfileSetting(models.Model):
         return self.key
 
 
-class Platform(models.Model):
+class Platform(SearchObservationStatisticsMixin, models.Model):
     name = models.CharField(
         max_length=100,
         unique=True,
@@ -1322,7 +1357,7 @@ class Direction(models.Model):
         return self.description
 
 
-class SearchTerm(models.Model):
+class SearchTerm(SearchObservationStatisticsMixin, models.Model):
     """
     The literal text entered into a job search.
 
@@ -1341,7 +1376,7 @@ class SearchTerm(models.Model):
         return self.term
 
 
-class SearchPath(models.Model):
+class SearchPath(SearchObservationStatisticsMixin, models.Model):
     """
     A reusable method of searching for jobs.
 
@@ -1406,32 +1441,9 @@ class SearchPath(models.Model):
             ),
         ]
 
-    @property
-    def completed_observations(self) -> Any:
-        """Executes this callable."""
-        return self.observations.filter(
-            complete=True,
-        ).exclude(
-            job_posting__expired=True,
-        )
-
-    @property
-    def observation_count(self) -> Any:
-        """Executes this callable."""
-        return self.completed_observations.count()
-
-    @property
-    def success_count(self) -> Any:
-        """Executes this callable."""
-        return sum(
-            observation.success is True
-            for observation in self.completed_observations
-        )
-
-    @property
-    def success_probability(self) -> Any:
-        """Executes this callable."""
-        return (self.success_count + 1) / (self.observation_count + 2)
+    def _observation_queryset(self) -> Any:
+        """Return observations directly associated with this SearchPath."""
+        return self.observations.all()
 
     @property
     def alpha(self) -> Any:
@@ -1706,6 +1718,35 @@ class Application(models.Model):
         """Executes this callable."""
         return bool(self.stop_reason)
 
+    @property
+    def latest_email(self) -> Any:
+        """Return this application's newest email by received time and primary key."""
+        prefetched_emails = getattr(self, "_latest_application_emails", None)
+        if prefetched_emails is not None:
+            return prefetched_emails[0] if prefetched_emails else None
+        return self.emails.order_by("-received_at", "-pk").first()
+
+    @property
+    def last_email_type(self) -> Any:
+        """Return the email type from the newest associated email, if any."""
+        latest_email = self.latest_email
+        return latest_email.email_type if latest_email is not None else None
+
+    @property
+    def last_email_type_display(self) -> str:
+        """Return the human-readable newest email type or a no-email label."""
+        latest_email = self.latest_email
+        return latest_email.get_email_type_display() if latest_email else "No emails"
+
+    @property
+    def has_email_outcome_discrepancy(self) -> bool:
+        """Return whether the newest outcome email conflicts with the stored outcome."""
+        if self.last_email_type == ApplicationEmail.EmailType.ACCEPTED:
+            return self.outcome != self.Outcome.ACCEPTED
+        if self.last_email_type == ApplicationEmail.EmailType.REJECTED:
+            return self.outcome != self.Outcome.REJECTED
+        return False
+
     def __str__(self) -> Any:
         """Returns the display representation."""
         return f"Application — {self.job_posting}"
@@ -1765,6 +1806,8 @@ class ApplicationEmail(models.Model):
     received_at = models.DateTimeField()
 
     body = models.TextField(blank=True)
+
+    html_body = models.TextField(blank=True)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Saves the instance."""

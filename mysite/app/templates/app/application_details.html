@@ -274,6 +274,13 @@
         white-space: pre-wrap;
     }
 
+    .application-email-modal-html {
+        width: 100%;
+        min-height: 28rem;
+        max-height: 60vh;
+        border: 1px solid #bbb;
+    }
+
     @media (max-width: 600px) {
         .application-details-header {
             flex-wrap: wrap;
@@ -448,9 +455,11 @@
                                             <button
                                                 type="button"
                                                 class="open-application-email"
+                                                data-application-email-id="{{ application_email.pk }}"
                                                 data-subject="{{ application_email.subject|escape }}"
                                                 data-sender="{{ application_email.sender|escape }}"
                                                 data-body="{{ application_email.body|escape }}"
+                                                data-html-body="{{ application_email.html_body|escape }}"
                                             >{{ application_email.received_at|date:"M j, Y, g:i A" }}</button>
                                         </td>
                                         <td>
@@ -570,6 +579,18 @@
         <button id="application-email-modal-close" class="application-review-modal-close" type="button" aria-label="Close">&times;</button>
         <h2 id="application-email-modal-title"></h2>
         <p id="application-email-modal-sender"></p>
+        <form id="application-email-html-refresh-form" method="post">
+            {% csrf_token %}
+            <input id="application-email-html-refresh-id" type="hidden" name="application_email_id">
+            <button type="submit" name="refresh_application_email_html" value="1">Refresh HTML</button>
+        </form>
+        <iframe
+            id="application-email-modal-html"
+            class="application-email-modal-html"
+            title="HTML email content"
+            sandbox
+            hidden
+        ></iframe>
         <div id="application-email-modal-body" class="application-review-content"></div>
     </div>
 </div>
@@ -609,6 +630,8 @@
         const emailModalTitle = document.getElementById("application-email-modal-title");
         const emailModalSender = document.getElementById("application-email-modal-sender");
         const emailModalBody = document.getElementById("application-email-modal-body");
+        const emailModalHtml = document.getElementById("application-email-modal-html");
+        const emailModalRefreshId = document.getElementById("application-email-html-refresh-id");
         const portfolioModal = document.getElementById("application-portfolio-modal");
         const portfolioModalTitle = document.getElementById("application-portfolio-modal-title");
         const portfolioFrame = document.getElementById("application-portfolio-frame");
@@ -644,6 +667,9 @@
             .replace(/(<li>.*?<\/li>)+/g, match => `<ul>${match}</ul>`);
         const closeModal = modal => {
             modal.classList.add("hidden");
+            if (modal === emailModal) {
+                emailModalHtml.srcdoc = "";
+            }
             document.body.classList.remove("modal-open");
         };
         const openModal = modal => {
@@ -729,7 +755,16 @@
             button.addEventListener("click", () => {
                 emailModalTitle.textContent = button.dataset.subject || "(No subject)";
                 emailModalSender.textContent = button.dataset.sender;
-                emailModalBody.textContent = button.dataset.body || "No saved email body is available.";
+                emailModalRefreshId.value = button.dataset.applicationEmailId;
+                if (button.dataset.htmlBody) {
+                    emailModalHtml.srcdoc = button.dataset.htmlBody;
+                    emailModalHtml.hidden = false;
+                    emailModalBody.hidden = true;
+                } else {
+                    emailModalBody.textContent = button.dataset.body || "No saved email body is available.";
+                    emailModalBody.hidden = false;
+                    emailModalHtml.hidden = true;
+                }
                 openModal(emailModal);
             });
         });

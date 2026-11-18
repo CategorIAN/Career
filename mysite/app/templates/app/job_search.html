@@ -131,6 +131,7 @@
                                     data-observation-id="{{ observation.pk }}"
                                     aria-label="Show description for {{ observation.job_posting }}"
                                     aria-controls="job-posting-description-preview"
+                                    {% if forloop.first %}checked{% endif %}
                                 >
                             {% endif %}
                         </td>
@@ -360,6 +361,12 @@
                 descriptionPreview.hidden = false;
             });
         });
+        const defaultDescriptionToggle = document.querySelector(
+            ".job-posting-description-toggle:checked"
+        );
+        if (defaultDescriptionToggle) {
+            defaultDescriptionToggle.dispatchEvent(new Event("change"));
+        }
         applyToSelect.addEventListener("change", () => applyToForm.submit());
         aiExplanationButton.addEventListener("click", () => {
             aiExplanationPanel.classList.add("open");

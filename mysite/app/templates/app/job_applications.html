@@ -20,6 +20,11 @@
         cursor: pointer;
     }
 
+    .job-application-card-outcome-discrepancy {
+        border: 2px solid #c58a00;
+        background: #fff8e1;
+    }
+
     .job-application-card h3 {
         margin: 0 0 0.5rem;
     }
@@ -200,12 +205,14 @@
 <section class="utility-page">
     <h1>Job Applications</h1>
 
-    <section class="job-application-group" aria-labelledby="to-apply-heading">
-        <h2 id="to-apply-heading">To Apply</h2>
+    {% for heading, to_apply_applications in to_apply_application_groups %}
+    {% if to_apply_applications %}
+    <section class="job-application-group" aria-labelledby="{{ heading|slugify }}-heading">
+        <h2 id="{{ heading|slugify }}-heading">{{ heading }}</h2>
         <div class="job-application-card-grid">
             {% for application in to_apply_applications %}
                 <article
-                    class="utility-card job-application-card open-application-detail"
+                    class="utility-card job-application-card open-application-detail{% if application.has_email_outcome_discrepancy %} job-application-card-outcome-discrepancy{% endif %}"
                     role="button"
                     tabindex="0"
                     data-application-id="{{ application.pk }}"
@@ -220,22 +227,25 @@
                     <h3>{{ application.job_posting.title }}</h3>
                     <p>{{ application.job_posting.company_name }}</p>
                     <p class="job-application-date">{{ application.created|date:"M j, Y, g:i A" }}</p>
+                    <p>Latest email: {{ application.last_email_type_display }}</p>
                     {% if application.stop_reason %}
                         <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
                     {% endif %}
                 </article>
-            {% empty %}
-                <p>No applications are waiting to be submitted.</p>
             {% endfor %}
         </div>
     </section>
+    {% endif %}
+    {% endfor %}
 
-    <section class="job-application-group" aria-labelledby="applied-heading">
-        <h2 id="applied-heading">Applied</h2>
-        <div class="job-application-card-grid">
-            {% for application in applied_applications %}
+    {% for heading, applied_applications in applied_application_groups %}
+        {% if applied_applications %}
+        <section class="job-application-group" aria-labelledby="{{ heading|slugify }}-heading">
+            <h2 id="{{ heading|slugify }}-heading">{{ heading }}</h2>
+            <div class="job-application-card-grid">
+                {% for application in applied_applications %}
                 <article
-                    class="utility-card job-application-card open-application-detail"
+                    class="utility-card job-application-card open-application-detail{% if application.has_email_outcome_discrepancy %} job-application-card-outcome-discrepancy{% endif %}"
                     role="button"
                     tabindex="0"
                     data-application-id="{{ application.pk }}"
@@ -250,22 +260,24 @@
                     <h3>{{ application.job_posting.title }}</h3>
                     <p>{{ application.job_posting.company_name }}</p>
                     <p class="job-application-date">Submitted: {{ application.submitted|date:"M j, Y, g:i A" }}</p>
+                    <p>Latest email: {{ application.last_email_type_display }}</p>
                     {% if application.stop_reason %}
                         <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
                     {% endif %}
                 </article>
-            {% empty %}
-                <p>No applications have been submitted.</p>
-            {% endfor %}
-        </div>
-    </section>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    {% endfor %}
 
+    {% if stopped_applications %}
     <section class="job-application-group" aria-labelledby="stopped-heading">
         <h2 id="stopped-heading">Stopped</h2>
         <div class="job-application-card-grid">
             {% for application in stopped_applications %}
                 <article
-                    class="utility-card job-application-card open-application-detail"
+                    class="utility-card job-application-card open-application-detail{% if application.has_email_outcome_discrepancy %} job-application-card-outcome-discrepancy{% endif %}"
                     role="button"
                     tabindex="0"
                     data-application-id="{{ application.pk }}"
@@ -280,15 +292,15 @@
                     <h3>{{ application.job_posting.title }}</h3>
                     <p>{{ application.job_posting.company_name }}</p>
                     <p class="job-application-date">{{ application.created|date:"M j, Y, g:i A" }}</p>
+                    <p>Latest email: {{ application.last_email_type_display }}</p>
                     {% if application.stop_reason %}
                         <span class="job-application-stop-reason">{{ application.get_stop_reason_display }}</span>
                     {% endif %}
                 </article>
-            {% empty %}
-                <p>No applications have been stopped.</p>
             {% endfor %}
         </div>
     </section>
+    {% endif %}
 </section>
 
 <div

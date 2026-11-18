@@ -67,6 +67,13 @@
         white-space: pre-wrap;
     }
 
+    .email-preview-modal-html {
+        width: 100%;
+        min-height: 28rem;
+        max-height: 60vh;
+        border: 1px solid #bbb;
+    }
+
     .email-assigned-status {
         color: #35682d;
         font-weight: 600;
@@ -209,6 +216,7 @@
                             data-subject="{{ email.subject|escape }}"
                             data-sender="{{ email.sender|escape }}"
                             data-body="{{ email.body|escape }}"
+                            data-html-body="{{ email.html_body|escape }}"
                         >{{ email.preview|default:"No preview available." }}</button>
                     </td>
                     <td>{{ email.received_at|date:"M j, Y, g:i A" }}</td>
@@ -250,6 +258,13 @@
         <button id="email-preview-modal-close" class="email-assignment-panel-close" type="button" aria-label="Close">&times;</button>
         <h2 id="email-preview-modal-title"></h2>
         <p id="email-preview-modal-sender"></p>
+        <iframe
+            id="email-preview-modal-html"
+            class="email-preview-modal-html"
+            title="HTML email preview"
+            sandbox
+            hidden
+        ></iframe>
         <div id="email-preview-modal-body" class="email-preview-modal-body"></div>
     </div>
 </div>
@@ -266,11 +281,12 @@
         const previewModalTitle = document.getElementById("email-preview-modal-title");
         const previewModalSender = document.getElementById("email-preview-modal-sender");
         const previewModalBody = document.getElementById("email-preview-modal-body");
+        const previewModalHtml = document.getElementById("email-preview-modal-html");
         const csrfToken = document.querySelector(
             "#emails-csrf-form input[name=csrfmiddlewaretoken]"
         ).value;
         const emailTypeChoices = JSON.parse(document.getElementById("email-type-choices").textContent);
-        const pageToken = "{{ page_token|escapejs }}";
+        const pageToken = "{{ page_token|default_if_none:''|escapejs }}";
         const optionsUrlTemplate = "{% url 'email_application_options' '__message_id__' %}";
 
         const closePanel = () => {
@@ -280,6 +296,7 @@
 
         const closePreviewModal = () => {
             previewModal.classList.add("hidden");
+            previewModalHtml.srcdoc = "";
             document.body.classList.remove("modal-open");
         };
 
@@ -393,7 +410,15 @@
                 event.stopPropagation();
                 previewModalTitle.textContent = button.dataset.subject || "(No subject)";
                 previewModalSender.textContent = button.dataset.sender;
-                previewModalBody.textContent = button.dataset.body || "No email body is available.";
+                if (button.dataset.htmlBody) {
+                    previewModalHtml.srcdoc = button.dataset.htmlBody;
+                    previewModalHtml.hidden = false;
+                    previewModalBody.hidden = true;
+                } else {
+                    previewModalBody.textContent = button.dataset.body || "No email body is available.";
+                    previewModalBody.hidden = false;
+                    previewModalHtml.hidden = true;
+                }
                 previewModal.classList.remove("hidden");
                 document.body.classList.add("modal-open");
             });

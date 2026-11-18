@@ -234,40 +234,50 @@
         {% endfor %}
     {% endif %}
 
+    {% if undecided_job_postings %}
     <section class="job-posting-group" aria-labelledby="undecided-heading">
         <h2 id="undecided-heading">Apply To: Not Set</h2>
         <div class="job-posting-card-grid">
             {% include "app/includes/job_posting_cards.html" with job_postings=undecided_job_postings empty_message="No undecided job postings." %}
         </div>
     </section>
+    {% endif %}
 
+    {% if apply_without_application_job_postings %}
     <section class="job-posting-group" aria-labelledby="apply-without-application-heading">
         <h2 id="apply-without-application-heading">Apply To: Yes — No Application</h2>
         <div class="job-posting-card-grid" data-apply-to="true">
             {% include "app/includes/job_posting_cards.html" with job_postings=apply_without_application_job_postings empty_message="No job postings awaiting an application." %}
         </div>
     </section>
+    {% endif %}
 
+    {% if apply_in_progress_job_postings %}
     <section class="job-posting-group" aria-labelledby="apply-in-progress-heading">
         <h2 id="apply-in-progress-heading">Apply To: Yes -- Application in Progress</h2>
         <div class="job-posting-card-grid" data-apply-to="true">
             {% include "app/includes/job_posting_cards.html" with job_postings=apply_in_progress_job_postings empty_message="No applications in progress." %}
         </div>
     </section>
+    {% endif %}
 
+    {% if applied_job_postings %}
     <section class="job-posting-group" aria-labelledby="applied-heading">
         <h2 id="applied-heading">Apply To: Yes — Application Submitted</h2>
         <div class="job-posting-card-grid" data-apply-to="true">
             {% include "app/includes/job_posting_cards.html" with job_postings=applied_job_postings empty_message="No submitted applications." %}
         </div>
     </section>
+    {% endif %}
 
+    {% if do_not_apply_job_postings %}
     <section class="job-posting-group" aria-labelledby="do-not-apply-heading">
         <h2 id="do-not-apply-heading">Apply To: No</h2>
         <div class="job-posting-card-grid" data-apply-to="false">
             {% include "app/includes/job_posting_cards.html" with job_postings=do_not_apply_job_postings empty_message="No job postings marked not to apply to." %}
         </div>
     </section>
+    {% endif %}
 </section>
 
 <div id="add-job-posting-modal" class="modal{% if not show_add_job_posting_modal %} hidden{% endif %}" role="dialog" aria-modal="true" aria-labelledby="add-job-posting-title">

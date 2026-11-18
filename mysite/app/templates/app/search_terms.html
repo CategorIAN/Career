@@ -14,6 +14,9 @@
             <tr>
                 <th>Term</th>
                 <th>Active</th>
+                <th>Observation Count</th>
+                <th>Success Count</th>
+                <th>Success Probability</th>
                 <th>Edit</th>
             </tr>
         </thead>
@@ -22,10 +25,13 @@
                 <tr>
                     <td>{{ search_term.term }}</td>
                     <td>{{ search_term.active|yesno:"Yes,No" }}</td>
+                    <td>{{ search_term.observation_count }}</td>
+                    <td>{{ search_term.success_count }}</td>
+                    <td>{{ search_term.success_probability|floatformat:2 }}</td>
                     <td><button type="button" class="copy-button open-edit-search-term-modal" data-target="edit-search-term-modal-{{ search_term.pk }}">Edit</button></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="3">No search terms found.</td></tr>
+                <tr><td colspan="6">No search terms found.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -39,6 +45,35 @@
             <a href="?page={{ page_obj.next_page_number }}" aria-label="Next search term">&rarr;</a>
         {% endif %}
     </nav>
+
+    <form method="get" style="margin-top: 1rem;">
+        <label for="search-term-search">Search Search Term</label>
+        <input
+            id="search-term-search"
+            type="text"
+            list="search-term-search-options"
+            value="{% if searched_search_term %}{{ searched_search_term.term }} ({{ searched_search_term.success_probability|floatformat:2 }}){% endif %}"
+            autocomplete="new-password"
+            class="autofill-blocked"
+            data-form-type="other"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            data-dashlane-ignore="true"
+            data-dashlane-autofill="false"
+            data-dashlane-disabled-on-field="true"
+            readonly
+            style="width: 20rem;"
+        >
+        <datalist id="search-term-search-options">
+            {% for search_term in all_search_terms %}
+                <option value="{{ search_term.term }} ({{ search_term.success_probability|floatformat:2 }})" data-search-term-id="{{ search_term.pk }}"></option>
+            {% endfor %}
+        </datalist>
+        <input id="search-term-id-input" type="hidden" name="search_term_id" value="{% if searched_search_term %}{{ searched_search_term.pk }}{% endif %}">
+        <button type="submit">Search</button>
+        <button type="button" onclick="window.location.href='{% url 'search_terms' %}'">Clear</button>
+    </form>
 
     {% if selected_search_term %}
         <section style="margin-top: 1.5rem;">
@@ -160,6 +195,30 @@
                 if (event.target === modal) closeModal(modal);
             });
         });
+
+        const searchInput = document.getElementById("search-term-search");
+        const searchTermIdInput = document.getElementById("search-term-id-input");
+        const searchTermOptions = document.querySelectorAll("#search-term-search-options option");
+        const searchTermIdByTerm = new Map();
+        searchTermOptions.forEach(option => {
+            if (!searchTermIdByTerm.has(option.value)) {
+                searchTermIdByTerm.set(option.value, option.dataset.searchTermId || "");
+            }
+        });
+
+        const syncSearchTermId = () => {
+            searchTermIdInput.value = searchTermIdByTerm.get(searchInput.value) || "";
+        };
+
+        searchInput.addEventListener("input", syncSearchTermId);
+        searchInput.addEventListener("change", syncSearchTermId);
+        searchInput.form.addEventListener("submit", () => {
+            syncSearchTermId();
+            if (!searchTermIdInput.value) {
+                searchTermIdInput.disabled = true;
+            }
+        });
+        window.setTimeout(() => searchInput.removeAttribute("readonly"), 100);
     });
 </script>
 

@@ -84,6 +84,9 @@
                 <th>Name</th>
                 <th>URL</th>
                 <th>Job Search Enabled</th>
+                <th>Observation Count</th>
+                <th>Success Count</th>
+                <th>Success Probability</th>
                 <th>Delete</th>
                 <th>Save</th>
             </tr>
@@ -106,6 +109,9 @@
                         {{ form.job_search_enabled.errors }}
                         {{ form.job_search_enabled }}
                     </td>
+                    <td>{{ form.instance.observation_count }}</td>
+                    <td>{{ form.instance.success_count }}</td>
+                    <td>{{ form.instance.success_probability|floatformat:2 }}</td>
                     <td>
                         <button type="submit" name="delete_platform" value="{{ form.instance.pk }}">Delete</button>
                     </td>
@@ -149,6 +155,34 @@
         <a href="?page={{ page_obj.next_page_number }}" aria-label="Next platform">&rarr;</a>
     {% endif %}
 </div>
+<form method="get" style="margin-top: 1rem;">
+    <label for="platform-search">Search Platform</label>
+    <input
+        id="platform-search"
+        type="text"
+        list="platform-search-options"
+        value="{% if searched_platform %}{{ searched_platform.name }} ({{ searched_platform.success_probability|floatformat:2 }}){% endif %}"
+        autocomplete="new-password"
+        class="autofill-blocked"
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore="true"
+        data-bwignore="true"
+        data-dashlane-ignore="true"
+        data-dashlane-autofill="false"
+        data-dashlane-disabled-on-field="true"
+        readonly
+        style="width: 20rem;"
+    >
+    <datalist id="platform-search-options">
+        {% for platform in all_platforms %}
+            <option value="{{ platform.name }} ({{ platform.success_probability|floatformat:2 }})" data-platform-id="{{ platform.pk }}"></option>
+        {% endfor %}
+    </datalist>
+    <input id="platform-id-input" type="hidden" name="platform_id" value="{% if searched_platform %}{{ searched_platform.pk }}{% endif %}">
+    <button type="submit">Search</button>
+    <button type="button" onclick="window.location.href='{% url 'platforms' %}'">Clear</button>
+</form>
 {% if selected_platform %}
     <section style="margin-top: 1.5rem;">
         <h2>Job Search Paths</h2>
@@ -241,7 +275,7 @@
         });
 
         window.setTimeout(() => {
-            modal.querySelectorAll(".autofill-blocked").forEach(input => {
+            document.querySelectorAll(".autofill-blocked").forEach(input => {
                 input.removeAttribute("readonly");
             });
         });
@@ -271,6 +305,35 @@
         document.addEventListener("keydown", event => {
             if (event.key === "Escape") {
                 modals.forEach(closeModal);
+            }
+        });
+    })();
+
+    (() => {
+        const searchInput = document.getElementById("platform-search");
+        const platformIdInput = document.getElementById("platform-id-input");
+        const platformOptions = document.querySelectorAll("#platform-search-options option");
+        if (!searchInput || !platformIdInput) {
+            return;
+        }
+
+        const platformIdByName = new Map();
+        platformOptions.forEach(option => {
+            if (!platformIdByName.has(option.value)) {
+                platformIdByName.set(option.value, option.dataset.platformId || "");
+            }
+        });
+
+        const syncPlatformId = () => {
+            platformIdInput.value = platformIdByName.get(searchInput.value) || "";
+        };
+
+        searchInput.addEventListener("input", syncPlatformId);
+        searchInput.addEventListener("change", syncPlatformId);
+        searchInput.form.addEventListener("submit", () => {
+            syncPlatformId();
+            if (!platformIdInput.value) {
+                platformIdInput.disabled = true;
             }
         });
     })();

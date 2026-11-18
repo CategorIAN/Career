@@ -82,6 +82,7 @@ from .services.gmail import (
     remove_labels,
     search_emails,
 )
+from .services.application_emails import refresh_application_email_html
 from .services.google_auth import SCOPES, _missing_scopes, get_google_credentials
 from .services.candidate_background import build_candidate_background
 from .services.cover_letter import (
@@ -3084,7 +3085,7 @@ class PlatformPageTests(TestCase):
         self.assertEqual(first_page.status_code, 200)
         self.assertEqual(first_page.context["page_obj"].paginator.per_page, 1)
         self.assertContains(first_page, first_platform.name)
-        self.assertNotContains(first_page, second_platform.name)
+        self.assertEqual(first_page.context["selected_platform"], first_platform)
         self.assertContains(first_page, "Platform 1 of 2")
         self.assertContains(
             first_page,
@@ -3095,13 +3096,42 @@ class PlatformPageTests(TestCase):
         second_page = self.client.get(reverse("platforms"), {"page": 2})
 
         self.assertContains(second_page, second_platform.name)
-        self.assertNotContains(second_page, first_platform.name)
+        self.assertEqual(second_page.context["selected_platform"], second_platform)
         self.assertContains(second_page, "Platform 2 of 2")
         self.assertContains(
             second_page,
             f'?page=1\" aria-label="Previous platform"',
             html=False,
         )
+
+    def test_platform_search_form_selects_a_platform_from_the_filtered_datalist(self) -> None:
+        """Verifies the platform search form selects the requested platform."""
+        first_platform = Platform.objects.create(name="Alpha Platform")
+        selected_platform = Platform.objects.create(name="Beta Platform")
+
+        default_response = self.client.get(reverse("platforms"))
+        response = self.client.get(
+            reverse("platforms"),
+            {"platform_id": selected_platform.pk},
+        )
+
+        self.assertIsNone(default_response.context["searched_platform"])
+        self.assertContains(
+            default_response,
+            'id="platform-search"\n        type="text"\n        list="platform-search-options"\n        value=""',
+            html=False,
+        )
+        self.assertContains(response, "Search Platform")
+        self.assertContains(response, 'id="platform-search"', html=False)
+        self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
+        self.assertContains(response, 'autocomplete="new-password"', html=False)
+        self.assertContains(
+            response,
+            f'<option value="{selected_platform.name} (0.50)" data-platform-id="{selected_platform.pk}">',
+            html=False,
+        )
+        self.assertEqual(response.context["selected_platform"], selected_platform)
+        self.assertNotEqual(response.context["selected_platform"], first_platform)
 
     def test_platforms_page_shows_add_delete_column_and_buttons(self) -> None:
         """Verifies the expected behavior."""
@@ -3118,6 +3148,9 @@ class PlatformPageTests(TestCase):
         self.assertContains(response, "Delete")
         self.assertContains(response, "<th>Save</th>", html=False)
         self.assertContains(response, "Job Search Enabled")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
+        self.assertContains(response, "Success Probability")
         self.assertNotContains(response, "Max Skills")
         self.assertContains(response, 'name="form-0-job_search_enabled"', html=False)
         self.assertContains(response, 'id="open-add-platform-modal"', html=False)
@@ -4507,7 +4540,8 @@ class ProfessionalPageTests(TestCase):
             html=False,
         )
         self.assertContains(response, 'id="professional-invite-message"', html=False)
-        self.assertContains(response, "Hello Ada Lovelace.")
+        self.assertContains(response, "Hello Ada.")
+        self.assertNotContains(response, "Hello Ada Lovelace.")
         self.assertContains(
             response,
             "I have a Master's in Data Science, and I am currently looking for data engineering and software engineering roles focused in Python and SQL.",
@@ -4598,7 +4632,7 @@ class CompanyPageTests(TestCase):
         second_page = self.client.get(reverse("companies"), {"page": 2})
 
         self.assertContains(first_page, "Company 01")
-        self.assertNotContains(first_page, "Company 02")
+        self.assertEqual(first_page.context["selected_company"].name, "Company 01")
         self.assertContains(first_page, "Company 1 of 11")
         self.assertContains(
             first_page,
@@ -4606,7 +4640,7 @@ class CompanyPageTests(TestCase):
             html=False,
         )
         self.assertContains(second_page, "Company 02")
-        self.assertNotContains(second_page, "Company 01")
+        self.assertEqual(second_page.context["selected_company"].name, "Company 02")
         self.assertContains(second_page, "Company 2 of 11")
         self.assertContains(
             second_page,
@@ -4636,6 +4670,9 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, company.phone)
         self.assertContains(response, "Job Search")
         self.assertContains(response, "Search Terms")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
+        self.assertContains(response, "Success Probability")
         self.assertContains(response, "Yes")
         self.assertContains(response, "Job Search Paths")
 
@@ -4835,7 +4872,7 @@ class CompanyPageTests(TestCase):
         self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
         self.assertContains(
             response,
-            f'<option value="{selected_company.name}" data-company-id="{selected_company.pk}">',
+            f'<option value="{selected_company.name} (0.50)" data-company-id="{selected_company.pk}">',
             html=False,
         )
         self.assertEqual(response.context["selected_company"], selected_company)
@@ -4863,15 +4900,46 @@ class SearchTermsPageTests(TestCase):
         self.assertContains(response, 'id="open-add-search-term-modal"', html=False)
         self.assertContains(response, "Search Term 1 of 2")
         self.assertContains(response, "Data Engineer")
-        self.assertNotContains(response, "Python")
+        self.assertEqual(response.context["selected_search_term"].term, "Data Engineer")
         self.assertContains(response, "Yes")
+        self.assertContains(response, "Observation Count")
+        self.assertContains(response, "Success Count")
+        self.assertContains(response, "Success Probability")
 
         second_page_response = self.client.get(f"{reverse('search_terms')}?page=2")
 
         self.assertContains(second_page_response, "Search Term 2 of 2")
         self.assertContains(second_page_response, "Python")
-        self.assertNotContains(second_page_response, "Data Engineer")
+        self.assertEqual(second_page_response.context["selected_search_term"].term, "Python")
         self.assertContains(second_page_response, "No")
+
+    def test_search_search_term_form_selects_term_from_filtered_datalist(self) -> None:
+        """Verifies the search form selects the requested search term."""
+        first_search_term = SearchTerm.objects.create(term="Data Engineer")
+        selected_search_term = SearchTerm.objects.create(term="Python")
+
+        default_response = self.client.get(reverse("search_terms"))
+        response = self.client.get(
+            reverse("search_terms"),
+            {"search_term_id": selected_search_term.pk},
+        )
+
+        self.assertIsNone(default_response.context["searched_search_term"])
+        self.assertContains(
+            default_response,
+            'id="search-term-search"\n            type="text"\n            list="search-term-search-options"\n            value=""',
+            html=False,
+        )
+        self.assertContains(response, "Search Search Term")
+        self.assertContains(response, 'data-dashlane-ignore="true"', html=False)
+        self.assertContains(response, 'autocomplete="new-password"', html=False)
+        self.assertContains(
+            response,
+            f'<option value="{selected_search_term.term} (0.50)" data-search-term-id="{selected_search_term.pk}">',
+            html=False,
+        )
+        self.assertEqual(response.context["selected_search_term"], selected_search_term)
+        self.assertNotEqual(response.context["selected_search_term"], first_search_term)
 
     def test_search_terms_page_creates_and_edits_search_term(self) -> None:
         """Verifies the expected behavior."""
@@ -5250,6 +5318,128 @@ class SearchTermSearchPathServiceTests(TestCase):
         self.assertEqual(SearchPath.objects.filter(search_term=search_term).count(), 2)
 
 
+class SearchObservationStatisticsTests(TestCase):
+    def test_source_statistics_aggregate_completed_non_expired_observations(self) -> None:
+        """Verifies source statistics aggregate paths before calculating probability."""
+        platform = Platform.objects.create(name="Example Platform")
+        company = Company.objects.create(name="Example Company")
+        search_term = SearchTerm.objects.create(term="Python")
+        platform_path = SearchPath.objects.create(platform=platform, search_term=search_term)
+        company_path = SearchPath.objects.create(company=company, search_term=search_term)
+        unrelated_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Other Platform"),
+            search_term=SearchTerm.objects.create(term="SQL"),
+        )
+        successful_posting = JobPosting.objects.create(
+            title="Successful Role",
+            company_name="Example",
+            apply_to=True,
+        )
+        unsuccessful_posting = JobPosting.objects.create(
+            title="Unsuccessful Role",
+            company_name="Example",
+            apply_to=False,
+        )
+        expired_posting = JobPosting.objects.create(
+            title="Expired Role",
+            company_name="Example",
+            expired=True,
+        )
+        SearchObservation.objects.create(
+            search_path=platform_path,
+            job_posting=successful_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=platform_path,
+            job_posting=unsuccessful_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=platform_path,
+            job_posting=expired_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(search_path=platform_path, complete=False)
+        SearchObservation.objects.create(
+            search_path=company_path,
+            job_posting=successful_posting,
+            complete=True,
+        )
+        SearchObservation.objects.create(
+            search_path=unrelated_path,
+            job_posting=successful_posting,
+            complete=True,
+        )
+
+        self.assertEqual(platform.observation_count, 2)
+        self.assertEqual(platform.success_count, 1)
+        self.assertEqual(platform.success_probability, 0.5)
+        self.assertEqual(company.observation_count, 1)
+        self.assertEqual(company.success_count, 1)
+        self.assertEqual(company.success_probability, 2 / 3)
+        self.assertEqual(search_term.observation_count, 3)
+        self.assertEqual(search_term.success_count, 2)
+        self.assertEqual(search_term.success_probability, 3 / 5)
+        self.assertEqual(platform_path.observation_count, 2)
+        self.assertEqual(platform_path.success_count, 1)
+        self.assertEqual(platform_path.success_probability, 0.5)
+
+    def test_source_statistics_use_laplace_smoothing_without_observations(self) -> None:
+        """Verifies empty sources use the same smoothed probability as SearchPaths."""
+        platform = Platform.objects.create(name="Empty Platform")
+        company = Company.objects.create(name="Empty Company")
+        search_term = SearchTerm.objects.create(term="Empty Term")
+
+        for source in (platform, company, search_term):
+            self.assertEqual(source.observation_count, 0)
+            self.assertEqual(source.success_count, 0)
+            self.assertEqual(source.success_probability, 0.5)
+
+
+class SourcePageSuccessProbabilityOrderingTests(TestCase):
+    def setUp(self) -> None:
+        """Signs in as the Career administrator for source management pages."""
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
+    def test_source_pages_sort_by_success_probability_descending(self) -> None:
+        """Verifies Platform, Company, and Search Term pages prioritize higher probability."""
+        platform_low = Platform.objects.create(name="Alpha Platform")
+        platform_high = Platform.objects.create(name="Beta Platform")
+        company_low = Company.objects.create(name="Alpha Company")
+        company_high = Company.objects.create(name="Beta Company")
+        term_low = SearchTerm.objects.create(term="Django")
+        term_high = SearchTerm.objects.create(term="Python")
+        successful_posting = JobPosting.objects.create(
+            title="Successful Role",
+            company_name="Example",
+            apply_to=True,
+        )
+        for search_path in (
+            SearchPath.objects.create(platform=platform_high, search_term=term_high),
+            SearchPath.objects.create(company=company_high, search_term=term_high),
+        ):
+            SearchObservation.objects.create(
+                search_path=search_path,
+                job_posting=successful_posting,
+                complete=True,
+            )
+        SearchPath.objects.create(platform=platform_low, search_term=term_low)
+        SearchPath.objects.create(company=company_low, search_term=term_low)
+
+        platforms_response = self.client.get(reverse("platforms"))
+        companies_response = self.client.get(reverse("companies"))
+        search_terms_response = self.client.get(reverse("search_terms"))
+
+        self.assertEqual(platforms_response.context["selected_platform"], platform_high)
+        self.assertEqual(companies_response.context["selected_company"], company_high)
+        self.assertEqual(search_terms_response.context["selected_search_term"], term_high)
+
+
 class JobPostingsPageTests(TestCase):
     def setUp(self) -> None:
         """Executes this callable."""
@@ -5445,6 +5635,18 @@ class JobPostingsPageTests(TestCase):
         self.assertLess(content.index("Apply In Progress"), content.index("Apply Submitted"))
         self.assertLess(content.index("Apply Submitted"), content.index("Do Not Apply"))
 
+    def test_job_postings_omits_empty_status_groups(self) -> None:
+        """Shows only status sections that contain job postings."""
+        JobPosting.objects.create(
+            title="Undecided Role",
+            company_name="Example Company",
+        )
+
+        response = self.client.get(reverse("job_postings"))
+
+        self.assertContains(response, "Apply To: Not Set")
+        self.assertEqual(response.content.decode().count('class="job-posting-group"'), 1)
+
     def test_job_postings_can_mark_a_posting_expired(self) -> None:
         """Verifies the expected behavior."""
         job_posting = JobPosting.objects.create(
@@ -5574,6 +5776,14 @@ class JobPostingsPageTests(TestCase):
         self.assertFalse(job_posting.apply_to)
 
 class JobApplicationsPageTests(TestCase):
+    def setUp(self) -> None:
+        """Authenticates as the career administrator for private application pages."""
+        administrator = get_user_model().objects.create_user(
+            username=settings.CAREER_ADMIN_USERNAME,
+            password="test-password",
+        )
+        self.client.force_login(administrator)
+
     def test_job_applications_are_grouped_and_sorted_by_submission_status(self) -> None:
         """Verifies the expected behavior."""
         to_apply_older = Application.objects.create(
@@ -5586,7 +5796,8 @@ class JobApplicationsPageTests(TestCase):
             job_posting=JobPosting.objects.create(
                 title="To Apply Newer",
                 company_name="Company B",
-            )
+            ),
+            company=Company.objects.create(name="Saved Company"),
         )
         applied_older = Application.objects.create(
             job_posting=JobPosting.objects.create(
@@ -5601,6 +5812,22 @@ class JobApplicationsPageTests(TestCase):
                 company_name="Company D",
             ),
             submitted=datetime(2026, 1, 4, tzinfo=UTC),
+        )
+        accepted_application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Applied Accepted",
+                company_name="Company Accepted",
+            ),
+            submitted=datetime(2026, 1, 5, tzinfo=UTC),
+            outcome=Application.Outcome.ACCEPTED,
+        )
+        rejected_application = Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Applied Rejected",
+                company_name="Company Rejected",
+            ),
+            submitted=datetime(2026, 1, 6, tzinfo=UTC),
+            outcome=Application.Outcome.REJECTED,
         )
         stopped_older = Application.objects.create(
             job_posting=JobPosting.objects.create(
@@ -5628,13 +5855,30 @@ class JobApplicationsPageTests(TestCase):
         Application.objects.filter(pk=stopped_newer.pk).update(
             created=datetime(2026, 1, 4, tzinfo=UTC)
         )
+        ApplicationEmail.objects.create(
+            application=applied_newer,
+            gmail_message_id="applied-newer-accepted",
+            sender="recruiter@example.com",
+            received_at=datetime(2026, 1, 5, tzinfo=UTC),
+            email_type=ApplicationEmail.EmailType.ACCEPTED,
+        )
 
         response = self.client.get(reverse("job_applications"))
 
         self.assertContains(response, "Job Applications")
-        self.assertContains(response, "To Apply")
-        self.assertContains(response, "Applied")
+        self.assertContains(response, "To Apply (No Company Saved)")
+        self.assertContains(response, "To Apply (Company Saved)")
+        self.assertContains(response, "Applied (In Process)")
+        self.assertContains(response, "Applied (Accepted)")
+        self.assertContains(response, "Applied (Rejected)")
         self.assertContains(response, "Stopped")
+        self.assertContains(response, "Latest email: Accepted")
+        self.assertContains(response, "Latest email: No emails")
+        self.assertContains(
+            response,
+            'class="utility-card job-application-card open-application-detail job-application-card-outcome-discrepancy"',
+            html=False,
+        )
         self.assertContains(response, "Application Issue")
         self.assertContains(
             response,
@@ -5646,8 +5890,26 @@ class JobApplicationsPageTests(TestCase):
             [to_apply_newer.pk, to_apply_older.pk],
         )
         self.assertEqual(
+            [
+                [application.pk for application in group]
+                for _, group in response.context["to_apply_application_groups"]
+            ],
+            [[to_apply_older.pk], [to_apply_newer.pk]],
+        )
+        self.assertEqual(
             [application.pk for application in response.context["applied_applications"]],
-            [applied_newer.pk, applied_older.pk],
+            [rejected_application.pk, accepted_application.pk, applied_newer.pk, applied_older.pk],
+        )
+        self.assertEqual(
+            [
+                [application.pk for application in group]
+                for _, group in response.context["applied_application_groups"]
+            ],
+            [
+                [applied_newer.pk, applied_older.pk],
+                [accepted_application.pk],
+                [rejected_application.pk],
+            ],
         )
         self.assertEqual(
             [application.pk for application in response.context["stopped_applications"]],
@@ -5655,7 +5917,23 @@ class JobApplicationsPageTests(TestCase):
         )
         content = response.content.decode()
         self.assertLess(content.index("To Apply Newer"), content.index("Applied Newer"))
-        self.assertLess(content.index("Applied Newer"), content.index("Stopped Newer"))
+        self.assertLess(content.index("Applied Newer"), content.index("Applied Accepted"))
+        self.assertLess(content.index("Applied Accepted"), content.index("Applied Rejected"))
+        self.assertLess(content.index("Applied Rejected"), content.index("Stopped Newer"))
+
+    def test_job_applications_omits_empty_sections(self) -> None:
+        """Shows only application groups containing at least one application."""
+        Application.objects.create(
+            job_posting=JobPosting.objects.create(
+                title="Unsubmitted Role",
+                company_name="Example Company",
+            )
+        )
+
+        response = self.client.get(reverse("job_applications"))
+
+        self.assertContains(response, "To Apply (No Company Saved)")
+        self.assertEqual(response.content.decode().count('class="job-application-group"'), 1)
 
     def test_job_application_modal_renders_description_and_saves_company(self) -> None:
         """Verifies the expected behavior."""
@@ -6081,6 +6359,40 @@ class ApplicationEmailModelTests(TestCase):
 
         self.assertEqual(application_email.direction, ApplicationEmail.Direction.OUTGOING)
 
+    def test_latest_email_type_and_outcome_discrepancy(self) -> None:
+        """Uses the newest email and highlights only outcome mismatches."""
+        self.assertIsNone(self.application.last_email_type)
+        self.assertEqual(self.application.last_email_type_display, "No emails")
+        self.assertFalse(self.application.has_email_outcome_discrepancy)
+
+        received_at = datetime(2026, 10, 7, tzinfo=UTC)
+        ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="rejected-email",
+            sender="recruiter@example.com",
+            received_at=received_at,
+            email_type=ApplicationEmail.EmailType.REJECTED,
+        )
+        ApplicationEmail.objects.create(
+            application=self.application,
+            gmail_message_id="accepted-email",
+            sender="recruiter@example.com",
+            received_at=received_at,
+            email_type=ApplicationEmail.EmailType.ACCEPTED,
+        )
+
+        self.assertEqual(
+            self.application.last_email_type,
+            ApplicationEmail.EmailType.ACCEPTED,
+        )
+        self.assertEqual(self.application.last_email_type_display, "Accepted")
+        self.assertTrue(self.application.has_email_outcome_discrepancy)
+
+        self.application.outcome = Application.Outcome.ACCEPTED
+        self.application.save(update_fields=["outcome"])
+
+        self.assertFalse(self.application.has_email_outcome_discrepancy)
+
 
 class SearchObservationSuccessTests(TestCase):
     def create_observation(self, *, complete: Any=True, job_posting: Any=None) -> Any:
@@ -6269,6 +6581,7 @@ class EmailsPageTests(TestCase):
                 "sender": "Recruiter <jobs@example.com>",
                 "subject": "New role",
                 "plain_text_body": "This is a recent opportunity.",
+                "html_body": "<p>This is a <strong>recent</strong> opportunity.</p>",
                 "received_at": datetime(2026, 10, 2, 10, 0, tzinfo=UTC),
             },
             {
@@ -6289,7 +6602,14 @@ class EmailsPageTests(TestCase):
         self.assertContains(response, "Load More Messages")
         self.assertContains(response, 'id="email-assignment-panel"', html=False)
         self.assertContains(response, 'id="email-preview-modal"', html=False)
+        self.assertContains(response, 'id="email-preview-modal-html"', html=False)
         self.assertContains(response, 'class="email-preview-button"', html=False)
+        self.assertContains(
+            response,
+            'data-html-body="&lt;p&gt;This is a &lt;strong&gt;recent&lt;/strong&gt; opportunity.&lt;/p&gt;"',
+            html=False,
+        )
+        self.assertContains(response, "previewModalHtml.srcdoc = button.dataset.htmlBody;", html=False)
         self.assertFalse(ApplicationEmail.objects.exists())
         mock_search_emails.assert_called_once_with(
             query="in:inbox",
@@ -6373,7 +6693,7 @@ class EmailsPageTests(TestCase):
             "recipients": "ian@example.com",
             "received_at": received_at,
             "plain_text_body": "Thank you for applying.",
-            "html_body": "",
+            "html_body": "<p>Thank you for <strong>applying</strong>.</p>",
         }
 
         response = self.client.post(
@@ -6387,6 +6707,7 @@ class EmailsPageTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("emails"))
+        self.assertNotIn("token=None", response["Location"])
         assigned_email = ApplicationEmail.objects.get(gmail_message_id="message-1")
         self.assertEqual(assigned_email.application, application)
         self.assertEqual(assigned_email.gmail_thread_id, "thread-1")
@@ -6394,6 +6715,10 @@ class EmailsPageTests(TestCase):
         self.assertEqual(assigned_email.recipients, "ian@example.com")
         self.assertEqual(assigned_email.received_at, received_at)
         self.assertEqual(assigned_email.body, "Thank you for applying.")
+        self.assertEqual(
+            assigned_email.html_body,
+            "<p>Thank you for <strong>applying</strong>.</p>",
+        )
         mock_get_or_create_label.assert_has_calls(
             [
                 call("Career/Companies/Example Co"),
@@ -6403,6 +6728,84 @@ class EmailsPageTests(TestCase):
         mock_apply_labels_and_archive.assert_called_once_with(
             "message-1",
             ["company-label", "type-label"],
+        )
+
+    @patch("app.views.apply_labels_and_archive")
+    @patch("app.views.get_or_create_label", return_value="type-label")
+    @patch("app.views.get_email")
+    def test_assigning_email_preserves_a_valid_pagination_token(
+        self,
+        mock_get_email: Any,
+        mock_get_or_create_label: Any,
+        mock_apply_labels_and_archive: Any,
+    ) -> None:
+        """Keeps the active Gmail page when assigning an email from that page."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        mock_get_email.return_value = {
+            "message_id": "message-with-token",
+            "sender": "recruiter@example.com",
+            "received_at": datetime(2026, 10, 2, 10, 0, tzinfo=UTC),
+        }
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "assign_email",
+                "gmail_message_id": "message-with-token",
+                "application_id": application.pk,
+                "email_type": ApplicationEmail.EmailType.OTHER,
+                "page_token": "valid-next-page-token",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('emails')}?page_token=valid-next-page-token",
+        )
+        mock_get_or_create_label.assert_called_once_with("Career/Types/Other")
+        mock_apply_labels_and_archive.assert_called_once_with(
+            "message-with-token",
+            ["type-label"],
+        )
+
+    @patch("app.views.apply_labels_and_archive")
+    @patch("app.views.get_or_create_label", return_value="type-label")
+    @patch("app.views.get_email")
+    def test_assigning_email_discards_literal_none_pagination_token(
+        self,
+        mock_get_email: Any,
+        mock_get_or_create_label: Any,
+        mock_apply_labels_and_archive: Any,
+    ) -> None:
+        """Prevents a template placeholder from becoming a Gmail page token."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        mock_get_email.return_value = {
+            "message_id": "message-without-token",
+            "sender": "recruiter@example.com",
+            "received_at": datetime(2026, 10, 2, 10, 0, tzinfo=UTC),
+        }
+
+        response = self.client.post(
+            reverse("emails"),
+            {
+                "action": "assign_email",
+                "gmail_message_id": "message-without-token",
+                "application_id": application.pk,
+                "email_type": ApplicationEmail.EmailType.OTHER,
+                "page_token": "None",
+            },
+        )
+
+        self.assertRedirects(response, reverse("emails"))
+        self.assertNotIn("token=None", response["Location"])
+        mock_get_or_create_label.assert_called_once_with("Career/Types/Other")
+        mock_apply_labels_and_archive.assert_called_once_with(
+            "message-without-token",
+            ["type-label"],
         )
 
     @patch("app.views.apply_labels_and_archive", side_effect=GmailError("Gmail unavailable"))
@@ -6554,6 +6957,7 @@ class EmailsPageTests(TestCase):
             sender="new@example.com",
             subject="Newer email",
             body="Newer saved body",
+            html_body="<p>Newer <strong>saved</strong> body</p>",
             received_at=datetime(2026, 10, 2, tzinfo=UTC),
         )
         standalone_email = ApplicationEmail.objects.create(
@@ -6577,6 +6981,15 @@ class EmailsPageTests(TestCase):
         self.assertContains(response, "2 messages")
         self.assertContains(response, "Outgoing")
         self.assertContains(response, "Older saved body")
+        self.assertContains(response, 'id="application-email-modal-html"', html=False)
+        self.assertContains(response, 'data-html-body=""', html=False)
+        self.assertContains(
+            response,
+            'data-html-body="&lt;p&gt;Newer &lt;strong&gt;saved&lt;/strong&gt; body&lt;/p&gt;"',
+            html=False,
+        )
+        self.assertContains(response, "emailModalHtml.srcdoc = button.dataset.htmlBody;", html=False)
+        self.assertContains(response, "emailModalBody.textContent = button.dataset.body", html=False)
         content = response.content.decode()
         self.assertLess(content.index("Older email"), content.index("Newer email"))
         self.assertLess(content.index("Standalone email"), content.index("Older email"))
@@ -6614,6 +7027,42 @@ class EmailsPageTests(TestCase):
         self.assertRedirects(response, details_url)
         application_email.refresh_from_db()
         self.assertEqual(application_email.email_type, ApplicationEmail.EmailType.INTERVIEW)
+
+    @patch("app.views.refresh_application_email_html")
+    def test_application_details_refreshes_only_saved_email_html(
+        self,
+        mock_refresh_application_email_html: Any,
+    ) -> None:
+        """Refreshes HTML without changing the email's application metadata."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        application_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-1",
+            email_type=ApplicationEmail.EmailType.INTERVIEW,
+            sender="recruiter@example.com",
+            subject="Interview request",
+            body="Plain-text fallback",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        mock_refresh_application_email_html.return_value = True
+        details_url = f"{reverse('application_details')}?application_id={application.pk}"
+
+        response = self.client.post(
+            details_url,
+            {
+                "refresh_application_email_html": "1",
+                "application_email_id": application_email.pk,
+            },
+        )
+
+        self.assertRedirects(response, details_url)
+        mock_refresh_application_email_html.assert_called_once_with(application_email)
+        application_email.refresh_from_db()
+        self.assertEqual(application_email.application_id, application.pk)
+        self.assertEqual(application_email.email_type, ApplicationEmail.EmailType.INTERVIEW)
+        self.assertEqual(application_email.body, "Plain-text fallback")
 
 
 class InterviewPracticeTests(TestCase):
@@ -7084,18 +7533,38 @@ class JobSearchPageTests(TestCase):
         pending_path = SearchPath.objects.create(
             platform=Platform.objects.create(name="Pending Platform")
         )
+        job_posting = JobPosting.objects.create(
+            title="Pending Role",
+            company_name="Pending Company",
+            description="Pending posting description.",
+        )
         pending_observation = SearchObservation.objects.create(
             search_path=pending_path,
+            job_posting=job_posting,
             complete=False,
         )
 
         response = self.client.get(reverse("job_search"))
 
         self.assertContains(response, "Pending Search Observations")
-        self.assertContains(response, "Add Posting")
+        self.assertContains(
+            response,
+            f'data-target="edit-job-posting-modal-{pending_observation.pk}"',
+            html=False,
+        )
         self.assertContains(
             response,
             f'name="complete_search_observation" value="{pending_observation.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'data-observation-id="{pending_observation.pk}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            "aria-controls=\"job-posting-description-preview\"\n                                    checked",
             html=False,
         )
         self.assertEqual(
@@ -7338,6 +7807,35 @@ class JobSearchPageTests(TestCase):
         self.assertRedirects(response, f"{reverse('job_search')}?page=1")
         pending_observation.refresh_from_db()
         self.assertTrue(pending_observation.complete)
+
+    def test_job_search_completion_creates_application_for_apply_to_posting(self) -> None:
+        """Creates an application when a completed posting is marked to apply to."""
+        pending_path = SearchPath.objects.create(
+            platform=Platform.objects.create(name="Pending Platform")
+        )
+        job_posting = JobPosting.objects.create(
+            title="Application Role",
+            company_name="Example Company",
+            apply_to=True,
+        )
+        pending_observation = SearchObservation.objects.create(
+            search_path=pending_path,
+            job_posting=job_posting,
+            complete=False,
+        )
+
+        response = self.client.post(
+            reverse("job_search"),
+            {
+                "page": "1",
+                "complete_search_observation": pending_observation.pk,
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('job_search')}?page=1")
+        pending_observation.refresh_from_db()
+        self.assertTrue(pending_observation.complete)
+        self.assertTrue(Application.objects.filter(job_posting=job_posting).exists())
 
     def test_job_search_deletes_current_pending_observation(self) -> None:
         """Verifies the expected behavior."""
@@ -7779,10 +8277,11 @@ class RecruiterPageTests(TestCase):
 
         self.assertContains(
             response,
-            "Hello Ada Recruiter! I have a Master's in Data Science, and I am looking "
+            "Hello Ada! I have a Master's in Data Science, and I am looking "
             "for software engineer roles focused in Python and SQL. Are you currently "
             "recruiting for those kind of roles?",
         )
+        self.assertNotContains(response, "Hello Ada Recruiter!")
 
     def test_recruiters_page_creates_company_search_paths(self) -> None:
         """Verifies the expected behavior."""
@@ -8804,8 +9303,13 @@ class GmailServiceTests(TestCase):
                         "body": {"data": "SGVsbG8gZnJvbSBHbWFpbA"},
                     },
                     {
-                        "mimeType": "text/html",
-                        "body": {"data": "PHA-SGVsbG8gZnJvbSBHbWFpbDwvcD4"},
+                        "mimeType": "multipart/related",
+                        "parts": [
+                            {
+                                "mimeType": "text/html",
+                                "body": {"data": "PHA-SGVsbG8gZnJvbSBHbWFpbDwvcD4"},
+                            },
+                        ],
                     },
                     {
                         "mimeType": "text/plain",
@@ -8859,6 +9363,58 @@ class GmailServiceTests(TestCase):
                 "removeLabelIds": ["INBOX"],
             },
         )
+
+
+class ApplicationEmailRefreshServiceTests(TestCase):
+    @patch("app.services.application_emails.get_email")
+    def test_refresh_updates_only_html_body(self, mock_get_email: Any) -> None:
+        """Stores Gmail HTML without changing saved application-email metadata."""
+        application = Application.objects.create(
+            job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+        )
+        application_email = ApplicationEmail.objects.create(
+            application=application,
+            gmail_message_id="message-1",
+            gmail_thread_id="thread-1",
+            email_type=ApplicationEmail.EmailType.INTERVIEW,
+            sender="recruiter@example.com",
+            subject="Interview request",
+            body="Plain-text body",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        mock_get_email.return_value = {"html_body": "<p>Formatted body</p>"}
+
+        refreshed = refresh_application_email_html(application_email)
+
+        self.assertTrue(refreshed)
+        mock_get_email.assert_called_once_with("message-1")
+        application_email.refresh_from_db()
+        self.assertEqual(application_email.html_body, "<p>Formatted body</p>")
+        self.assertEqual(application_email.application_id, application.pk)
+        self.assertEqual(application_email.email_type, ApplicationEmail.EmailType.INTERVIEW)
+        self.assertEqual(application_email.body, "Plain-text body")
+
+    @patch("app.services.application_emails.get_email")
+    def test_refresh_leaves_record_unchanged_without_gmail_html(self, mock_get_email: Any) -> None:
+        """Leaves the existing saved email untouched when Gmail has no HTML part."""
+        application_email = ApplicationEmail.objects.create(
+            application=Application.objects.create(
+                job_posting=JobPosting.objects.create(title="Data Engineer", company_name="Example Co")
+            ),
+            gmail_message_id="message-1",
+            sender="recruiter@example.com",
+            subject="Update",
+            body="Plain-text body",
+            received_at=datetime(2026, 10, 1, tzinfo=UTC),
+        )
+        mock_get_email.return_value = {"html_body": ""}
+
+        refreshed = refresh_application_email_html(application_email)
+
+        self.assertFalse(refreshed)
+        application_email.refresh_from_db()
+        self.assertEqual(application_email.html_body, "")
+        self.assertEqual(application_email.body, "Plain-text body")
 
 
 class SkillPageTests(TestCase):
@@ -10112,7 +10668,6 @@ class FeaturePageTests(TestCase):
                 "save_feature_notes": "1",
             },
         )
-
         self.assertRedirects(
             save_response,
             f"{reverse('features')}?feature_id={feature.pk}",
