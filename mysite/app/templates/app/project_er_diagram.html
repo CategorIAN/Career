@@ -1,6 +1,6 @@
 {% extends "app/base.html" %}
 
-{% block title %}{{ project.title }} E/R Diagram{% endblock %}
+{% block title %}{{ project.title }} {{ diagram_name|default:"E/R Diagram" }}{% endblock %}
 
 {% block content %}
 <style>
@@ -60,9 +60,9 @@
         <button id="er-diagram-reset-zoom" class="copy-button" type="button">Reset zoom</button>
         <output id="er-diagram-zoom-level" class="er-diagram-zoom-level" aria-live="polite">100%</output>
     </div>
-    <div id="er-diagram-scroll" class="er-diagram-scroll" tabindex="0" aria-label="{{ project.title }} entity relationship diagram">
+    <div id="er-diagram-scroll" class="er-diagram-scroll" tabindex="0" aria-label="{{ project.title }} {{ diagram_name|default:"E/R Diagram"|lower }}">
         <div id="er-diagram-canvas" class="er-diagram-canvas">
-            <div id="er-diagram-mermaid" class="mermaid">{{ project.mermaid_er_diagram }}</div>
+            <div id="er-diagram-mermaid" class="mermaid">{{ mermaid_source|default:project.mermaid_er_diagram }}</div>
         </div>
     </div>
 </section>

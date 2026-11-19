@@ -204,6 +204,9 @@
                         {% if project.mermaid_er_diagram %}
                             <a class="copy-button" href="{% url 'project_er_diagram' project.pk %}">E/R Diagram</a>
                         {% endif %}
+                        {% if project.mermaid_site_map %}
+                            <a class="copy-button" href="{% url 'project_site_map' project.pk %}">Site Map</a>
+                        {% endif %}
                         {% if project.start_date or project.end_date %}
                             <p class="project-presentation-dates">
                                 {% if project.start_date %}{{ project.start_date|date:"M Y" }}{% endif %}
@@ -251,6 +254,9 @@
                     </button>
                     {% if project.mermaid_er_diagram %}
                         <a class="copy-button" href="{% url 'project_er_diagram' project.pk %}">E/R Diagram</a>
+                    {% endif %}
+                    {% if project.mermaid_site_map %}
+                        <a class="copy-button" href="{% url 'project_site_map' project.pk %}">Site Map</a>
                     {% endif %}
                     <button type="button" class="copy-button" data-copy-source="project-all-{{ project.id }}">Copy All</button>
                 </div>
@@ -482,6 +488,9 @@
                         <span class="project-order-handle" draggable="true">Drag to reorder</span>
                         {% if project.mermaid_er_diagram %}
                             <a class="copy-button" href="{% url 'project_er_diagram' project.pk %}">E/R Diagram</a>
+                        {% endif %}
+                        {% if project.mermaid_site_map %}
+                            <a class="copy-button" href="{% url 'project_site_map' project.pk %}">Site Map</a>
                         {% endif %}
                         <button type="button" class="copy-button project-edit-toggle" data-target="project-edit-details-{{ project.pk }}">Show</button>
                     </div>

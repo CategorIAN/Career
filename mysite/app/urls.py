@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("", views.home_view, name="home"),
+    path("site-flowchart/", views.site_flowchart_view, name="site_flowchart"),
     path("contact/", views.contact_view, name="contact"),
     path("skills/", views.skill_formset_view, name="skills"),
     path("platforms/", views.platform_formset_view, name="platforms"),
@@ -129,6 +130,11 @@ urlpatterns = [
         "projects/<int:project_id>/er-diagram/",
         views.project_er_diagram_view,
         name="project_er_diagram",
+    ),
+    path(
+        "projects/<int:project_id>/site-map/",
+        views.project_site_map_view,
+        name="project_site_map",
     ),
     path(
         "projects/<int:project_id>/<str:section>/save/",

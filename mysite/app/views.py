@@ -173,6 +173,7 @@ from freelancersdk.resources.projects.helpers import create_get_projects_project
 SEARCH_PAGE_SIZE = 10
 SEARCH_API_RESULT_LIMIT = 50
 GMAIL_INBOX_PAGE_SIZE = 20
+CAREER_PROJECT_GITHUB_URL = "https://github.com/CategorIAN/Career"
 SEARCH_CACHE_TIMEOUT = 60 * 60
 FREELANCER_RATE_LIMIT_MESSAGE = (
     "Freelancer has temporarily rate-limited project searches. Please try again later."
@@ -635,6 +636,11 @@ def home_view(request: Any) -> Any:
         "app/home.html",
         {"professional_summary": professional_summary},
     )
+
+
+def site_flowchart_view(request: Any) -> Any:
+    """Render the map of Career pages and their interactions."""
+    return render(request, "app/site_flowchart.html")
 
 
 def _contact_rate_limit_key(request: Any) -> Any:
@@ -4134,6 +4140,29 @@ def project_er_diagram_view(request: Any, project_id: int) -> Any:
 
     project = get_object_or_404(projects, pk=project_id)
     return render(request, "app/project_er_diagram.html", {"project": project})
+
+
+@xframe_options_sameorigin
+def project_site_map_view(request: Any, project_id: int) -> Any:
+    """Render a project's Mermaid sitemap when it is available."""
+    projects = Project.objects.filter(mermaid_site_map__gt="")
+    if not is_career_administrator(request.user):
+        projects = projects.filter(is_public=True)
+
+    project = get_object_or_404(projects, pk=project_id)
+    if project.github_url.rstrip("/") == CAREER_PROJECT_GITHUB_URL:
+        # The Career project already has a detailed, maintained sitemap template.
+        return render(request, "app/site_flowchart.html")
+
+    return render(
+        request,
+        "app/project_er_diagram.html",
+        {
+            "project": project,
+            "diagram_name": "Site Map",
+            "mermaid_source": project.mermaid_site_map,
+        },
+    )
 
 
 def _project_management_redirect(include_inactive: Any, selected_project_id: Any="") -> Any:

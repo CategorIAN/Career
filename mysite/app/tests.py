@@ -946,6 +946,103 @@ class ProjectDisplayModeTests(TestCase):
         self.assertEqual(private_response.status_code, 404)
         self.assertEqual(missing_response.status_code, 404)
 
+    def test_project_site_map_links_render_each_projects_own_map(self) -> None:
+        """Links each public project to its own public sitemap source."""
+        self.public_project.mermaid_site_map = "flowchart TD\n    CAREER[Career Site]"
+        self.public_project.save(update_fields=["mermaid_site_map"])
+        event_planner_project = Project.objects.create(
+            title="Tabletop Event Planning Application",
+            is_public=True,
+            mermaid_site_map="flowchart TD\n    PLANNER[Event Planner Site]",
+        )
+
+        projects_response = self.client.get(reverse("projects"))
+        career_site_map_url = reverse("project_site_map", args=[self.public_project.pk])
+        event_site_map_url = reverse("project_site_map", args=[event_planner_project.pk])
+        career_response = self.client.get(career_site_map_url)
+        event_response = self.client.get(event_site_map_url)
+
+        self.assertNotEqual(career_site_map_url, event_site_map_url)
+        self.assertContains(projects_response, f'href="{career_site_map_url}"', html=False)
+        self.assertContains(projects_response, f'href="{event_site_map_url}"', html=False)
+        self.assertContains(career_response, "CAREER[Career Site]", html=False)
+        self.assertNotContains(career_response, "PLANNER[Event Planner Site]", html=False)
+        self.assertContains(event_response, "PLANNER[Event Planner Site]", html=False)
+        self.assertNotContains(event_response, "CAREER[Career Site]", html=False)
+
+    def test_project_site_map_returns_404_when_unavailable_to_visitors(self) -> None:
+        """Keeps private and empty project sitemaps unavailable publicly."""
+        self.private_project.mermaid_site_map = "flowchart TD\n    PRIVATE[Private Site]"
+        self.private_project.save(update_fields=["mermaid_site_map"])
+
+        private_response = self.client.get(
+            reverse("project_site_map", args=[self.private_project.pk])
+        )
+        missing_response = self.client.get(
+            reverse("project_site_map", args=[self.public_project.pk])
+        )
+
+        self.assertEqual(private_response.status_code, 404)
+        self.assertEqual(missing_response.status_code, 404)
+
+    def test_career_project_site_map_uses_the_complete_existing_flowchart(self) -> None:
+        """Keeps the Career project on its detailed sitemap rather than a summary."""
+        self.public_project.github_url = "https://github.com/CategorIAN/Career"
+        self.public_project.mermaid_site_map = "flowchart TD\n    SUMMARY[Short summary]"
+        self.public_project.save(update_fields=["github_url", "mermaid_site_map"])
+
+        response = self.client.get(
+            reverse("project_site_map", args=[self.public_project.pk])
+        )
+
+        self.assertContains(response, "Career Site Flowchart")
+        self.assertContains(response, "Public pages and their actual links")
+        self.assertNotContains(response, "SUMMARY[Short summary]", html=False)
+
+    def test_event_planner_site_map_seed_contains_detailed_workflows(self) -> None:
+        """Seeds the Event Planner with its complete navigation and action map."""
+        from importlib import import_module
+        from django.apps import apps as django_apps
+
+        event_planner_project = Project.objects.create(
+            title="Tabletop Event Planning Application",
+            github_url="https://github.com/CategorIAN/Event_Planning",
+            is_public=True,
+        )
+        migration = import_module("app.migrations.0071_expand_event_planner_site_map")
+
+        migration.expand_event_planner_site_map(django_apps, None)
+        event_planner_project.refresh_from_db()
+        response = self.client.get(
+            reverse("project_site_map", args=[event_planner_project.pk])
+        )
+
+        self.assertIn("subgraph EventWorkflow", event_planner_project.mermaid_site_map)
+        self.assertIn("Sync Google Form Responses", event_planner_project.mermaid_site_map)
+        self.assertIn("Request Survey Update", event_planner_project.mermaid_site_map)
+        self.assertContains(response, "subgraph EventWorkflow", html=False)
+
+    def test_optimization_lab_site_map_seed_renders_algorithm_workflows(self) -> None:
+        """Seeds the Optimization Lab with its visualization and API workflows."""
+        from importlib import import_module
+        from django.apps import apps as django_apps
+
+        optimization_lab = Project.objects.create(
+            title="Optimization Lab",
+            github_url="https://github.com/CategorIAN/optimization-lab",
+            is_public=True,
+        )
+        migration = import_module("app.migrations.0072_populate_optimization_lab_site_map")
+
+        migration.populate_optimization_lab_site_map(django_apps, None)
+        optimization_lab.refresh_from_db()
+        response = self.client.get(reverse("project_site_map", args=[optimization_lab.pk]))
+
+        self.assertIn("subgraph SegmentedLeastSquares", optimization_lab.mermaid_site_map)
+        self.assertIn("POST API maximum flow trace", optimization_lab.mermaid_site_map)
+        self.assertIn("Deep Q Learning and Held Karp comparison", optimization_lab.mermaid_site_map)
+        self.assertContains(response, "subgraph TravelingSalesman", html=False)
+
     def test_owner_can_save_project_sections_and_reordered_tasks(self) -> None:
         """Verifies the expected behavior."""
         self.client.force_login(self.administrator)

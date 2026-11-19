@@ -1,0 +1,182 @@
+{% extends "app/base.html" %}
+
+{% block title %}Career Site Flowchart{% endblock %}
+
+{% block content %}
+<style>
+    .site-flowchart-page { max-width: 100%; }
+    .site-flowchart-key, .site-flowchart-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+    .site-flowchart-key span { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .site-flowchart-key i { display: inline-block; width: 1.15rem; height: 0.8rem; border: 1px solid #555; }
+    .page-key { background: #dbeafe; }
+    .action-key { background: #fef3c7; border-radius: 999px; }
+    .modal-key { background: #f3e8ff; border-radius: 0.25rem; }
+    .access-key { background: #fee2e2; transform: rotate(45deg); }
+    .site-flowchart-zoom-level { min-width: 4rem; font-weight: 600; }
+    .site-flowchart-scroll { overflow: auto; max-height: 75vh; padding: 1rem; border: 1px solid #c9c9c9; background: #fff; cursor: grab; }
+    .site-flowchart-scroll.is-panning { cursor: grabbing; user-select: none; }
+    .site-flowchart-canvas { position: relative; min-width: 94rem; }
+    .site-flowchart-canvas svg { display: block; max-width: none; transform-origin: top left; }
+</style>
+
+<section class="utility-page site-flowchart-page">
+    <h1>Career Site Flowchart</h1>
+    <p class="utility-page-intro">Rectangles are pages, rounded shapes are buttons or links, purple boxes are modal states, and diamonds identify access rules. Management routes require the configured Career administrator; the portfolio routes remain public.</p>
+    <div class="site-flowchart-key" aria-label="Flowchart key">
+        <span><i class="page-key"></i>Page</span>
+        <span><i class="action-key"></i>Button or link</span>
+        <span><i class="modal-key"></i>Modal state</span>
+        <span><i class="access-key"></i>Access rule</span>
+    </div>
+    <div class="site-flowchart-controls" role="group" aria-label="Diagram zoom controls">
+        <button id="site-flowchart-zoom-out" class="copy-button" type="button">Zoom out (−)</button>
+        <button id="site-flowchart-zoom-in" class="copy-button" type="button">Zoom in (+)</button>
+        <button id="site-flowchart-reset-zoom" class="copy-button" type="button">Reset zoom</button>
+        <output id="site-flowchart-zoom-level" class="site-flowchart-zoom-level" aria-live="polite">100%</output>
+    </div>
+    <div id="site-flowchart-scroll" class="site-flowchart-scroll" tabindex="0" aria-label="Career website flowchart">
+        <div id="site-flowchart-canvas" class="site-flowchart-canvas">
+            <pre id="site-flowchart-mermaid" class="mermaid">
+flowchart TD
+    Visitor{{Visitor}} --> PublicRoute{Public portfolio route?}
+    PublicRoute -->|Yes| Home[Home]
+    PublicRoute -->|No| Administrator{Configured Career administrator?}
+    Administrator -->|Yes| AdminArea[Administrator area]
+    Administrator -->|No| Forbidden[403 Forbidden]
+
+    subgraph PublicPages[Public pages and their actual links]
+        Home --> HResume([Resume]) --> Resume[Resume]
+        Home --> HExperience([Experience]) --> Experience[Experience]
+        Home --> HProjects([Projects]) --> Projects[Projects]
+        Home --> HEducation([Education]) --> Education[Education]
+        Home --> HContact([Contact]) --> Contact[Contact]
+        Resume --> RExperience([Experience]) --> Experience
+        Resume --> RProjects([Projects]) --> Projects
+        Resume --> REducation([Education]) --> Education
+        Projects --> ProjectER([E/R Diagram]) --> ProjectERPage[Project E/R Diagram]
+    end
+
+    subgraph AdministratorNavigation[Administrator sidebar links]
+        AdminArea --> PortfolioLinks([Portfolio])
+        PortfolioLinks --> Resume
+        PortfolioLinks --> Experience
+        PortfolioLinks --> Residencies[Residencies]
+        PortfolioLinks --> Projects
+        PortfolioLinks --> Education
+        PortfolioLinks --> Contact
+        AdminArea --> ManagementLinks([Management])
+        ManagementLinks --> Features[Features]
+        ManagementLinks --> Platforms[Platforms]
+        ManagementLinks --> Companies[Companies]
+        ManagementLinks --> Skills[Skills]
+        ManagementLinks --> SearchTerms[Search Terms]
+        ManagementLinks --> ProjectManagement[Project Management]
+        ManagementLinks --> SiteFlowchart[Site Flowchart]
+        AdminArea --> NetworkingLinks([Networking])
+        NetworkingLinks --> Professionals[Professionals]
+        NetworkingLinks --> Recruiters[Recruiters]
+        NetworkingLinks --> Connections[Connections]
+        NetworkingLinks --> Directions[Directions]
+        NetworkingLinks --> References[References]
+        AdminArea --> WorkLinks([Finding Work])
+        WorkLinks --> JobSearch[Job Search]
+        WorkLinks --> JobPostings[Job Postings]
+        WorkLinks --> JobApplications[Job Applications]
+        WorkLinks --> Emails[Emails]
+        WorkLinks --> FreelancerSearch[Freelancer Search]
+        AdminArea --> AdminLink([Admin]) --> DjangoAdmin[Django Admin]
+    end
+
+    subgraph CrossPageFlows[Cross-page controls]
+        Emails --> EmailOptions([Application options]) --> EmailApplicationOptions[Email application options]
+        EmailApplicationOptions --> CreateApplication([Create or select application]) --> ApplicationDetails[Application Details]
+        JobApplications --> ApplicationLink([Application link]) --> ApplicationDetails
+        ApplicationDetails --> InterviewLink([Start interview practice]) --> InterviewPractice[Interview Practice]
+        InterviewPractice --> Opening([Submit opening]) --> InterviewPractice
+        InterviewPractice --> Message([Send message]) --> InterviewPractice
+        InterviewPractice --> End([End interview]) --> InterviewPractice
+        InterviewPractice --> Retry([Retry feedback]) --> InterviewPractice
+        ApplicationDetails --> GenerateLetter([Generate cover letter]) --> ApplicationDetails
+        ApplicationDetails --> DownloadLetter([Download cover letter]) --> CoverLetter[Cover letter PDF]
+        Connections --> Events([Connection events]) --> ConnectionEvents[Connection Events]
+        Connections --> DirectionsLink([Directions]) --> Directions
+        Connections --> WeeklyTotal([Weekly total]) --> ConnectionWeeklyTotal[Connection weekly total]
+        ConnectionEvents --> EventDirections([Directions]) --> ConnectionDirections[Connection directions]
+        Projects --> DiagramLink([E/R Diagram]) --> ProjectERPage
+    end
+
+    subgraph ModalStates[Buttons that open modal states]
+        DescriptionButton([Description button]) --> DescriptionModal[[Description modal]] --> CloseDescription([Close, Escape, or backdrop])
+        JobPostings --> AddPosting([Add Posting]) --> AddPostingModal[[Add Job Posting modal]] --> JobPostings
+        JobPostings --> PostingCard([Posting card]) --> PostingDetailsModal[[Job Posting details modal]]
+        PostingDetailsModal --> CreateFromPosting([Create application]) --> ApplicationDetails
+        Platforms --> AddPlatform([Add Platform]) --> AddPlatformModal[[Add Platform modal]] --> Platforms
+        Platforms --> EditSearchPath([Edit Job Search Path]) --> SearchPathModal[[Edit Job Search Path modal]] --> Platforms
+        Professionals --> ProfessionalButton([Add, edit, or invite]) --> ProfessionalModal[[Professional modal]] --> Professionals
+        Professionals --> RelatedButton([Add company, referral, referrer, or connection]) --> RelatedModal[[Related-record modal]] --> Professionals
+        Recruiters --> RecruiterButton([Add, edit, or invite]) --> RecruiterModal[[Recruiter modal]] --> Recruiters
+        Companies --> CompanyButton([Add or edit]) --> CompanyModal[[Company modal]] --> Companies
+        Skills --> SkillButton([Add or edit]) --> SkillModal[[Skill modal]] --> Skills
+        SearchTerms --> SearchTermButton([Add or edit]) --> SearchTermModal[[Search Term modal]] --> SearchTerms
+        Features --> FeatureButton([Add or edit]) --> FeatureModal[[Feature modal]] --> Features
+    end
+
+    subgraph SamePageActions[Buttons and forms that return to their page]
+        Contact --> ContactSubmit([Send message]) --> Contact
+        JobSearch --> JobSearchAction([Search, filter, or save]) --> JobSearch
+        FreelancerSearch --> FreelancerAction([Search or save project]) --> FreelancerSearch
+        JobPostings --> PostingAction([Set Apply To]) --> JobPostings
+        ProjectManagement --> SyncToggl([Sync Toggl]) --> ProjectManagement
+        Skills --> SkillForm([Create, edit, or delete]) --> Skills
+        Platforms --> PlatformForm([Create, edit, or delete]) --> Platforms
+        Companies --> CompanyForm([Create, edit, or delete]) --> Companies
+        SearchTerms --> SearchTermForm([Create, edit, or delete]) --> SearchTerms
+        Professionals --> ProfessionalForm([Create, edit, or delete]) --> Professionals
+        Recruiters --> RecruiterForm([Create, edit, or delete]) --> Recruiters
+        Features --> FeatureForm([Create, edit, or delete]) --> Features
+        Directions --> DirectionForm([Create, edit, or delete]) --> Directions
+        ConnectionEvents --> ConnectionForm([Create, edit, or delete]) --> ConnectionEvents
+        Experience --> ExperienceForm([Save role section or tasks]) --> Experience
+        Projects --> ProjectForm([Save order, section, or tasks]) --> Projects
+        Education --> EducationForm([Save education or course section]) --> Education
+    end
+
+    classDef page fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    classDef action fill:#fef3c7,stroke:#a16207,color:#111827
+    classDef modal fill:#f3e8ff,stroke:#7e22ce,color:#111827
+    classDef access fill:#fee2e2,stroke:#b91c1c,color:#111827
+    class Home,Resume,Experience,Residencies,Projects,Education,Contact,ProjectERPage,Features,Platforms,Companies,Skills,SearchTerms,ProjectManagement,SiteFlowchart,Professionals,Recruiters,Connections,Directions,References,JobSearch,JobPostings,JobApplications,Emails,FreelancerSearch,DjangoAdmin,EmailApplicationOptions,ApplicationDetails,InterviewPractice,CoverLetter,ConnectionEvents,ConnectionWeeklyTotal,ConnectionDirections page
+    class HResume,HExperience,HProjects,HEducation,HContact,RExperience,RProjects,REducation,ProjectER,PortfolioLinks,ManagementLinks,NetworkingLinks,WorkLinks,AdminLink,EmailOptions,CreateApplication,ApplicationLink,InterviewLink,Opening,Message,End,Retry,GenerateLetter,DownloadLetter,Events,DirectionsLink,WeeklyTotal,EventDirections,DiagramLink,DescriptionButton,CloseDescription,AddPosting,PostingCard,CreateFromPosting,AddPlatform,EditSearchPath,ProfessionalButton,RelatedButton,RecruiterButton,CompanyButton,SkillButton,SearchTermButton,FeatureButton,ContactSubmit,JobSearchAction,FreelancerAction,PostingAction,SyncToggl,SkillForm,PlatformForm,CompanyForm,SearchTermForm,ProfessionalForm,RecruiterForm,FeatureForm,DirectionForm,ConnectionForm,ExperienceForm,ProjectForm,EducationForm action
+    class DescriptionModal,AddPostingModal,PostingDetailsModal,AddPlatformModal,SearchPathModal,ProfessionalModal,RelatedModal,RecruiterModal,CompanyModal,SkillModal,SearchTermModal,FeatureModal modal
+    class Visitor,PublicRoute,Administrator,Forbidden access
+            </pre>
+        </div>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+    (() => {
+        const minimumZoom = 0.5, maximumZoom = 3, zoomStep = 0.1;
+        const scroll = document.getElementById("site-flowchart-scroll"), canvas = document.getElementById("site-flowchart-canvas"), diagram = document.getElementById("site-flowchart-mermaid");
+        const zoomIn = document.getElementById("site-flowchart-zoom-in"), zoomOut = document.getElementById("site-flowchart-zoom-out"), reset = document.getElementById("site-flowchart-reset-zoom"), level = document.getElementById("site-flowchart-zoom-level");
+        let zoom = 1, baseWidth = 0, baseHeight = 0, pointerId = null, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+        const stopPanning = () => { if (pointerId === null) return; if (scroll.hasPointerCapture(pointerId)) scroll.releasePointerCapture(pointerId); pointerId = null; scroll.classList.remove("is-panning"); };
+        const applyZoom = (next, resetPosition = false) => {
+            const centerX = (scroll.scrollLeft + scroll.clientWidth / 2) / zoom, centerY = (scroll.scrollTop + scroll.clientHeight / 2) / zoom;
+            zoom = Math.min(maximumZoom, Math.max(minimumZoom, next));
+            const svg = diagram.querySelector("svg"); svg.style.transform = `scale(${zoom})`; canvas.style.width = `${baseWidth * zoom}px`; canvas.style.height = `${baseHeight * zoom}px`;
+            level.value = `${Math.round(zoom * 100)}%`; level.textContent = level.value; zoomIn.disabled = zoom >= maximumZoom; zoomOut.disabled = zoom <= minimumZoom;
+            window.requestAnimationFrame(() => { scroll.scrollLeft = resetPosition ? 0 : Math.max(0, centerX * zoom - scroll.clientWidth / 2); scroll.scrollTop = resetPosition ? 0 : Math.max(0, centerY * zoom - scroll.clientHeight / 2); });
+        };
+        mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+        mermaid.run({ nodes: [diagram] }).then(() => {
+            const svg = diagram.querySelector("svg"), box = svg.viewBox.baseVal; baseWidth = box.width || svg.getBoundingClientRect().width; baseHeight = box.height || svg.getBoundingClientRect().height; svg.style.width = `${baseWidth}px`; svg.style.height = `${baseHeight}px`; applyZoom(1, true);
+            zoomIn.addEventListener("click", () => applyZoom(Number((zoom + zoomStep).toFixed(2)))); zoomOut.addEventListener("click", () => applyZoom(Number((zoom - zoomStep).toFixed(2)))); reset.addEventListener("click", () => applyZoom(1, true));
+            scroll.addEventListener("pointerdown", event => { if (event.pointerType !== "mouse" || event.button !== 0) return; event.preventDefault(); pointerId = event.pointerId; startX = event.clientX; startY = event.clientY; startLeft = scroll.scrollLeft; startTop = scroll.scrollTop; scroll.setPointerCapture(pointerId); scroll.classList.add("is-panning"); });
+            scroll.addEventListener("pointermove", event => { if (event.pointerId === pointerId) { scroll.scrollLeft = startLeft - (event.clientX - startX); scroll.scrollTop = startTop - (event.clientY - startY); } });
+            scroll.addEventListener("pointerup", stopPanning); scroll.addEventListener("pointercancel", stopPanning); scroll.addEventListener("lostpointercapture", stopPanning);
+        });
+    })();
+</script>
+{% endblock %}

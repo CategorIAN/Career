@@ -466,6 +466,8 @@ class Project(models.Model):
 
     mermaid_er_diagram = models.TextField(blank=True)
 
+    mermaid_site_map = models.TextField(blank=True)
+
     sort_order = models.PositiveIntegerField(default=0)
 
     allocation_weight = models.PositiveIntegerField(default=1)
